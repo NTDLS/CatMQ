@@ -12,15 +12,6 @@ namespace StressTest
             public string Text { get; set; } = text;
         }
 
-        static readonly string[] _allQueueNames =
-           ["QueueA", "QueueB", "QueueC", "QueueD", "QueueE",
-            "QueueF", "QueueG", "QueueH", "QueueI", "QueueJ",
-            "QueueK", "QueueL", "QueueM", "QueueN", "QueueO",
-            "QueueP", "QueueQ", "QueueR", "QueueS", "QueueT",
-            "QueueU", "QueueV", "QueueW", "QueueX", "QueueY",
-            "QueueZ", "Queue1", "Queue2", "Queue3", "Queue4",
-            "Queue5", "Queue6", "Queue7", "Queue8", "Queue9"];
-
         static void Main()
         {
             Thread.Sleep(5000);
@@ -51,7 +42,7 @@ namespace StressTest
             int numberOfQueuesToCreate = _random.Next(3, 10); //May create less depending on whether we push duplicates to the HashSet.
             for (int i = 0; i < numberOfQueuesToCreate; i++)
             {
-                var queueName = _allQueueNames[_random.Next(0, _allQueueNames.Length - 1)];
+                var queueName = "MQ_" + _random.Next(0, 10);
                 myQueueNames.Add(queueName);
 
                 Console.WriteLine($"Creating queue: '{queueName}'.");
@@ -91,7 +82,7 @@ namespace StressTest
             client.Disconnect();
         }
 
-        private static bool Client_OnReceived(CMqClient client, ICMqMessage message)
+        private static bool Client_OnReceived(CMqClient client, string queueName, ICMqMessage message)
         {
             if (message is MyMessage myMessage)
             {

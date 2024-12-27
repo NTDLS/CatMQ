@@ -19,7 +19,7 @@ namespace NTDLS.CatMQClient
 
         private readonly RmClient _rmClient;
         private bool _explicitDisconnect = false;
-        private CMqClientConfiguration _configuration;
+        private readonly CMqClientConfiguration _configuration;
 
         private string? _lastReconnectHost;
         private int _lastReconnectPort;
@@ -34,7 +34,7 @@ namespace NTDLS.CatMQClient
         /// Delegate used for server-to-client delivery notifications.
         /// </summary>
         /// <returns>Return true to mark the message as consumed by the client.</returns>
-        public delegate bool OnReceivedEvent(CMqClient client, ICMqMessage message);
+        public delegate bool OnReceivedEvent(CMqClient client, string queueName, ICMqMessage message);
 
         /// <summary>
         /// Event used for server-to-client delivery notifications.
@@ -143,8 +143,22 @@ namespace NTDLS.CatMQClient
             }
         }
 
-        internal bool InvokeOnReceived(CMqClient client, ICMqMessage message)
-            => (OnReceived?.Invoke(client, message) == true);
+        internal bool InvokeOnReceived(CMqClient client, string queueName, ICMqMessage message)
+        {
+            bool wasConsumed = false;
+            if (OnReceived != null)
+            {
+                foreach (var handler in OnReceived.GetInvocationList().Cast<OnReceivedEvent>())
+                {
+                    bool isConsumed = handler(client, queueName, message);
+                    if (isConsumed)
+                    {
+                        wasConsumed = true;
+                    }
+                }
+            }
+            return wasConsumed;
+        }
 
         internal void InvokeOnException(CMqClient client, CMqQueueConfiguration? queue, Exception ex)
             => OnException?.Invoke(client, queue, ex);

@@ -62,7 +62,7 @@ namespace NTDLS.CatMQClient.Client.QueryHandlers
                         ?? throw new Exception($"Extraction message can not be null.");
                 }
 
-                bool wasMessageConsumed = mqClient.InvokeOnReceived(mqClient, deserializedMessage);
+                bool wasMessageConsumed = mqClient.InvokeOnReceived(mqClient, param.QueueName, deserializedMessage);
                 return new CMqMessageDeliveryQueryReply(wasMessageConsumed);
             }
             catch (Exception ex)

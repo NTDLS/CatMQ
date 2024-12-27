@@ -29,11 +29,13 @@ namespace TestHarness
             Console.WriteLine("Press [enter] to shutdown.");
             Console.ReadLine();
 
+            client.OnReceived -= Client_OnReceived;
+
             //Cleanup.
             client.Disconnect();
         }
 
-        private static bool Client_OnReceived(CMqClient client, ICMqMessage message)
+        private static bool Client_OnReceived(CMqClient client, string queueName, ICMqMessage message)
         {
             if (message is MyMessage myMessage)
             {

@@ -48,6 +48,11 @@ namespace NTDLS.CatMQServer.Management
         public int CurrentEnqueuedMessageCount { get; internal set; }
 
         /// <summary>
+        /// The number of subscriber for this queue.
+        /// </summary>
+        public int SubscriberCount { get; set; }
+
+        /// <summary>
         /// The current number of messages that are enqueued in this message queue.
         /// </summary>
         public ulong TotalDeliveredMessages { get; internal set; }
@@ -61,5 +66,10 @@ namespace NTDLS.CatMQServer.Management
         /// The total number of messages that have expired in this message queue without being delivered.
         /// </summary>
         public ulong TotalExpiredMessages { get; internal set; }
+
+        /// <summary>
+        /// Whether the queue is persisted or ephemeral.
+        /// </summary>
+        public PMqPersistence Persistence { get; set; } = PMqPersistence.Ephemeral;
     }
 }
