@@ -1,5 +1,7 @@
 # CatMQ
 
+![64](https://github.com/user-attachments/assets/b857b3c0-a3f0-4d49-94c6-cb884ad0400b)
+
 📦 Be sure to check out the NuGet package: https://www.nuget.org/packages/NTDLS.CatMQ
 
 In memory persistent message queue intended for inter-process-communication,
