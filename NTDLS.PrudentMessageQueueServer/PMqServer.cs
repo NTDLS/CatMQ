@@ -1,9 +1,9 @@
 ﻿using Newtonsoft.Json;
 using NTDLS.PrudentMessageQueue.Server;
 using NTDLS.PrudentMessageQueue.Server.QueryHandlers;
-using NTDLS.PrudentMessageQueueLibrary;
-using NTDLS.PrudentMessageQueueLibrary.Payloads.Queries.ServerToClient;
 using NTDLS.PrudentMessageQueueServer.Management;
+using NTDLS.PrudentMessageQueueShared;
+using NTDLS.PrudentMessageQueueShared.Payloads.Queries.ServerToClient;
 using NTDLS.ReliableMessaging;
 using NTDLS.Semaphore;
 using RocksDbSharp;
@@ -35,17 +35,6 @@ namespace NTDLS.PrudentMessageQueueServer
         /// <summary>
         /// Creates a new instance of the queue service.
         /// </summary>
-        public PMqServer()
-        {
-            _configuration = new PMqServerConfiguration();
-            _rmServer = new RmServer();
-            _rmServer.AddHandler(new InternalServerQueryHandlers(this));
-            _rmServer.OnDisconnected += RmServer_OnDisconnected;
-        }
-
-        /// <summary>
-        /// Creates a new instance of the queue service.
-        /// </summary>
         public PMqServer(PMqServerConfiguration configuration)
         {
             _configuration = configuration;
@@ -60,6 +49,17 @@ namespace NTDLS.PrudentMessageQueueServer
             };
 
             _rmServer = new RmServer(rmConfiguration);
+            _rmServer.AddHandler(new InternalServerQueryHandlers(this));
+            _rmServer.OnDisconnected += RmServer_OnDisconnected;
+        }
+
+        /// <summary>
+        /// Creates a new instance of the queue service.
+        /// </summary>
+        public PMqServer()
+        {
+            _configuration = new PMqServerConfiguration();
+            _rmServer = new RmServer();
             _rmServer.AddHandler(new InternalServerQueryHandlers(this));
             _rmServer.OnDisconnected += RmServer_OnDisconnected;
         }
@@ -430,7 +430,7 @@ namespace NTDLS.PrudentMessageQueueServer
         /// </summary>
         internal bool DeliverMessage(Guid connectionId, string queueName, EnqueuedMessage enqueuedMessage)
         {
-            var result = _rmServer.Query(connectionId, new MessageDeliveryQuery(queueName, enqueuedMessage.ObjectType, enqueuedMessage.MessageJson)).Result;
+            var result = _rmServer.Query(connectionId, new PMqMessageDeliveryQuery(queueName, enqueuedMessage.ObjectType, enqueuedMessage.MessageJson)).Result;
             if (string.IsNullOrEmpty(result.ErrorMessage) == false)
             {
                 throw new Exception(result.ErrorMessage);

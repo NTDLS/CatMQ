@@ -1,12 +1,12 @@
 ﻿using Newtonsoft.Json;
-using NTDLS.PrudentMessageQueueLibrary.Payloads.Queries.ServerToClient;
+using NTDLS.PrudentMessageQueueShared.Payloads.Queries.ServerToClient;
 using NTDLS.ReliableMessaging;
 using NTDLS.Semaphore;
 using System.Reflection;
 
 namespace NTDLS.PrudentMessageQueueClient.Client.QueryHandlers
 {
-    internal class InternalClientQueryHandlers(MqClient mqClient)
+    internal class InternalClientQueryHandlers(PMqClient mqClient)
         : IRmMessageHandler
     {
         private static readonly PessimisticCriticalResource<Dictionary<string, MethodInfo>> _reflectionCache = new();
@@ -22,7 +22,7 @@ namespace NTDLS.PrudentMessageQueueClient.Client.QueryHandlers
         public static T? MqDeserializeToObject<T>(string json)
             => JsonConvert.DeserializeObject<T>(json, _typeNameHandlingAll);
 
-        public MessageDeliveryQueryReply MessageDeliveryQuery(RmContext context, MessageDeliveryQuery param)
+        public PMqMessageDeliveryQueryReply MessageDeliveryQuery(RmContext context, PMqMessageDeliveryQuery param)
         {
             try
             {
@@ -63,11 +63,11 @@ namespace NTDLS.PrudentMessageQueueClient.Client.QueryHandlers
                 }
 
                 bool wasMessageConsumed = mqClient.InvokeOnReceived(mqClient, deserializedMessage);
-                return new MessageDeliveryQueryReply(wasMessageConsumed);
+                return new PMqMessageDeliveryQueryReply(wasMessageConsumed);
             }
             catch (Exception ex)
             {
-                return new MessageDeliveryQueryReply(ex.GetBaseException());
+                return new PMqMessageDeliveryQueryReply(ex.GetBaseException());
             }
         }
     }

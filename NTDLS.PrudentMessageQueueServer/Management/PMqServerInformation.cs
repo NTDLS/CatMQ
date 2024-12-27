@@ -18,18 +18,18 @@
         /// The initial size in bytes of the receive buffer.
         /// If the buffer ever gets full while receiving data it will be automatically resized up to MaxReceiveBufferSize.
         /// </summary>
-        public int InitialReceiveBufferSize { get; internal set; } = PrudentMessageQueueLibrary.PrudentMessageQueue.INITIAL_BUFFER_SIZE;
+        public int InitialReceiveBufferSize { get; internal set; } = PrudentMessageQueueShared.PMqDefaults.INITIAL_BUFFER_SIZE;
 
         /// <summary>
         ///The maximum size in bytes of the receive buffer.
         ///If the buffer ever gets full while receiving data it will be automatically resized up to MaxReceiveBufferSize.
         /// </summary>
-        public int MaxReceiveBufferSize { get; internal set; } = PrudentMessageQueueLibrary.PrudentMessageQueue.MAX_BUFFER_SIZE;
+        public int MaxReceiveBufferSize { get; internal set; } = PrudentMessageQueueShared.PMqDefaults.MAX_BUFFER_SIZE;
 
         /// <summary>
         ///The growth rate of the auto-resizing for the receive buffer.
         /// </summary>
-        public double ReceiveBufferGrowthRate { get; internal set; } = PrudentMessageQueueLibrary.PrudentMessageQueue.BUFFER_GROWTH_RATE;
+        public double ReceiveBufferGrowthRate { get; internal set; } = PrudentMessageQueueShared.PMqDefaults.BUFFER_GROWTH_RATE;
 
         /// <summary>
         /// The TCP/IP port that the message queue server is listening on.

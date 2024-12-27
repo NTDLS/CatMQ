@@ -1,5 +1,5 @@
 ﻿using NTDLS.PrudentMessageQueueClient;
-using NTDLS.PrudentMessageQueueLibrary;
+using NTDLS.PrudentMessageQueueShared;
 
 namespace TestHarness
 {
@@ -12,8 +12,7 @@ namespace TestHarness
 
         static void Main()
         {
-
-            var client = new MqClient();
+            var client = new PMqClient();
             client.Connect("127.0.0.1", 45784);
             client.CreateQueue(new PMqQueueConfiguration("MyFirstQueue")
             {
@@ -34,7 +33,7 @@ namespace TestHarness
             client.Disconnect();
         }
 
-        private static bool Client_OnReceived(MqClient client, IPMqMessage message)
+        private static bool Client_OnReceived(PMqClient client, IPMqMessage message)
         {
             if (message is MyMessage myMessage)
             {

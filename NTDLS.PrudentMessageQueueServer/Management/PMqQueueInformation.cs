@@ -1,4 +1,4 @@
-﻿using NTDLS.PrudentMessageQueueLibrary;
+﻿using NTDLS.PrudentMessageQueueShared;
 
 namespace NTDLS.PrudentMessageQueueServer.Management
 {

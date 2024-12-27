@@ -43,9 +43,9 @@ NTDLS.PrudentMessageQueueClient/bin/
 
 NTDLS.PrudentMessageQueueClient/obj/
 
-NTDLS.PrudentMessageQueueLibrary/bin/
+NTDLS.PrudentMessageQueueShared/bin/
 
-NTDLS.PrudentMessageQueueLibrary/obj/
+NTDLS.PrudentMessageQueueShared/obj/
 
 PrudentMessageQueueService/bin/
 

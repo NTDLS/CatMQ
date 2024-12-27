@@ -1,7 +1,7 @@
 ﻿using NTDLS.Helpers;
-using NTDLS.PrudentMessageQueueLibrary;
 using NTDLS.PrudentMessageQueueServer;
 using NTDLS.PrudentMessageQueueServer.Management;
+using NTDLS.PrudentMessageQueueShared;
 using NTDLS.Semaphore;
 
 namespace NTDLS.PrudentMessageQueue.Server

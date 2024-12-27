@@ -1,9 +1,9 @@
 ﻿using NTDLS.ReliableMessaging;
 
-namespace NTDLS.PrudentMessageQueueLibrary.Payloads.Queries.ServerToClient
+namespace NTDLS.PrudentMessageQueueShared.Payloads.Queries.ServerToClient
 {
-    public class MessageDeliveryQuery(string queueName, string objectType, string messageJson)
-    : IRmQuery<MessageDeliveryQueryReply>
+    public class PMqMessageDeliveryQuery(string queueName, string objectType, string messageJson)
+    : IRmQuery<PMqMessageDeliveryQueryReply>
     {
         /// <summary>
         /// The name of the queue from which this message is being delivered.
@@ -16,7 +16,7 @@ namespace NTDLS.PrudentMessageQueueLibrary.Payloads.Queries.ServerToClient
         public string MessageJson { get; set; } = messageJson;
     }
 
-    public class MessageDeliveryQueryReply
+    public class PMqMessageDeliveryQueryReply
         : IRmQueryReply
     {
         /// <summary>
@@ -27,18 +27,18 @@ namespace NTDLS.PrudentMessageQueueLibrary.Payloads.Queries.ServerToClient
         public bool WasMessageConsumed { get; set; }
         public string? ErrorMessage { get; set; }
 
-        public MessageDeliveryQueryReply(Exception exception)
+        public PMqMessageDeliveryQueryReply(Exception exception)
         {
             WasMessageConsumed = false;
             ErrorMessage = exception.Message;
         }
 
-        public MessageDeliveryQueryReply(bool wasMessageConsumed)
+        public PMqMessageDeliveryQueryReply(bool wasMessageConsumed)
         {
             WasMessageConsumed = wasMessageConsumed;
         }
 
-        public MessageDeliveryQueryReply()
+        public PMqMessageDeliveryQueryReply()
         {
         }
     }

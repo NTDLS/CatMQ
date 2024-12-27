@@ -1,4 +1,4 @@
-﻿namespace NTDLS.PrudentMessageQueueLibrary
+﻿namespace NTDLS.PrudentMessageQueueShared
 {
     /// <summary>
     /// Determines when to remove messages from the queue as they are distributed to subscribers.

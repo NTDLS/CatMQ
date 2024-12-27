@@ -1,31 +1,31 @@
 ﻿using NTDLS.ReliableMessaging;
 
-namespace NTDLS.PrudentMessageQueueLibrary.Payloads.Queries.ClientToServer
+namespace NTDLS.PrudentMessageQueueShared.Payloads.Queries.ClientToServer
 {
-    public class UnsubscribeFromQueueQuery(string queueName)
-        : IRmQuery<UnsubscribeFromQueueQueryReply>
+    public class PMqDeleteQueueQuery(string queueName)
+        : IRmQuery<PMqDeleteQueueQueryReply>
     {
         public string QueueName { get; set; } = queueName;
     }
 
-    public class UnsubscribeFromQueueQueryReply
+    public class PMqDeleteQueueQueryReply
         : IRmQueryReply
     {
         public bool IsSuccess { get; set; }
         public string? ErrorMessage { get; set; }
 
-        public UnsubscribeFromQueueQueryReply(Exception exception)
+        public PMqDeleteQueueQueryReply(Exception exception)
         {
             IsSuccess = false;
             ErrorMessage = exception.Message;
         }
 
-        public UnsubscribeFromQueueQueryReply(bool isSuccess)
+        public PMqDeleteQueueQueryReply(bool isSuccess)
         {
             IsSuccess = isSuccess;
         }
 
-        public UnsubscribeFromQueueQueryReply()
+        public PMqDeleteQueueQueryReply()
         {
         }
     }

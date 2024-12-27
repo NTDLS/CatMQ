@@ -1,5 +1,5 @@
-﻿using NTDLS.PrudentMessageQueueLibrary;
-using NTDLS.PrudentMessageQueueServer;
+﻿using NTDLS.PrudentMessageQueueServer;
+using NTDLS.PrudentMessageQueueShared;
 using Serilog;
 using Topshelf.ServiceConfigurators;
 

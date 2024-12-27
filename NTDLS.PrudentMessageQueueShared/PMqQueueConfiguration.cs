@@ -1,4 +1,4 @@
-﻿namespace NTDLS.PrudentMessageQueueLibrary
+﻿namespace NTDLS.PrudentMessageQueueShared
 {
     /// <summary>
     /// Defines a queue configuration.

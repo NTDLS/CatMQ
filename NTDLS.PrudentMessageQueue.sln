@@ -13,7 +13,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NTDLS.PrudentMessageQueueCl
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NTDLS.PrudentMessageQueueServer", "NTDLS.PrudentMessageQueueServer\NTDLS.PrudentMessageQueueServer.csproj", "{4F686185-AFA3-4786-AB7D-138F7EF5DC61}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NTDLS.PrudentMessageQueueLibrary", "NTDLS.PrudentMessageQueueLibrary\NTDLS.PrudentMessageQueueLibrary.csproj", "{D8413625-472E-4D35-9700-4AD10B372F80}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NTDLS.PrudentMessageQueueShared", "NTDLS.PrudentMessageQueueShared\NTDLS.PrudentMessageQueueShared.csproj", "{D8413625-472E-4D35-9700-4AD10B372F80}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PrudentMessageQueueService", "PrudentMessageQueueService\PrudentMessageQueueService.csproj", "{47C0EE83-853C-43C9-BF7D-E3DF361EEB34}"
 EndProject

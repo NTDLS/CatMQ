@@ -3,7 +3,7 @@
     /// <summary>
     /// Queue client configuration parameters.
     /// </summary>
-    public class MqClientConfiguration
+    public class PMqClientConfiguration
     {
         /// <summary>
         /// Whether or not the client should attempt to reconnect when unexpectedly disconnected.
@@ -23,17 +23,17 @@
         /// The initial size in bytes of the receive buffer.
         /// If the buffer ever gets full while receiving data it will be automatically resized up to MaxReceiveBufferSize.
         /// </summary>
-        public int InitialReceiveBufferSize { get; set; } = PrudentMessageQueueLibrary.PrudentMessageQueue.INITIAL_BUFFER_SIZE;
+        public int InitialReceiveBufferSize { get; set; } = PrudentMessageQueueShared.PMqDefaults.INITIAL_BUFFER_SIZE;
 
         /// <summary>
         ///The maximum size in bytes of the receive buffer.
         ///If the buffer ever gets full while receiving data it will be automatically resized up to MaxReceiveBufferSize.
         /// </summary>
-        public int MaxReceiveBufferSize { get; set; } = PrudentMessageQueueLibrary.PrudentMessageQueue.MAX_BUFFER_SIZE;
+        public int MaxReceiveBufferSize { get; set; } = PrudentMessageQueueShared.PMqDefaults.MAX_BUFFER_SIZE;
 
         /// <summary>
         ///The growth rate of the auto-resizing for the receive buffer.
         /// </summary>
-        public double ReceiveBufferGrowthRate { get; set; } = PrudentMessageQueueLibrary.PrudentMessageQueue.BUFFER_GROWTH_RATE;
+        public double ReceiveBufferGrowthRate { get; set; } = PrudentMessageQueueShared.PMqDefaults.BUFFER_GROWTH_RATE;
     }
 }

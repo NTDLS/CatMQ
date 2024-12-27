@@ -1,5 +1,5 @@
 ﻿using NTDLS.PrudentMessageQueueClient;
-using NTDLS.PrudentMessageQueueLibrary;
+using NTDLS.PrudentMessageQueueShared;
 
 namespace QueueClient
 {
@@ -23,7 +23,7 @@ namespace QueueClient
         {
             var random = new Random();
 
-            var client = new MqClient();
+            var client = new PMqClient();
             client.Connect("127.0.0.1", 45784);
 
             var myQueueNames = new HashSet<string>();
@@ -73,7 +73,7 @@ namespace QueueClient
             client.Disconnect();
         }
 
-        private static bool Client_OnReceived(MqClient client, IPMqMessage message)
+        private static bool Client_OnReceived(PMqClient client, IPMqMessage message)
         {
             if (message is MyMessage myMessage)
             {

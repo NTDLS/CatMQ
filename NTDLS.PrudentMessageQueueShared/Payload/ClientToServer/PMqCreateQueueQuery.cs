@@ -1,31 +1,31 @@
 ﻿using NTDLS.ReliableMessaging;
 
-namespace NTDLS.PrudentMessageQueueLibrary.Payloads.Queries.ClientToServer
+namespace NTDLS.PrudentMessageQueueShared.Payloads.Queries.ClientToServer
 {
-    public class CreateQueueQuery(PMqQueueConfiguration queueConfiguration)
-        : IRmQuery<CreateQueueQueryReply>
+    public class PMqCreateQueueQuery(PMqQueueConfiguration queueConfiguration)
+        : IRmQuery<PMqCreateQueueQueryReply>
     {
         public PMqQueueConfiguration QueueConfiguration { get; set; } = queueConfiguration;
     }
 
-    public class CreateQueueQueryReply
+    public class PMqCreateQueueQueryReply
         : IRmQueryReply
     {
         public bool IsSuccess { get; set; }
         public string? ErrorMessage { get; set; }
 
-        public CreateQueueQueryReply(Exception exception)
+        public PMqCreateQueueQueryReply(Exception exception)
         {
             IsSuccess = false;
             ErrorMessage = exception.Message;
         }
 
-        public CreateQueueQueryReply(bool isSuccess)
+        public PMqCreateQueueQueryReply(bool isSuccess)
         {
             IsSuccess = isSuccess;
         }
 
-        public CreateQueueQueryReply()
+        public PMqCreateQueueQueryReply()
         {
         }
     }

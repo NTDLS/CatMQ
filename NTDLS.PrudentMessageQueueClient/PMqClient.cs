@@ -1,7 +1,7 @@
 ﻿using Newtonsoft.Json;
 using NTDLS.PrudentMessageQueueClient.Client.QueryHandlers;
-using NTDLS.PrudentMessageQueueLibrary;
-using NTDLS.PrudentMessageQueueLibrary.Payloads.Queries.ClientToServer;
+using NTDLS.PrudentMessageQueueShared;
+using NTDLS.PrudentMessageQueueShared.Payloads.Queries.ClientToServer;
 using NTDLS.ReliableMessaging;
 using System.Net;
 
@@ -10,7 +10,7 @@ namespace NTDLS.PrudentMessageQueueClient
     /// <summary>
     /// Connects to a MessageServer then sends/received and processes notifications/queries.
     /// </summary>
-    public class MqClient
+    public class PMqClient
     {
         private static readonly JsonSerializerSettings _typeNameHandlingAll = new()
         {
@@ -20,7 +20,7 @@ namespace NTDLS.PrudentMessageQueueClient
 
         private readonly RmClient _rmClient;
         private bool _explicitDisconnect = false;
-        private MqClientConfiguration _configuration;
+        private PMqClientConfiguration _configuration;
 
         private string? _lastReconnectHost;
         private int _lastReconnectPort;
@@ -30,7 +30,7 @@ namespace NTDLS.PrudentMessageQueueClient
         /// Delegate used for server-to-client delivery notifications.
         /// </summary>
         /// <returns>Return true to mark the message as consumed by the client.</returns>
-        public delegate bool OnReceivedEvent(MqClient client, IPMqMessage message);
+        public delegate bool OnReceivedEvent(PMqClient client, IPMqMessage message);
 
         /// <summary>
         /// Event used for server-to-client delivery notifications.
@@ -41,7 +41,7 @@ namespace NTDLS.PrudentMessageQueueClient
         /// <summary>
         /// Delegate used client connectivity notifications.
         /// </summary>
-        public delegate void OnConnectedEvent(MqClient client);
+        public delegate void OnConnectedEvent(PMqClient client);
 
         /// <summary>
         /// Event used client connectivity notifications.
@@ -56,7 +56,7 @@ namespace NTDLS.PrudentMessageQueueClient
         /// <summary>
         /// Delegate used to notify of queue client exceptions.
         /// </summary>
-        public delegate void OnExceptionEvent(MqClient client, PMqQueueConfiguration? queue, Exception ex);
+        public delegate void OnExceptionEvent(PMqClient client, PMqQueueConfiguration? queue, Exception ex);
 
         /// <summary>
         /// Event used to notify of queue client exceptions.
@@ -64,23 +64,9 @@ namespace NTDLS.PrudentMessageQueueClient
         public event OnExceptionEvent? OnException;
 
         /// <summary>
-        /// Creates a new instance of the queue client.
-        /// </summary>
-        public MqClient()
-        {
-            _configuration = new MqClientConfiguration();
-            _rmClient = new RmClient();
-
-            _rmClient.OnConnected += RmClient_OnConnected;
-            _rmClient.OnDisconnected += RmClient_OnDisconnected;
-
-            _rmClient.AddHandler(new InternalClientQueryHandlers(this));
-        }
-
-        /// <summary>
         /// Creates a new instance of the queue service.
         /// </summary>
-        public MqClient(MqClientConfiguration configuration)
+        public PMqClient(PMqClientConfiguration configuration)
         {
             _configuration = configuration;
 
@@ -96,6 +82,21 @@ namespace NTDLS.PrudentMessageQueueClient
             _rmClient = new RmClient(rmConfiguration);
             _rmClient.AddHandler(new InternalClientQueryHandlers(this));
         }
+
+        /// <summary>
+        /// Creates a new instance of the queue client.
+        /// </summary>
+        public PMqClient()
+        {
+            _configuration = new PMqClientConfiguration();
+            _rmClient = new RmClient();
+
+            _rmClient.OnConnected += RmClient_OnConnected;
+            _rmClient.OnDisconnected += RmClient_OnDisconnected;
+
+            _rmClient.AddHandler(new InternalClientQueryHandlers(this));
+        }
+
 
         private void RmClient_OnConnected(RmContext context)
         {
@@ -139,10 +140,10 @@ namespace NTDLS.PrudentMessageQueueClient
             }
         }
 
-        internal bool InvokeOnReceived(MqClient client, IPMqMessage message)
+        internal bool InvokeOnReceived(PMqClient client, IPMqMessage message)
             => (OnReceived?.Invoke(client, message) == true);
 
-        internal void InvokeOnException(MqClient client, PMqQueueConfiguration? queue, Exception ex)
+        internal void InvokeOnException(PMqClient client, PMqQueueConfiguration? queue, Exception ex)
             => OnException?.Invoke(client, queue, ex);
 
         /// <summary>
@@ -187,7 +188,7 @@ namespace NTDLS.PrudentMessageQueueClient
         /// </summary>
         public void CreateQueue(string queueName)
         {
-            var result = _rmClient.Query(new CreateQueueQuery(new PMqQueueConfiguration(queueName))).Result;
+            var result = _rmClient.Query(new PMqCreateQueueQuery(new PMqQueueConfiguration(queueName))).Result;
             if (result.IsSuccess == false)
             {
                 throw new Exception(result.ErrorMessage);
@@ -199,7 +200,7 @@ namespace NTDLS.PrudentMessageQueueClient
         /// </summary>
         public void CreateQueue(PMqQueueConfiguration queueConfiguration)
         {
-            var result = _rmClient.Query(new CreateQueueQuery(queueConfiguration)).Result;
+            var result = _rmClient.Query(new PMqCreateQueueQuery(queueConfiguration)).Result;
             if (result.IsSuccess == false)
             {
                 throw new Exception(result.ErrorMessage);
@@ -211,7 +212,7 @@ namespace NTDLS.PrudentMessageQueueClient
         /// </summary>
         public void DeleteQueue(string queueName)
         {
-            var result = _rmClient.Query(new DeleteQueueQuery(queueName)).Result;
+            var result = _rmClient.Query(new PMqDeleteQueueQuery(queueName)).Result;
             if (result.IsSuccess == false)
             {
                 throw new Exception(result.ErrorMessage);
@@ -223,7 +224,7 @@ namespace NTDLS.PrudentMessageQueueClient
         /// </summary>
         public void PurgeQueue(string queueName)
         {
-            var result = _rmClient.Query(new PurgeQueueQuery(queueName)).Result;
+            var result = _rmClient.Query(new PMqPurgeQueueQuery(queueName)).Result;
             if (result.IsSuccess == false)
             {
                 throw new Exception(result.ErrorMessage);
@@ -235,7 +236,7 @@ namespace NTDLS.PrudentMessageQueueClient
         /// </summary>
         public void Subscribe(string queueName)
         {
-            var result = _rmClient.Query(new SubscribeToQueueQuery(queueName)).Result;
+            var result = _rmClient.Query(new PMqSubscribeToQueueQuery(queueName)).Result;
             if (result.IsSuccess == false)
             {
                 throw new Exception(result.ErrorMessage);
@@ -247,7 +248,7 @@ namespace NTDLS.PrudentMessageQueueClient
         /// </summary>
         public void Unsubscribe(string queueName)
         {
-            var result = _rmClient.Query(new UnsubscribeFromQueueQuery(queueName)).Result;
+            var result = _rmClient.Query(new PMqUnsubscribeFromQueueQuery(queueName)).Result;
             if (result.IsSuccess == false)
             {
                 throw new Exception(result.ErrorMessage);
@@ -263,7 +264,7 @@ namespace NTDLS.PrudentMessageQueueClient
             var messageJson = JsonConvert.SerializeObject(message, _typeNameHandlingAll);
             var objectType = message.GetType()?.AssemblyQualifiedName ?? string.Empty;
 
-            var result = _rmClient.Query(new EnqueueMessageToQueue(queueName, objectType, messageJson)).Result;
+            var result = _rmClient.Query(new PMqEnqueueMessageToQueue(queueName, objectType, messageJson)).Result;
             if (result.IsSuccess == false)
             {
                 throw new Exception(result.ErrorMessage);

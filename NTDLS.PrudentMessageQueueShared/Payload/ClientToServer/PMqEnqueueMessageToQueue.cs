@@ -1,9 +1,9 @@
 ﻿using NTDLS.ReliableMessaging;
 
-namespace NTDLS.PrudentMessageQueueLibrary.Payloads.Queries.ClientToServer
+namespace NTDLS.PrudentMessageQueueShared.Payloads.Queries.ClientToServer
 {
-    public class EnqueueMessageToQueue(string queueName, string objectType, string messageJson)
-        : IRmQuery<EnqueueMessageToQueueReply>
+    public class PMqEnqueueMessageToQueue(string queueName, string objectType, string messageJson)
+        : IRmQuery<PMqEnqueueMessageToQueueReply>
     {
         public string QueueName { get; set; } = queueName;
         /// <summary>
@@ -13,24 +13,24 @@ namespace NTDLS.PrudentMessageQueueLibrary.Payloads.Queries.ClientToServer
         public string MessageJson { get; set; } = messageJson;
     }
 
-    public class EnqueueMessageToQueueReply
+    public class PMqEnqueueMessageToQueueReply
         : IRmQueryReply
     {
         public bool IsSuccess { get; set; }
         public string? ErrorMessage { get; set; }
 
-        public EnqueueMessageToQueueReply(Exception exception)
+        public PMqEnqueueMessageToQueueReply(Exception exception)
         {
             IsSuccess = false;
             ErrorMessage = exception.Message;
         }
 
-        public EnqueueMessageToQueueReply(bool isSuccess)
+        public PMqEnqueueMessageToQueueReply(bool isSuccess)
         {
             IsSuccess = isSuccess;
         }
 
-        public EnqueueMessageToQueueReply()
+        public PMqEnqueueMessageToQueueReply()
         {
         }
     }

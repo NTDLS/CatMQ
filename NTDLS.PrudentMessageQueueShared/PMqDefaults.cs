@@ -1,6 +1,6 @@
-﻿namespace NTDLS.PrudentMessageQueueLibrary
+﻿namespace NTDLS.PrudentMessageQueueShared
 {
-    public static class PrudentMessageQueue
+    public static class PMqDefaults
     {
         /// <summary>
         /// The initial size in bytes of the buffer. If the buffer ever gets full while receiving data it will be automatically resized up to MaxBufferSize.
