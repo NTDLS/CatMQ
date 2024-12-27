@@ -5,7 +5,7 @@ using NTDLS.PrudentMessageQueueServer.Management;
 
 namespace PrudentMessageQueueService.Pages
 {
-    public class MessagesModel(ILogger<IndexModel> logger, PMqServer mqServer) : PageModel
+    public class MessagesModel(ILogger<MessagesModel> logger, PMqServer mqServer) : PageModel
     {
         const int PageSize = 20;
 
@@ -15,7 +15,7 @@ namespace PrudentMessageQueueService.Pages
         public int PageNumber { get; set; } = 0;
         public string? ErrorMessage { get; set; }
 
-        private readonly ILogger<IndexModel> _logger = logger;
+        private readonly ILogger<MessagesModel> _logger = logger;
         public List<PMqEnqueuedMessageInformation> Messages { get; set; } = new();
 
         public void OnGet()

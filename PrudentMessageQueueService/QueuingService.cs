@@ -7,15 +7,10 @@ namespace PrudentMessageQueueService
 {
     public class QueuingService
     {
-        private readonly PMqServer _mqServer = new();
+        private PMqServer? _mqServer;
 
         public QueuingService(ServiceConfigurator<QueuingService> s)
         {
-            _mqServer = new PMqServer(new PMqServerConfiguration
-            {
-                PersistencePath = "C:\\DropZone\\MqServer"
-            });
-            _mqServer.OnException += MqServer_OnException;
         }
 
         public void Start()
@@ -23,12 +18,23 @@ namespace PrudentMessageQueueService
             var builder = WebApplication.CreateBuilder();
             var configuration = builder.Configuration;
 
-            int portNumber = configuration.GetValue<int>("MqServer:Port");
+            builder.Services.AddAuthentication("CookieAuth")
+                .AddCookie("CookieAuth", options =>
+                {
+                    options.LoginPath = "/Login";
+                });
 
-            Log.Verbose("Starting message queue service.");
+            _mqServer = new PMqServer(new PMqServerConfiguration
+            {
+                PersistencePath = configuration.GetValue<string>("MqServer:DataPath")
+            });
+            _mqServer.OnException += MqServer_OnException;
+
+
+            int portNumber = configuration.GetValue<int>("MqServer:Port");
+            Log.Verbose($"Starting message queue service on port: {portNumber}.");
             _mqServer.Start(portNumber);
             Log.Verbose("Message queue service started.");
-
 
             builder.Services.AddSingleton<PMqServer>(_mqServer);
 
@@ -49,6 +55,7 @@ namespace PrudentMessageQueueService
 
             app.UseRouting();
 
+            app.UseAuthentication();
             app.UseAuthorization();
 
             app.MapStaticAssets();
@@ -61,9 +68,12 @@ namespace PrudentMessageQueueService
 
         public void Stop()
         {
-            Log.Verbose("Stopping message queue service.");
-            _mqServer.Stop();
-            Log.Verbose("Message queue service stopped.");
+            if (_mqServer != null)
+            {
+                Log.Verbose("Stopping message queue service.");
+                _mqServer.Stop();
+                Log.Verbose("Message queue service stopped.");
+            }
         }
 
         private void MqServer_OnException(PMqServer server, PMqQueueConfiguration? queue, Exception ex)

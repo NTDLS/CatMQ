@@ -1,9 +1,12 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using NTDLS.PrudentMessageQueueServer;
 using NTDLS.PrudentMessageQueueServer.Management;
 
 namespace PrudentMessageQueueService.Pages
 {
+    [Authorize]
+
     public class IndexModel(ILogger<IndexModel> logger, PMqServer mqServer) : PageModel
     {
         private readonly ILogger<IndexModel> _logger = logger;
