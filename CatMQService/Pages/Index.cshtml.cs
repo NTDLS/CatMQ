@@ -19,13 +19,7 @@ namespace CatMQService.Pages
             try
             {
                 ServerConfig = mqServer.GetConfiguration();
-
-                var queues = mqServer.GetQueues();
-
-                foreach (var queue in queues)
-                {
-                    Queues.Add(queue);
-                }
+                Queues = mqServer.GetQueues().OrderBy(o => o.QueueName).ToList();
             }
             catch (Exception ex)
             {

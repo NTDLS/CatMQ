@@ -66,7 +66,7 @@ namespace NTDLS.CatMQ.Server
                     EnqueuedMessage? topMessage = null;
                     List<CMqSubscriberInformation>? yetToBeDeliveredSubscribers = null;
 
-                    #region Get message and its subscribers.
+                    #region Get top message and its subscribers.
 
                     messageQueue.EnqueuedMessages.TryUseAll([messageQueue.Subscribers], m =>
                     {
@@ -144,22 +144,6 @@ namespace NTDLS.CatMQ.Server
                                 messageQueue.TotalDeliveredMessages++;
                                 subscriber.SuccessfulMessagesDeliveries++;
 
-                                if (messageQueue.QueueConfiguration.DeliveryThrottle > TimeSpan.Zero)
-                                {
-                                    if (messageQueue.QueueConfiguration.DeliveryThrottle.TotalSeconds >= 1)
-                                    {
-                                        double sleepSeconds = messageQueue.QueueConfiguration.DeliveryThrottle.TotalSeconds;
-                                        for (int sleep = 0; sleep < sleepSeconds && messageQueue.KeepRunning; sleep++)
-                                        {
-                                            Thread.Sleep(1000);
-                                        }
-                                    }
-                                    else
-                                    {
-                                        Thread.Sleep((int)messageQueue.QueueConfiguration.DeliveryThrottle.TotalMilliseconds);
-                                    }
-                                }
-
                                 if (messageQueue.KeepRunning == false)
                                 {
                                     break;
@@ -204,10 +188,25 @@ namespace NTDLS.CatMQ.Server
 
                         #endregion
 
-                        if (messageQueue.KeepRunning == false)
+                        #region Delivery Throttle.
+
+                        if (messageQueue.QueueConfiguration.DeliveryThrottle > TimeSpan.Zero)
                         {
-                            break;
+                            if (messageQueue.QueueConfiguration.DeliveryThrottle.TotalSeconds >= 1)
+                            {
+                                int sleepSeconds = (int)messageQueue.QueueConfiguration.DeliveryThrottle.TotalSeconds;
+                                for (int sleep = 0; sleep < sleepSeconds && messageQueue.KeepRunning; sleep++)
+                                {
+                                    Thread.Sleep(1000);
+                                }
+                            }
+                            else
+                            {
+                                Thread.Sleep((int)messageQueue.QueueConfiguration.DeliveryThrottle.TotalMilliseconds);
+                            }
                         }
+
+                        #endregion
 
                         #region Remove message from queue.
 

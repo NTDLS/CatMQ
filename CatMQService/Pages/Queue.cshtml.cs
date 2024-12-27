@@ -22,7 +22,7 @@ namespace CatMQService.Pages
             try
             {
                 Queue = mqServer.GetQueues().Where(o => o.QueueName.Equals(QueueName, StringComparison.OrdinalIgnoreCase)).FirstOrDefault() ?? new();
-                Subscribers = mqServer.GetSubscribers(Queue.QueueName).ToList();
+                Subscribers = mqServer.GetSubscribers(Queue.QueueName).OrderBy(o => o.ConnectionId).ToList();
             }
             catch (Exception ex)
             {

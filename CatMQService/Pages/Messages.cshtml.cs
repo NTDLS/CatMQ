@@ -22,7 +22,7 @@ namespace CatMQService.Pages
         {
             try
             {
-                Messages = mqServer.GetQueueMessages(QueueName, PageNumber * PageSize, PageSize).ToList();
+                Messages = mqServer.GetQueueMessages(QueueName, PageNumber * PageSize, PageSize).OrderBy(o => o.Timestamp).ToList();
             }
             catch (Exception ex)
             {
