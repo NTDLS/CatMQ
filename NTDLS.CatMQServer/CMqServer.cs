@@ -78,12 +78,6 @@ namespace NTDLS.CatMQServer
 
         private void CheckpointPersistentMessageQueues(CaseInsensitiveMessageQueueDictionary mqd)
         {
-            //Stop all message queues.
-            foreach (var q in mqd)
-            {
-                q.Value.Stop();
-            }
-
             if (string.IsNullOrEmpty(_configuration.PersistencePath) == false)
             {
                 //TODO: checkpoint this from time to time.
@@ -348,24 +342,32 @@ namespace NTDLS.CatMQServer
             {
                 #region Load and create persisted queues.
 
-                var persistedQueuesJson = File.ReadAllText(Path.Join(_configuration.PersistencePath, "queues.json"));
-                var persistedQueues = JsonConvert.DeserializeObject<List<MessageQueue>>(persistedQueuesJson);
+                List<MessageQueue>? persistedQueues = null;
 
-                if (persistedQueues != null)
+                var persistedQueuesFile = Path.Join(_configuration.PersistencePath, "queues.json");
+                if (File.Exists(persistedQueuesFile))
                 {
-                    _messageQueues.Use(mqd =>
+                    var persistedQueuesJson = File.ReadAllText(persistedQueuesFile);
+                    var loadedPersistedQueues = JsonConvert.DeserializeObject<List<MessageQueue>>(persistedQueuesJson);
+
+                    if (loadedPersistedQueues != null)
                     {
-                        foreach (var persistedQueue in persistedQueues)
+                        _messageQueues.Use(mqd =>
                         {
-                            persistedQueue.SetServer(this);
-                            string queueKey = persistedQueue.QueueConfiguration.QueueName.ToLower();
-                            if (mqd.ContainsKey(queueKey) == false)
+                            foreach (var persistedQueue in loadedPersistedQueues)
                             {
-                                mqd.Add(queueKey, persistedQueue);
-                                persistedQueue.Start();
+                                persistedQueue.SetServer(this);
+                                string queueKey = persistedQueue.QueueConfiguration.QueueName.ToLower();
+                                if (mqd.ContainsKey(queueKey) == false)
+                                {
+                                    mqd.Add(queueKey, persistedQueue);
+                                    persistedQueue.Start();
+                                }
                             }
-                        }
-                    });
+                        });
+
+                        persistedQueues = loadedPersistedQueues;
+                    }
                 }
 
                 #endregion
@@ -378,14 +380,14 @@ namespace NTDLS.CatMQServer
                 var persistedQueueMessages = new Dictionary<string, List<EnqueuedMessage>>(StringComparer.OrdinalIgnoreCase);
                 RocksDb? persistenceDatabase = null;
 
-                if (persistedQueues != null)
-                {
                     string databaseFile = Path.Join(_configuration.PersistencePath, "messages");
 
                     var options = new DbOptions()
                         .SetCreateIfMissing(true);
                     persistenceDatabase = RocksDb.Open(options, databaseFile);
 
+                if (persistedQueues != null)
+                {
                     using (var iterator = persistenceDatabase.NewIterator())
                     {
                         for (iterator.SeekToFirst(); iterator.Valid(); iterator.Next())
