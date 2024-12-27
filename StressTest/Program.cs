@@ -35,7 +35,7 @@ namespace StressTest
         {
             var client = new PMqClient(new PMqClientConfiguration
             {
-                 AutoReconnect = true
+                AutoReconnect = true
             });
             client.ConnectAsync("127.0.0.1", 45784);
 

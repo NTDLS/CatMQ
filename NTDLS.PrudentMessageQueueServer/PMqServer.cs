@@ -17,10 +17,12 @@ namespace NTDLS.PrudentMessageQueueServer
     /// </summary>
     public class PMqServer
     {
+        private const int _deadlockAvoidanceWaitMs = 10;
         private readonly RmServer _rmServer;
         private readonly PessimisticCriticalResource<CaseInsensitiveMessageQueueDictionary> _messageQueues = new();
         private readonly PMqServerConfiguration _configuration;
         private RocksDb? _persistenceDatabase;
+        private bool _keepRunning = false;
 
         /// <summary>
         /// Delegate used to notify of queue server exceptions.
@@ -64,6 +66,33 @@ namespace NTDLS.PrudentMessageQueueServer
             _rmServer.OnDisconnected += RmServer_OnDisconnected;
         }
 
+        #region Management.
+
+        /// <summary>
+        /// Saves persistent message queues and their statistics to disk.
+        /// </summary>
+        public void CheckpointPersistentMessageQueues()
+        {
+            _messageQueues.Use(mqd => CheckpointPersistentMessageQueues(mqd));
+        }
+
+        private void CheckpointPersistentMessageQueues(CaseInsensitiveMessageQueueDictionary mqd)
+        {
+            //Stop all message queues.
+            foreach (var q in mqd)
+            {
+                q.Value.Stop();
+            }
+
+            if (string.IsNullOrEmpty(_configuration.PersistencePath) == false)
+            {
+                //TODO: checkpoint this from time to time.
+                var persistedQueues = mqd.Where(q => q.Value.QueueConfiguration.Persistence == PMqPersistence.Persistent).Select(q => q.Value).ToList();
+                var persistedQueuesJson = JsonConvert.SerializeObject(persistedQueues);
+                File.WriteAllText(Path.Join(_configuration.PersistencePath, "queues.json"), persistedQueuesJson);
+            }
+        }
+
         /// <summary>
         /// Returns a read-only copy of the running configuration.
         /// </summary>
@@ -85,7 +114,6 @@ namespace NTDLS.PrudentMessageQueueServer
         /// <summary>
         /// Returns a read-only copy of the queues.
         /// </summary>
-        /// <returns></returns>
         public ReadOnlyCollection<PMqQueueInformation> GetQueues()
         {
             while (true)
@@ -93,25 +121,25 @@ namespace NTDLS.PrudentMessageQueueServer
                 bool success = false;
                 List<PMqQueueInformation>? result = new();
 
-                success = _messageQueues.TryUse(mq =>
+                success = _messageQueues.TryUse(mqd =>
                 {
-                    foreach (var q in mq)
+                    foreach (var mqKVP in mqd)
                     {
-                        var enqueuedMessagesSuccess = q.Value.EnqueuedMessages.TryUse(m =>
+                        var enqueuedMessagesSuccess = mqKVP.Value.EnqueuedMessages.TryUse(m =>
                         {
                             result.Add(new PMqQueueInformation
                             {
-                                BatchDeliveryInterval = q.Value.QueueConfiguration.BatchDeliveryInterval,
-                                ConsumptionScheme = q.Value.QueueConfiguration.ConsumptionScheme,
+                                BatchDeliveryInterval = mqKVP.Value.QueueConfiguration.BatchDeliveryInterval,
+                                ConsumptionScheme = mqKVP.Value.QueueConfiguration.ConsumptionScheme,
                                 CurrentEnqueuedMessageCount = m.Count,
-                                DeliveryScheme = q.Value.QueueConfiguration.DeliveryScheme,
-                                DeliveryThrottle = q.Value.QueueConfiguration.DeliveryThrottle,
-                                MaxDeliveryAttempts = q.Value.QueueConfiguration.MaxDeliveryAttempts,
-                                MaxMessageAge = q.Value.QueueConfiguration.MaxMessageAge,
-                                QueueName = q.Value.QueueConfiguration.QueueName,
-                                TotalDeliveredMessages = q.Value.TotalDeliveredMessages,
-                                TotalEnqueuedMessages = q.Value.TotalEnqueuedMessages,
-                                TotalExpiredMessages = q.Value.TotalExpiredMessages
+                                DeliveryScheme = mqKVP.Value.QueueConfiguration.DeliveryScheme,
+                                DeliveryThrottle = mqKVP.Value.QueueConfiguration.DeliveryThrottle,
+                                MaxDeliveryAttempts = mqKVP.Value.QueueConfiguration.MaxDeliveryAttempts,
+                                MaxMessageAge = mqKVP.Value.QueueConfiguration.MaxMessageAge,
+                                QueueName = mqKVP.Value.QueueConfiguration.QueueName,
+                                TotalDeliveredMessages = mqKVP.Value.TotalDeliveredMessages,
+                                TotalEnqueuedMessages = mqKVP.Value.TotalEnqueuedMessages,
+                                TotalExpiredMessages = mqKVP.Value.TotalExpiredMessages
                             });
                         });
 
@@ -136,7 +164,6 @@ namespace NTDLS.PrudentMessageQueueServer
         /// <summary>
         /// Returns a read-only copy of the queue subscribers.
         /// </summary>
-        /// <returns></returns>
         public ReadOnlyCollection<PMqSubscriberInformation> GetSubscribers(string queueName)
         {
             while (true)
@@ -144,13 +171,13 @@ namespace NTDLS.PrudentMessageQueueServer
                 bool success = false;
                 var result = new List<PMqSubscriberInformation>();
 
-                success = _messageQueues.TryUse(mq =>
+                success = _messageQueues.TryUse(mqd =>
                 {
-                    if (mq.TryGetValue(queueName, out var messageQueue))
+                    if (mqd.TryGetValue(queueName, out var messageQueue))
                     {
-                        success = messageQueue.Subscribers.TryUse(s =>
+                        success = messageQueue.Subscribers.TryUse(sKVP =>
                         {
-                            foreach (var subscriber in s)
+                            foreach (var subscriber in sKVP)
                             {
                                 result.Add(subscriber.Value);
                             }
@@ -174,7 +201,6 @@ namespace NTDLS.PrudentMessageQueueServer
         /// <summary>
         /// Returns a read-only copy messages in the queue.
         /// </summary>
-        /// <returns></returns>
         public ReadOnlyCollection<PMqEnqueuedMessageInformation> GetQueueMessages(string queueName, int offset, int take)
         {
             while (true)
@@ -182,12 +208,12 @@ namespace NTDLS.PrudentMessageQueueServer
                 bool success = false;
                 List<PMqEnqueuedMessageInformation>? result = new();
 
-                success = _messageQueues.TryUse(mq =>
+                success = _messageQueues.TryUse(mqd =>
                 {
-                    var filteredQueues = mq.Where(o => o.Value.QueueConfiguration.QueueName.Equals(queueName, StringComparison.OrdinalIgnoreCase));
-                    foreach (var q in filteredQueues)
+                    var filteredQueues = mqd.Where(o => o.Value.QueueConfiguration.QueueName.Equals(queueName, StringComparison.OrdinalIgnoreCase));
+                    foreach (var qKVP in filteredQueues)
                     {
-                        var enqueuedMessagesSuccess = q.Value.EnqueuedMessages.TryUse(m =>
+                        var enqueuedMessagesSuccess = qKVP.Value.EnqueuedMessages.TryUse(m =>
                         {
                             foreach (var message in m.Skip(offset).Take(take))
                             {
@@ -224,7 +250,6 @@ namespace NTDLS.PrudentMessageQueueServer
         /// <summary>
         /// Returns a read-only copy messages in the queue.
         /// </summary>
-        /// <returns></returns>
         public PMqEnqueuedMessageInformation GetQueueMessage(string queueName, Guid messageId)
         {
             while (true)
@@ -232,9 +257,9 @@ namespace NTDLS.PrudentMessageQueueServer
                 bool success = false;
                 PMqEnqueuedMessageInformation? result = null;
 
-                success = _messageQueues.TryUse(mq =>
+                success = _messageQueues.TryUse(mqd =>
                 {
-                    if (mq.TryGetValue(queueName, out var messageQueue))
+                    if (mqd.TryGetValue(queueName, out var messageQueue))
                     {
                         success = messageQueue.EnqueuedMessages.TryUse(m =>
                         {
@@ -272,6 +297,8 @@ namespace NTDLS.PrudentMessageQueueServer
             }
         }
 
+        #endregion
+
         internal void InvokeOnException(PMqServer server, PMqQueueConfiguration? queue, Exception ex)
             => OnException?.Invoke(server, queue, ex);
 
@@ -282,13 +309,14 @@ namespace NTDLS.PrudentMessageQueueServer
                 bool success = false;
 
                 //When a client disconnects, remove their subscriptions.
-                _messageQueues.TryUse(mq =>
+                _messageQueues.TryUse(mqd =>
                 {
-                    foreach (var q in mq)
+                    foreach (var mqKVP in mqd)
                     {
-                        q.Value.Subscribers.TryUse(s =>
+                        mqKVP.Value.Subscribers.TryUse(s =>
                         {
                             success = true;
+
                             s.Remove(context.ConnectionId);
                         });
                     }
@@ -298,33 +326,42 @@ namespace NTDLS.PrudentMessageQueueServer
                 {
                     return;
                 }
-                Thread.Sleep(10);
+                Thread.Sleep(_deadlockAvoidanceWaitMs);
             }
         }
+
+        #region Start & Stop.
 
         /// <summary>
         /// Starts the message queue server.
         /// </summary>
         public void Start(int listenPort)
         {
+            if (_keepRunning)
+            {
+                return;
+            }
+
+            _keepRunning = true;
+
             if (_configuration.PersistencePath != null)
             {
-                #region Create persisted queues.
+                #region Load and create persisted queues.
 
                 var persistedQueuesJson = File.ReadAllText(Path.Join(_configuration.PersistencePath, "queues.json"));
                 var persistedQueues = JsonConvert.DeserializeObject<List<MessageQueue>>(persistedQueuesJson);
 
                 if (persistedQueues != null)
                 {
-                    _messageQueues.Use(o =>
+                    _messageQueues.Use(mqd =>
                     {
                         foreach (var persistedQueue in persistedQueues)
                         {
                             persistedQueue.SetServer(this);
                             string queueKey = persistedQueue.QueueConfiguration.QueueName.ToLower();
-                            if (o.ContainsKey(queueKey) == false)
+                            if (mqd.ContainsKey(queueKey) == false)
                             {
-                                o.Add(queueKey, persistedQueue);
+                                mqd.Add(queueKey, persistedQueue);
                                 persistedQueue.Start();
                             }
                         }
@@ -334,6 +371,9 @@ namespace NTDLS.PrudentMessageQueueServer
                 #endregion
 
                 #region Load persisted messages.
+
+                //The messages in RocksDB are not stored in order, so we need to load all messages into a dictonary by queue name
+                //  so we can then sort them by their time stamps and add them back to the appropriate queues.
 
                 var persistedQueueMessages = new Dictionary<string, List<EnqueuedMessage>>(StringComparer.OrdinalIgnoreCase);
                 RocksDb? persistenceDatabase = null;
@@ -370,20 +410,22 @@ namespace NTDLS.PrudentMessageQueueServer
 
                 #region Enqueue persisted messages.
 
+                //Loop though the persistent queues (names), sort the messages by their time-stamps and add them to the queues.
+
                 if (persistedQueues != null)
                 {
-                    _messageQueues.Use(o =>
+                    _messageQueues.Use(mqd =>
                     {
                         foreach (var persistedQueueMessage in persistedQueueMessages)
                         {
-                            if (o.TryGetValue(persistedQueueMessage.Key, out var messageQueue))
+                            if (mqd.TryGetValue(persistedQueueMessage.Key, out var messageQueue))
                             {
-                                messageQueue.EnqueuedMessages.Use(s =>
+                                messageQueue.EnqueuedMessages.Use(m =>
                                 {
                                     var persistedMessages = persistedQueueMessage.Value.OrderBy(o => o.Timestamp);
                                     foreach (var persistedMessage in persistedMessages)
                                     {
-                                        s.Add(persistedMessage);
+                                        m.Add(persistedMessage);
                                     }
                                 });
                             }
@@ -397,7 +439,27 @@ namespace NTDLS.PrudentMessageQueueServer
             }
 
             _rmServer.Start(listenPort);
+
+            new Thread(() => HeartbeatThread()).Start();
         }
+
+        private void HeartbeatThread()
+        {
+            var lastCheckpoint = DateTime.UtcNow;
+
+            while (_keepRunning)
+            {
+                if (DateTime.UtcNow - lastCheckpoint > TimeSpan.FromSeconds(30))
+                {
+                    //While the RockDB WAL logs data, it’s a good idea to flush the MemTable to disk periodically for additional safety.
+                    _persistenceDatabase?.Flush(new FlushOptions());
+                    lastCheckpoint = DateTime.UtcNow;
+                }
+
+                Thread.Sleep(100);
+            }
+        }
+
 
         /// <summary>
         /// Stops the message queue server.
@@ -407,23 +469,24 @@ namespace NTDLS.PrudentMessageQueueServer
             _persistenceDatabase?.Dispose();
             _rmServer.Stop();
 
-            _messageQueues.Use(o =>
+            _messageQueues.Use(mqd =>
             {
                 //Stop all message queues.
-                foreach (var q in o)
+                foreach (var mqKVP in mqd)
                 {
-                    q.Value.Stop();
+                    mqKVP.Value.Stop();
                 }
 
                 if (string.IsNullOrEmpty(_configuration.PersistencePath) == false)
                 {
-                    //TODO: checkpoint this from time to time.
-                    var persistedQueues = o.Where(q => q.Value.QueueConfiguration.Persistence == PMqPersistence.Persistent).Select(q => q.Value).ToList();
-                    var persistedQueuesJson = JsonConvert.SerializeObject(persistedQueues);
-                    File.WriteAllText(Path.Join(_configuration.PersistencePath, "queues.json"), persistedQueuesJson);
+                    CheckpointPersistentMessageQueues(mqd);
                 }
             });
         }
+
+        #endregion
+
+        #region Message queue interactions.
 
         /// <summary>
         /// Deliver a message from a server queue to a subscribed client.
@@ -438,6 +501,9 @@ namespace NTDLS.PrudentMessageQueueServer
             return result.WasMessageConsumed;
         }
 
+        /// <summary>
+        /// Removes a message from the persistent store.
+        /// </summary>
         internal void RemovePersistenceMessage(string queueName, Guid MessageId)
         {
             if (_persistenceDatabase != null)
@@ -445,33 +511,33 @@ namespace NTDLS.PrudentMessageQueueServer
                 string queueKey = queueName.ToLowerInvariant();
                 lock (_persistenceDatabase)
                 {
-                    _persistenceDatabase?.Remove($"{queueKey}_{MessageId}");
+                    _persistenceDatabase.Remove($"{queueKey}_{MessageId}");
                 }
             }
         }
 
-        #region Client Instructions.
+        #endregion
+
+        #region Client interactions.
 
         /// <summary>
         /// Creates a new empty queue if it does not already exist.
         /// </summary>
         internal void CreateQueue(PMqQueueConfiguration queueConfiguration)
         {
-            _messageQueues.Use(o =>
+            _messageQueues.Use(mqd =>
             {
                 string queueKey = queueConfiguration.QueueName.ToLowerInvariant();
-                if (o.ContainsKey(queueKey) == false)
+                if (mqd.ContainsKey(queueKey) == false)
                 {
                     var messageQueue = new MessageQueue(this, queueConfiguration);
-                    o.Add(queueKey, messageQueue);
+                    mqd.Add(queueKey, messageQueue);
 
                     if (queueConfiguration.Persistence == PMqPersistence.Persistent)
                     {
                         if (string.IsNullOrEmpty(_configuration.PersistencePath) == false)
                         {
-                            var persistedQueues = o.Where(q => q.Value.QueueConfiguration.Persistence == PMqPersistence.Persistent).Select(q => q.Value).ToList();
-                            var persistedQueuesJson = JsonConvert.SerializeObject(persistedQueues);
-                            File.WriteAllText(Path.Join(_configuration.PersistencePath, "queues.json"), persistedQueuesJson);
+                            CheckpointPersistentMessageQueues(mqd);
                         }
                         else
                         {
@@ -489,37 +555,41 @@ namespace NTDLS.PrudentMessageQueueServer
         /// </summary>
         internal void DeleteQueue(string queueName)
         {
+            string queueKey = queueName.ToLowerInvariant();
+
             while (true)
             {
                 bool success = false;
-                _messageQueues.TryUse(o =>
+                _messageQueues.TryUse(mqd =>
                 {
-                    string queueKey = queueName.ToLowerInvariant();
-                    if (o.TryGetValue(queueKey, out var messageQueue))
+                    if (mqd.TryGetValue(queueKey, out var messageQueue))
                     {
-                        messageQueue.EnqueuedMessages.TryUse(s =>
+                        messageQueue.EnqueuedMessages.TryUse(m =>
                         {
                             success = true;
 
                             messageQueue.Stop();
-                            o.Remove(queueKey);
+                            mqd.Remove(queueKey);
 
                             if (_persistenceDatabase != null)
                             {
-                                foreach (var message in s)
+                                foreach (var message in m)
                                 {
-                                    _persistenceDatabase?.Remove($"{queueKey}_{message.MessageId}");
+                                    lock (_persistenceDatabase)
+                                    {
+                                        _persistenceDatabase.Remove($"{queueKey}_{message.MessageId}");
+                                    }
                                 }
-
-                            }
-
-                            if (string.IsNullOrEmpty(_configuration.PersistencePath) == false)
-                            {
-                                var persistedQueues = o.Where(q => q.Value.QueueConfiguration.Persistence == PMqPersistence.Persistent).Select(q => q.Value).ToList();
-                                var persistedQueuesJson = JsonConvert.SerializeObject(persistedQueues);
-                                File.WriteAllText(Path.Join(_configuration.PersistencePath, "queues.json"), persistedQueuesJson);
                             }
                         });
+
+                        if (success)
+                        {
+                            if (string.IsNullOrEmpty(_configuration.PersistencePath) == false)
+                            {
+                                CheckpointPersistentMessageQueues(mqd);
+                            }
+                        }
                     }
                 });
 
@@ -527,7 +597,7 @@ namespace NTDLS.PrudentMessageQueueServer
                 {
                     return;
                 }
-                Thread.Sleep(10);
+                Thread.Sleep(_deadlockAvoidanceWaitMs);
             }
         }
 
@@ -536,13 +606,14 @@ namespace NTDLS.PrudentMessageQueueServer
         /// </summary>
         internal void SubscribeToQueue(Guid connectionId, IPEndPoint? localEndpoint, IPEndPoint? remoteEndpoint, string queueName)
         {
+            string queueKey = queueName.ToLowerInvariant();
+
             while (true)
             {
                 bool success = false;
-                _messageQueues.TryUse(o =>
+                _messageQueues.TryUse(mqd =>
                 {
-                    string queueKey = queueName.ToLowerInvariant();
-                    if (o.TryGetValue(queueKey, out var messageQueue))
+                    if (mqd.TryGetValue(queueKey, out var messageQueue))
                     {
                         messageQueue.Subscribers.TryUse(s =>
                         {
@@ -566,7 +637,7 @@ namespace NTDLS.PrudentMessageQueueServer
                 {
                     return;
                 }
-                Thread.Sleep(10);
+                Thread.Sleep(_deadlockAvoidanceWaitMs);
             }
         }
 
@@ -575,14 +646,15 @@ namespace NTDLS.PrudentMessageQueueServer
         /// </summary>
         internal void UnsubscribeFromQueue(Guid connectionId, string queueName)
         {
+            string queueKey = queueName.ToLowerInvariant();
+
             while (true)
             {
                 bool success = false;
 
-                _messageQueues.TryUse(o =>
+                _messageQueues.TryUse(mqd =>
                 {
-                    string queueKey = queueName.ToLowerInvariant();
-                    if (o.TryGetValue(queueKey, out var messageQueue))
+                    if (mqd.TryGetValue(queueKey, out var messageQueue))
                     {
                         messageQueue.Subscribers.TryUse(s =>
                         {
@@ -596,7 +668,7 @@ namespace NTDLS.PrudentMessageQueueServer
                 {
                     return;
                 }
-                Thread.Sleep(10);
+                Thread.Sleep(_deadlockAvoidanceWaitMs);
             }
         }
 
@@ -605,15 +677,16 @@ namespace NTDLS.PrudentMessageQueueServer
         /// </summary>
         internal void EnqueueMessage(string queueName, string objectType, string messageJson)
         {
+            string queueKey = queueName.ToLowerInvariant();
+
             while (true)
             {
                 bool success = false;
-                _messageQueues.TryUse(o =>
+                _messageQueues.TryUse(mqd =>
                 {
-                    string queueKey = queueName.ToLowerInvariant();
-                    if (o.TryGetValue(queueKey, out var messageQueue))
+                    if (mqd.TryGetValue(queueKey, out var messageQueue))
                     {
-                        messageQueue.EnqueuedMessages.TryUse(s =>
+                        messageQueue.EnqueuedMessages.TryUse(m =>
                         {
                             success = true;
 
@@ -624,13 +697,13 @@ namespace NTDLS.PrudentMessageQueueServer
                                 var persistedJson = JsonConvert.SerializeObject(message);
                                 lock (_persistenceDatabase)
                                 {
-                                    _persistenceDatabase?.Put($"{queueKey}_{message.MessageId}", persistedJson);
+                                    _persistenceDatabase.Put($"{queueKey}_{message.MessageId}", persistedJson);
                                 }
                             }
 
-                            s.Add(message);
+                            m.Add(message);
+                            messageQueue.DeliveryThreadWaitEvent.Set();
                         });
-                        messageQueue.DeliveryThreadWaitEvent.Set();
                     }
                     else
                     {
@@ -642,7 +715,7 @@ namespace NTDLS.PrudentMessageQueueServer
                 {
                     return;
                 }
-                Thread.Sleep(10);
+                Thread.Sleep(_deadlockAvoidanceWaitMs);
             }
         }
 
@@ -654,23 +727,25 @@ namespace NTDLS.PrudentMessageQueueServer
             while (true)
             {
                 bool success = false;
-
-                _messageQueues.TryUse(o =>
+                _messageQueues.TryUse(mqd =>
                 {
                     string queueKey = queueName.ToLowerInvariant();
-                    if (o.TryGetValue(queueKey, out var messageQueue))
+                    if (mqd.TryGetValue(queueKey, out var messageQueue))
                     {
-                        messageQueue.EnqueuedMessages.TryUse(s =>
+                        messageQueue.EnqueuedMessages.TryUse(m =>
                         {
                             success = true;
                             if (_persistenceDatabase != null)
                             {
-                                foreach (var message in s)
+                                foreach (var message in m)
                                 {
-                                    _persistenceDatabase?.Remove($"{queueKey}_{message.MessageId}");
+                                    lock (_persistenceDatabase)
+                                    {
+                                        _persistenceDatabase.Remove($"{queueKey}_{message.MessageId}");
+                                    }
                                 }
                             }
-                            s.Clear();
+                            m.Clear();
                         });
                     }
                     else
@@ -683,7 +758,7 @@ namespace NTDLS.PrudentMessageQueueServer
                 {
                     return;
                 }
-                Thread.Sleep(10);
+                Thread.Sleep(_deadlockAvoidanceWaitMs);
             }
         }
 
