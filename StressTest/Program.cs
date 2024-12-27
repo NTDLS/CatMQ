@@ -1,5 +1,5 @@
-﻿using NTDLS.PrudentMessageQueueClient;
-using NTDLS.PrudentMessageQueueShared;
+﻿using NTDLS.CatMQClient;
+using NTDLS.CatMQShared;
 
 namespace StressTest
 {
@@ -7,7 +7,7 @@ namespace StressTest
     {
         private static Random _random = new();
 
-        internal class MyMessage(string text) : IPMqMessage
+        internal class MyMessage(string text) : ICMqMessage
         {
             public string Text { get; set; } = text;
         }
@@ -33,7 +33,7 @@ namespace StressTest
 
         static void InstanceThread()
         {
-            var client = new PMqClient(new PMqClientConfiguration
+            var client = new CMqClient(new CMqClientConfiguration
             {
                 AutoReconnect = true
             });
@@ -55,7 +55,7 @@ namespace StressTest
                 myQueueNames.Add(queueName);
 
                 Console.WriteLine($"Creating queue: '{queueName}'.");
-                client.CreateQueue(new PMqQueueConfiguration(queueName)
+                client.CreateQueue(new CMqQueueConfiguration(queueName)
                 {
                     Persistence = PMqPersistence.Persistent
                 });
@@ -91,7 +91,7 @@ namespace StressTest
             client.Disconnect();
         }
 
-        private static bool Client_OnReceived(PMqClient client, IPMqMessage message)
+        private static bool Client_OnReceived(CMqClient client, ICMqMessage message)
         {
             if (message is MyMessage myMessage)
             {

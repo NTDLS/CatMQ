@@ -9,9 +9,9 @@ TestHarness/obj/
 
 TestHarness/bin/
 
-NTDLS.PrudentMessageQueue/bin/
+NTDLS.CatMQ/bin/
 
-NTDLS.PrudentMessageQueue/obj/
+NTDLS.CatMQ/obj/
 
 TestApps/Chat/ChatClient/bin/
 
@@ -33,23 +33,23 @@ QueueServer/obj/
 
 QueueServer/bin/
 
-NTDLS.PrudentMessageQueueServer/bin/
+NTDLS.CatMQServer/bin/
 
-NTDLS.PrudentMessageQueueServer/obj/
+NTDLS.CatMQServer/obj/
 
 *.user
 
-NTDLS.PrudentMessageQueueClient/bin/
+NTDLS.CatMQClient/bin/
 
-NTDLS.PrudentMessageQueueClient/obj/
+NTDLS.CatMQClient/obj/
 
-NTDLS.PrudentMessageQueueShared/bin/
+NTDLS.CatMQShared/bin/
 
-NTDLS.PrudentMessageQueueShared/obj/
+NTDLS.CatMQShared/obj/
 
-PrudentMessageQueueService/bin/
+CatMQService/bin/
 
-PrudentMessageQueueService/obj/
+CatMQService/obj/
 
 StressTest/bin/
 

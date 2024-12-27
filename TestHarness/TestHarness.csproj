@@ -8,7 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\NTDLS.PrudentMessageQueueClient\NTDLS.PrudentMessageQueueClient.csproj" />
+    <ProjectReference Include="..\NTDLS.CatMQClient\NTDLS.CatMQClient.csproj" />
   </ItemGroup>
 
 </Project>

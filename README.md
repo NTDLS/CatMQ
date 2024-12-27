@@ -1,6 +1,6 @@
-# Prudent Message Queue
+# CatMQ
 
-📦 Be sure to check out the NuGet package: https://www.nuget.org/packages/NTDLS.PrudentMessageQueue
+📦 Be sure to check out the NuGet package: https://www.nuget.org/packages/NTDLS.CatMQ
 
 In memory persistent message queue intended for inter-process-communication,
     queuing, load-balancing and buffering over TCP/IP.
@@ -27,7 +27,7 @@ internal class Program
     }
 }
 ```
-See documentation of [NTDLS.PrudentMessageQueue](https://www.nuget.org/packages/NTDLS.PrudentMessageQueue) for client and server interaction examples.
+See documentation of [NTDLS.CatMQ](https://www.nuget.org/packages/NTDLS.CatMQ) for client and server interaction examples.
 
 
 ## License

@@ -1,11 +1,11 @@
-﻿using NTDLS.PrudentMessageQueueClient;
-using NTDLS.PrudentMessageQueueShared;
+﻿using NTDLS.CatMQClient;
+using NTDLS.CatMQShared;
 
 namespace QueueClient
 {
     internal class Program
     {
-        internal class MyMessage(string text) : IPMqMessage
+        internal class MyMessage(string text) : ICMqMessage
         {
             public string Text { get; set; } = text;
         }
@@ -23,7 +23,7 @@ namespace QueueClient
         {
             var random = new Random();
 
-            var client = new PMqClient();
+            var client = new CMqClient();
             client.Connect("127.0.0.1", 45784);
 
             var myQueueNames = new HashSet<string>();
@@ -37,7 +37,7 @@ namespace QueueClient
                 myQueueNames.Add(queueName);
 
                 Console.WriteLine($"Creating queue: '{queueName}'.");
-                client.CreateQueue(new PMqQueueConfiguration(queueName)
+                client.CreateQueue(new CMqQueueConfiguration(queueName)
                 {
                     Persistence = PMqPersistence.Persistent
                 });
@@ -73,7 +73,7 @@ namespace QueueClient
             client.Disconnect();
         }
 
-        private static bool Client_OnReceived(PMqClient client, IPMqMessage message)
+        private static bool Client_OnReceived(CMqClient client, ICMqMessage message)
         {
             if (message is MyMessage myMessage)
             {

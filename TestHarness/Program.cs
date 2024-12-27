@@ -1,20 +1,20 @@
-﻿using NTDLS.PrudentMessageQueueClient;
-using NTDLS.PrudentMessageQueueShared;
+﻿using NTDLS.CatMQClient;
+using NTDLS.CatMQShared;
 
 namespace TestHarness
 {
     internal class Program
     {
-        internal class MyMessage(string text) : IPMqMessage
+        internal class MyMessage(string text) : ICMqMessage
         {
             public string Text { get; set; } = text;
         }
 
         static void Main()
         {
-            var client = new PMqClient();
+            var client = new CMqClient();
             client.Connect("127.0.0.1", 45784);
-            client.CreateQueue(new PMqQueueConfiguration("MyFirstQueue")
+            client.CreateQueue(new CMqQueueConfiguration("MyFirstQueue")
             {
                 Persistence = PMqPersistence.Persistent
             });
@@ -33,7 +33,7 @@ namespace TestHarness
             client.Disconnect();
         }
 
-        private static bool Client_OnReceived(PMqClient client, IPMqMessage message)
+        private static bool Client_OnReceived(CMqClient client, ICMqMessage message)
         {
             if (message is MyMessage myMessage)
             {
