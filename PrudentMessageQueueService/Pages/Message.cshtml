@@ -1,0 +1,69 @@
+﻿@page "/message/{QueueName}/{MessageId:Guid}"
+@model MessageModel
+@{
+    ViewData["Title"] = $"{@Model.QueueName} Queue";
+}
+
+<style>
+    .label-value {
+        font-size: 1rem;
+        margin-bottom: 1rem;
+    }
+    .label-value .label {
+        font-weight: bold;
+    }
+        .label-value .value {
+            white-space: pre-wrap;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+        }
+</style>
+
+@if (Model.ErrorMessage != null)
+{
+    <div>
+        <p>@Model.ErrorMessage</p>
+    </div>
+}
+
+<div>
+    <h1 class="display-4">@Model.QueueName</h1>
+
+    <div class="container mt-4">
+
+        <table class="table table-striped table-bordered">
+            <thead class="table-light">
+                <tr>
+                    <th colspan="5">Metadata</th>
+                </tr>
+            </thead>
+            <thead class="table-light">
+                <tr>
+                    <th>Message Id</th>
+                    <th>Timestamp</th>
+                    <th>Object Type</th>
+                    <th>Subscriber Deliveries</th>
+                    <th>Satisfied Subscribers</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>@Model.Message.MessageId</td>
+                    <td>@Model.Message.Timestamp</td>
+                    <td>@Model.Message.ObjectType</td>
+                    <td>@Model.Message.SubscriberMessageDeliveries.Count.ToString("n0")</td>
+                    <td>@Model.Message.SatisfiedSubscribersConnectionIDs.Count.ToString("n0")</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="container mt-4">
+            <div class="label-value">
+                <div class="label">Message Body:</div>
+                <div class="value">
+                    @Model.Message.MessageJson
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

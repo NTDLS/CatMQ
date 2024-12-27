@@ -1,0 +1,94 @@
+﻿@page "/queue/{QueueName}"
+@model QueueModel
+@{
+    ViewData["Title"] = $"{@Model.QueueName} Queue";
+}
+
+<div>
+    <h1 class="display-4">@Model.Queue.QueueName</h1>
+
+    <div class="container mt-4">
+        <table class="table table-striped table-bordered">
+            <thead class="table-light">
+                <tr>
+                    <th colspan="6">Configuration</th>
+                </tr>
+            </thead>
+            <thead class="table-light">
+                <tr>
+                    <th>Consumption Scheme</th>
+                    <th>Delivery Scheme</th>
+                    <th>Batch Delivery Interval</th>
+                    <th>Delivery Throttle</th>
+                    <th>Max. Delivery Attempts</th>
+                    <th>Max. Message Age</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>@Model.Queue.ConsumptionScheme</td>
+                    <td>@Model.Queue.DeliveryScheme</td>
+                    <td>@Model.Queue.BatchDeliveryInterval</td>
+                    <td>@Model.Queue.DeliveryThrottle</td>
+                    <td>@Model.Queue.MaxDeliveryAttempts</td>
+                    <td>@Model.Queue.MaxMessageAge</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <table class="table table-striped table-bordered">
+            <thead class="table-light">
+                <tr>
+                    <th colspan="4">Statistics</th>
+                </tr>
+            </thead>
+            <thead class="table-light">
+                <tr>
+                    <th>Current Enqueued Messages</th>
+                    <th>Total Delivered Messages</th>
+                    <th>Total Enqueued Messages</th>
+                    <th>Total Expired Messages</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><a href="/messages/@Model.Queue.QueueName">@Model.Queue.CurrentEnqueuedMessageCount.ToString("n0")</a></td>
+                    <td>@Model.Queue.TotalDeliveredMessages.ToString("n0")</td>
+                    <td>@Model.Queue.TotalEnqueuedMessages.ToString("n0")</td>
+                    <td>@Model.Queue.TotalExpiredMessages.ToString("n0")</td>
+                </tr>
+            </tbody>
+        </table>
+    
+        <table class="table table-striped table-bordered">
+            <thead class="table-light">
+                <tr>
+                    <th colspan="6">Subscribers</th>
+                </tr>
+            </thead>
+            <thead class="table-light">
+                <tr>
+                    <th>ConnectionId</th>
+                    <th>Address</th>
+                    <th>Delivery Attempts</th>
+                    <th>Successful Deliveries</th>
+                    <th>Failed Deliveries</th>
+                    <th>Consumed Messages</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var queue in Model.Subscribers)
+                {
+                    <tr>
+                        <td>@queue.ConnectionId</td>
+                        <td>@queue.RemoteAddress : @queue.RemotePort</td>
+                        <td>@queue.DeliveryAttempts.ToString("n0")</td>
+                        <td>@queue.SuccessfulMessagesDeliveries.ToString("n0")</td>
+                        <td>@queue.FailedMessagesDeliveries.ToString("n0")</td>
+                        <td>@queue.ConsumedMessages.ToString("n0")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
