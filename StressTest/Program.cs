@@ -25,7 +25,7 @@ namespace StressTest
         {
             Thread.Sleep(5000);
 
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 8; i++)
             {
                 new Thread(() => InstanceThread()).Start();
             }
@@ -33,8 +33,16 @@ namespace StressTest
 
         static void InstanceThread()
         {
-            var client = new PMqClient();
-            client.Connect("127.0.0.1", 45784);
+            var client = new PMqClient(new PMqClientConfiguration
+            {
+                 AutoReconnect = true
+            });
+            client.ConnectAsync("127.0.0.1", 45784);
+
+            while (client.IsConnected == false)
+            {
+                Thread.Sleep(1);
+            }
 
             var myQueueNames = new HashSet<string>();
 

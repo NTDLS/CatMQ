@@ -17,7 +17,6 @@ namespace NTDLS.PrudentMessageQueueClient
             TypeNameHandling = TypeNameHandling.All
         };
 
-
         private readonly RmClient _rmClient;
         private bool _explicitDisconnect = false;
         private PMqClientConfiguration _configuration;
@@ -25,6 +24,11 @@ namespace NTDLS.PrudentMessageQueueClient
         private string? _lastReconnectHost;
         private int _lastReconnectPort;
         private IPAddress? _lastReconnectIpAddress;
+
+        /// <summary>
+        /// Returns true if the client is connected.
+        /// </summary>
+        public bool IsConnected => _rmClient.IsConnected;
 
         /// <summary>
         /// Delegate used for server-to-client delivery notifications.
@@ -96,7 +100,6 @@ namespace NTDLS.PrudentMessageQueueClient
 
             _rmClient.AddHandler(new InternalClientQueryHandlers(this));
         }
-
 
         private void RmClient_OnConnected(RmContext context)
         {
@@ -172,6 +175,58 @@ namespace NTDLS.PrudentMessageQueueClient
             _explicitDisconnect = false;
 
             _rmClient.Connect(ipAddress, port);
+        }
+
+        /// <summary>
+        /// Connects the client to a queue server.
+        /// </summary>
+        public void ConnectAsync(string hostName, int port)
+        {
+            new Thread(() =>
+            {
+                while (!_explicitDisconnect)
+                {
+                    try
+                    {
+                        Connect(hostName, port);
+                        return;
+                    }
+                    catch
+                    {
+                        if (_configuration.AutoReconnect == false)
+                        {
+                            return;
+                        }
+                    }
+                    Thread.Sleep(500);
+                }
+            }).Start();
+        }
+
+        /// <summary>
+        /// Connects the client to a queue server.
+        /// </summary>
+        public void ConnectAsync(IPAddress ipAddress, int port)
+        {
+            new Thread(() =>
+            {
+                while (!_explicitDisconnect)
+                {
+                    try
+                    {
+                        Connect(ipAddress, port);
+                        return;
+                    }
+                    catch
+                    {
+                        if (_configuration.AutoReconnect == false)
+                        {
+                            return;
+                        }
+                    }
+                    Thread.Sleep(500);
+                }
+            }).Start();
         }
 
         /// <summary>
