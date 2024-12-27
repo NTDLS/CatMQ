@@ -380,11 +380,11 @@ namespace NTDLS.CatMQServer
                 var persistedQueueMessages = new Dictionary<string, List<EnqueuedMessage>>(StringComparer.OrdinalIgnoreCase);
                 RocksDb? persistenceDatabase = null;
 
-                    string databaseFile = Path.Join(_configuration.PersistencePath, "messages");
+                string databaseFile = Path.Join(_configuration.PersistencePath, "messages");
 
-                    var options = new DbOptions()
-                        .SetCreateIfMissing(true);
-                    persistenceDatabase = RocksDb.Open(options, databaseFile);
+                var options = new DbOptions()
+                    .SetCreateIfMissing(true);
+                persistenceDatabase = RocksDb.Open(options, databaseFile);
 
                 if (persistedQueues != null)
                 {
@@ -468,7 +468,9 @@ namespace NTDLS.CatMQServer
         /// </summary>
         public void Stop()
         {
+            _keepRunning = false;
             _persistenceDatabase?.Dispose();
+            _persistenceDatabase = null;
             _rmServer.Stop();
 
             _messageQueues.Use(mqd =>

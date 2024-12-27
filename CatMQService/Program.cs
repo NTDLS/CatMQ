@@ -29,9 +29,9 @@ namespace CatMQService
                 });
                 x.RunAsLocalSystem();
 
-                x.SetDescription("VPS message queuing service.");
-                x.SetDisplayName("VPS.MessageQueue");
-                x.SetServiceName("VPS.MessageQueue");
+                x.SetDescription("Cat MQ message queuing service.");
+                x.SetDisplayName("CatMQService");
+                x.SetServiceName("CatMQService");
             });
         }
     }

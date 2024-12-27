@@ -1,7 +1,7 @@
-﻿using NTDLS.Helpers;
-using NTDLS.CatMQServer;
+﻿using NTDLS.CatMQServer;
 using NTDLS.CatMQServer.Management;
 using NTDLS.CatMQShared;
+using NTDLS.Helpers;
 using NTDLS.Semaphore;
 
 namespace NTDLS.CatMQ.Server
