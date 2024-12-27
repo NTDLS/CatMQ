@@ -1,4 +1,4 @@
-# NTDLS.PrudentMessageQueueServer
+# Prudent Message Queue
 
 📦 Be sure to check out the NuGet package: https://www.nuget.org/packages/NTDLS.PrudentMessageQueue
 
