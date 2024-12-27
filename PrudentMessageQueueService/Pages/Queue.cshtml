@@ -4,6 +4,14 @@
     ViewData["Title"] = $"{@Model.QueueName} Queue";
 }
 
+@if (Model.ErrorMessage != null)
+{
+    <div>
+        <p>@Model.ErrorMessage</p>
+    </div>
+}
+else
+{
 <div>
     <h1 class="display-4">@Model.Queue.QueueName</h1>
 
@@ -92,3 +100,4 @@
         </table>
     </div>
 </div>
+}

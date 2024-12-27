@@ -50,3 +50,7 @@ NTDLS.PrudentMessageQueueShared/obj/
 PrudentMessageQueueService/bin/
 
 PrudentMessageQueueService/obj/
+
+StressTest/bin/
+
+StressTest/obj/
