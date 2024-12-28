@@ -402,7 +402,7 @@ namespace NTDLS.CatMQ.Server
 
                 string databaseFile = Path.Join(_configuration.PersistencePath, "messages");
 
-                OnLog?.Invoke(this, ErrorLevel.Information, "Instanciating persistent database.");
+                OnLog?.Invoke(this, ErrorLevel.Information, "Instantiating persistent database.");
 
                 var options = new DbOptions()
                     .SetCreateIfMissing(true);

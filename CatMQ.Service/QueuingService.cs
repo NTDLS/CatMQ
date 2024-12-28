@@ -1,8 +1,9 @@
 ﻿using NTDLS.CatMQ.Server;
 using NTDLS.CatMQ.Shared;
+using NTDLS.Helpers;
 using Serilog;
 using System.Reflection;
-using Topshelf.ServiceConfigurators;
+using System.Text.Json;
 
 namespace CatMQ.Service
 {
@@ -10,69 +11,76 @@ namespace CatMQ.Service
     {
         private CMqServer? _mqServer;
 
-        public QueuingService(ServiceConfigurator<QueuingService> s)
-        {
-        }
-
         public void Start()
         {
-            var builder = WebApplication.CreateBuilder();
-            var configuration = builder.Configuration;
-
-            builder.Services.AddAuthentication("CookieAuth")
-                .AddCookie("CookieAuth", options =>
-                {
-                    options.LoginPath = "/Login";
-                });
-
-            var persistencePath = configuration.GetValue<string>("MqServer:DataPath");
-
-            if (string.IsNullOrEmpty(persistencePath))
+            var executablePath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            string configurationFile = Path.Join(executablePath, "CatMQ.Service.Config.json");
+            if (File.Exists(configurationFile) == false)
             {
-                var executablePath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-                persistencePath = Path.Join(executablePath, "Data");
-                Directory.CreateDirectory(persistencePath);
+                File.WriteAllText(configurationFile, JsonSerializer.Serialize(new ServiceConfiguration(), new JsonSerializerOptions { WriteIndented = true }));
+            }
+            var serviceConfiguration = JsonSerializer.Deserialize<ServiceConfiguration>(File.ReadAllText(configurationFile)).EnsureNotNull();
+
+            var builder = WebApplication.CreateBuilder();
+
+            if (string.IsNullOrEmpty(serviceConfiguration.DataPath))
+            {
+                //If no data path was specified, use the executable directory.
+                serviceConfiguration.DataPath = Path.Join(executablePath, "Data");
+                Directory.CreateDirectory(serviceConfiguration.DataPath);
             }
 
             _mqServer = new CMqServer(new CMqServerConfiguration
             {
-                PersistencePath = persistencePath
+                PersistencePath = serviceConfiguration.DataPath,
+                AsynchronousQueryWaiting = serviceConfiguration.AsynchronousQueryWaiting,
+                InitialReceiveBufferSize = serviceConfiguration.InitialReceiveBufferSize,
+                MaxReceiveBufferSize = serviceConfiguration.MaxReceiveBufferSize,
+                QueryTimeout = serviceConfiguration.QueryTimeout,
+                ReceiveBufferGrowthRate = serviceConfiguration.ReceiveBufferGrowthRate,
             });
             _mqServer.OnLog += MqServer_OnLog;
 
-            int portNumber = configuration.GetValue<int>("MqServer:Port");
-            Log.Verbose($"Starting message queue service on port: {portNumber}.");
-            _mqServer.Start(portNumber);
+            Log.Verbose($"Starting message queue service on port: {serviceConfiguration.QueuePort}.");
+            _mqServer.Start(serviceConfiguration.QueuePort);
             Log.Verbose("Message queue service started.");
 
-            builder.Services.AddSingleton<CMqServer>(_mqServer);
-
-            // Add services to the container.
-            builder.Services.AddRazorPages();
-
-            var app = builder.Build();
-
-            // Configure the HTTP request pipeline.
-            if (!app.Environment.IsDevelopment())
+            if (serviceConfiguration.EnableWebUI && serviceConfiguration.WebUIURL != null)
             {
-                app.UseExceptionHandler("/Error");
-                // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
-                app.UseHsts();
+                builder.Services.AddAuthentication("CookieAuth")
+                    .AddCookie("CookieAuth", options =>
+                    {
+                        options.LoginPath = "/Login";
+                    });
+
+                builder.Services.AddSingleton<CMqServer>(_mqServer);
+
+                // Add services to the container.
+                builder.Services.AddRazorPages();
+
+                builder.WebHost.UseUrls(serviceConfiguration.WebUIURL);
+
+                var app = builder.Build();
+
+                // Configure the HTTP request pipeline.
+                if (!app.Environment.IsDevelopment())
+                {
+                    app.UseExceptionHandler("/Error");
+                    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
+                    app.UseHsts();
+                }
+
+                //app.UseHttpsRedirection();
+                app.UseRouting();
+                app.UseAuthentication();
+                app.UseAuthorization();
+                app.MapStaticAssets();
+                app.MapRazorPages()
+                   .WithStaticAssets();
+
+                Log.Verbose("Starting web service.");
+                app.RunAsync();
             }
-
-            app.UseHttpsRedirection();
-
-            app.UseRouting();
-
-            app.UseAuthentication();
-            app.UseAuthorization();
-
-            app.MapStaticAssets();
-            app.MapRazorPages()
-               .WithStaticAssets();
-
-            Log.Verbose("Starting web service.");
-            app.RunAsync();
         }
 
         public void Stop()

@@ -27,17 +27,16 @@
  Source: "C:\DropZone\CatMQ.Publish\*.exe"; DestDir: "{app}"; Flags: IgnoreVersion;
  Source: "C:\DropZone\CatMQ.Publish\*.dll"; DestDir: "{app}"; Flags: IgnoreVersion;
  Source: "C:\DropZone\CatMQ.Publish\*.json"; DestDir: "{app}"; Flags: IgnoreVersion;
- Source: ".\config\*.json"; DestDir: "{app}"; Flags: IgnoreVersion;
  Source: "..\Images\Logo.ico"; DestDir: "{app}"; Flags: IgnoreVersion;
 
 [Icons]
- Name: "{commondesktop}\CatMQ Manager"; Filename: "http://127.0.0.1:45783/"; IconFilename: "{app}\Logo.ico"
- Name: "{group}\CatMQ Manager"; Filename: "http://127.0.0.1:45783/"; IconFilename: "{app}\Logo.ico"
+ Name: "{commondesktop}\CatMQ Manager"; Filename: "https://localhost:45783/"; IconFilename: "{app}\Logo.ico"
+ Name: "{group}\CatMQ Manager"; Filename: "https://localhost:45783/"; IconFilename: "{app}\Logo.ico"
 
 [Run]
  Filename: "{app}\CatMQ.Service.exe"; Parameters: "install"; Flags: runhidden; StatusMsg: "Installing service...";
  Filename: "{app}\CatMQ.Service.exe"; Parameters: "start"; Flags: runhidden; StatusMsg: "Starting service...";
- Filename: "http://127.0.0.1:45783/"; Description: "Run CatMQ Manager now?"; Flags: postinstall nowait skipifsilent shellexec;
+ Filename: "https://localhost:45783/"; Description: "Run CatMQ Manager now?"; Flags: postinstall nowait skipifsilent shellexec;
 
 [UninstallRun]
  Filename: "{app}\CatMQ.Service.exe"; Parameters: "uninstall"; Flags: runhidden; StatusMsg: "Installing service..."; RunOnceId: "ServiceRemoval";

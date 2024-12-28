@@ -19,16 +19,16 @@ namespace CatMQ.Service
 
             HostFactory.Run(x =>
             {
-                x.StartAutomatically(); // Start the service automatically
+                x.StartAutomatically();
 
                 x.EnableServiceRecovery(rc =>
                 {
-                    rc.RestartService(1); // restart the service after 1 minute
+                    rc.RestartService(1);
                 });
 
                 x.Service<QueuingService>(s =>
                 {
-                    s.ConstructUsing(hostSettings => new QueuingService(s));
+                    s.ConstructUsing(hostSettings => new QueuingService());
                     s.WhenStarted(tc => tc.Start());
                     s.WhenStopped(tc => tc.Stop());
                 });
