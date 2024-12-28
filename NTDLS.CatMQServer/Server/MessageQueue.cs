@@ -29,9 +29,21 @@ namespace NTDLS.CatMQ.Server
 
         public CMqQueueConfiguration QueueConfiguration { get; private set; } = queueConfiguration;
 
+        /// <summary>
+        /// The total number of messages that have been euqued into this queue.
+        /// </summary>
         public ulong TotalEnqueuedMessages { get; set; }
+        /// <summary>
+        /// The total number of messages that have been removed from this queue due to age expiration.
+        /// </summary>
         public ulong TotalExpiredMessages { get; set; }
+        /// <summary>
+        /// The total number of messages that have been delivered from this queue to subscribers.
+        /// </summary>
         public ulong TotalDeliveredMessages { get; set; }
+        /// <summary>
+        /// The total number of messages that have failed to deliver from this queue to subscribers.
+        /// </summary>
         public ulong TotalDeliveryFailures { get; set; }
 
         internal void SetServer(CMqServer mqServer)
@@ -131,6 +143,17 @@ namespace NTDLS.CatMQ.Server
                                 break;
                             }
 
+                            //Keep track of per-message-subscriber delivery metrics.
+                            if (topMessage.SubscriberMessageDeliveries.TryGetValue(subscriber.ConnectionId, out var subscriberMessageDelivery))
+                            {
+                                subscriberMessageDelivery.DeliveryAttempts++;
+                            }
+                            else
+                            {
+                                subscriberMessageDelivery = new SubscriberMessageDelivery() { DeliveryAttempts = 1 };
+                                topMessage.SubscriberMessageDeliveries.Add(subscriber.ConnectionId, subscriberMessageDelivery);
+                            }
+
                             try
                             {
                                 subscriber.DeliveryAttempts++;
@@ -165,17 +188,6 @@ namespace NTDLS.CatMQ.Server
                                 messageQueue.TotalDeliveryFailures++;
                                 subscriber.FailedMessagesDeliveries++;
                                 messageQueue.QueueServer.InvokeOnException(messageQueue.QueueServer, messageQueue.QueueConfiguration, ex.GetBaseException());
-                            }
-
-                            //Keep track of per-message-subscriber delivery metrics.
-                            if (topMessage.SubscriberMessageDeliveries.TryGetValue(subscriber.ConnectionId, out var subscriberMessageDelivery))
-                            {
-                                subscriberMessageDelivery.DeliveryAttempts++;
-                            }
-                            else
-                            {
-                                subscriberMessageDelivery = new SubscriberMessageDelivery() { DeliveryAttempts = 1 };
-                                topMessage.SubscriberMessageDeliveries.Add(subscriber.ConnectionId, subscriberMessageDelivery);
                             }
 
                             //If we have tried to deliver this message to this subscriber too many times, then mark this subscriber-message as satisfied.

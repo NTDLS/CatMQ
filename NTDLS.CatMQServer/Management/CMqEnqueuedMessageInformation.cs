@@ -1,4 +1,6 @@
-﻿namespace NTDLS.CatMQServer.Management
+﻿using System.ComponentModel;
+
+namespace NTDLS.CatMQServer.Management
 {
     /// <summary>
     /// Contains readonly information about messages.
@@ -24,6 +26,11 @@
         /// The message payload that needs to be sent to the subscriber.
         /// </summary>
         public string MessageJson { get; internal set; } = string.Empty;
+
+        /// <summary>
+        /// The number of sunscribers expecting to receive this message.
+        /// </summary>
+        public int SubscriberCount { get; internal set; }
 
         /// <summary>
         /// The list of connection IDs that the message has been successfully delivered to.

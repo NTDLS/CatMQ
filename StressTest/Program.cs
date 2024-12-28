@@ -24,16 +24,21 @@ namespace StressTest
 
         static void InstanceThread()
         {
+            Console.WriteLine("Starting client...");
+
             var client = new CMqClient(new CMqClientConfiguration
             {
                 AutoReconnect = true
             });
             client.ConnectAsync("127.0.0.1", 45784);
 
+            Console.WriteLine("Waiting for connection...");
             while (client.IsConnected == false)
             {
                 Thread.Sleep(1);
             }
+
+            Console.WriteLine("Connected...");
 
             var myQueueNames = new HashSet<string>();
 

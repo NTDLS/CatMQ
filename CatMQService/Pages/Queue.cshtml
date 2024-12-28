@@ -49,23 +49,27 @@ else
             <table class="table table-striped table-bordered">
                 <thead class="table-light">
                     <tr>
-                        <th colspan="4">Statistics</th>
+                        <th colspan="6">Statistics</th>
                     </tr>
                 </thead>
                 <thead class="table-light">
                     <tr>
-                        <th>Current Enqueued Messages</th>
-                        <th>Total Delivered Messages</th>
-                        <th>Total Enqueued Messages</th>
-                        <th>Total Expired Messages</th>
+                        <th>Subscribers</th>
+                        <th>Current Messages</th>
+                        <th>Total Messages</th>
+                        <th>Total Delivered</th>
+                        <th>Expired Messages</th>
+                        <th>Delivery Failures</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr>
+                        <td>@Model.Queue.SubscriberCount.ToString("n0")</td>
                         <td><a href="/messages/@Model.Queue.QueueName">@Model.Queue.CurrentEnqueuedMessageCount.ToString("n0")</a></td>
-                        <td>@Model.Queue.TotalDeliveredMessages.ToString("n0")</td>
                         <td>@Model.Queue.TotalEnqueuedMessages.ToString("n0")</td>
+                        <td>@Model.Queue.TotalDeliveredMessages.ToString("n0")</td>
                         <td>@Model.Queue.TotalExpiredMessages.ToString("n0")</td>
+                        <td>@Model.Queue.TotalDeliveryFailures.ToString("n0")</td>
                     </tr>
                 </tbody>
             </table>

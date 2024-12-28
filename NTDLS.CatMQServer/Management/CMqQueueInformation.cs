@@ -53,19 +53,21 @@ namespace NTDLS.CatMQServer.Management
         public int SubscriberCount { get; set; }
 
         /// <summary>
-        /// The current number of messages that are enqueued in this message queue.
-        /// </summary>
-        public ulong TotalDeliveredMessages { get; internal set; }
-
-        /// <summary>
-        /// The total number of messages that have been enqueued to this message queue.
+        /// The total number of messages that have been euqued into this queue.
         /// </summary>
         public ulong TotalEnqueuedMessages { get; internal set; }
-
         /// <summary>
-        /// The total number of messages that have expired in this message queue without being delivered.
+        /// The total number of messages that have been removed from this queue due to age expiration.
         /// </summary>
         public ulong TotalExpiredMessages { get; internal set; }
+        /// <summary>
+        /// The total number of messages that have been delivered from this queue to subscribers.
+        /// </summary>
+        public ulong TotalDeliveredMessages { get; internal set; }
+        /// <summary>
+        /// The total number of messages that have failed to deliver from this queue to subscribers.
+        /// </summary>
+        public ulong TotalDeliveryFailures { get; internal set; }
 
         /// <summary>
         /// Whether the queue is persisted or ephemeral.

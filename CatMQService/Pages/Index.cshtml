@@ -48,7 +48,7 @@ else
             <table class="table table-striped table-bordered">
                 <thead class="table-light">
                     <tr>
-                        <th colspan="6">Queues</th>
+                        <th colspan="7">Queues</th>
                     </tr>
                 </thead>
                 <thead class="table-light">
@@ -56,9 +56,10 @@ else
                         <th>Name</th>
                         <th>Subscribers</th>
                         <th>Current Messages</th>
-                        <th>Total Delivered</th>
                         <th>Total Messages</th>
+                        <th>Total Delivered</th>
                         <th>Expired Messages</th>
+                        <th>Delivery Failures</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -68,9 +69,10 @@ else
                             <td><a href="/queue/@queue.QueueName">@queue.QueueName</a></td>
                             <td>@queue.SubscriberCount.ToString("n0")</td>
                             <td><a href="/messages/@queue.QueueName">@queue.CurrentEnqueuedMessageCount.ToString("n0")</a></td>
-                            <td>@queue.TotalDeliveredMessages.ToString("n0")</td>
                             <td>@queue.TotalEnqueuedMessages.ToString("n0")</td>
+                            <td>@queue.TotalDeliveredMessages.ToString("n0")</td>
                             <td>@queue.TotalExpiredMessages.ToString("n0")</td>
+                            <td>@queue.TotalDeliveryFailures.ToString("n0")</td>
                         </tr>
                     }
                 </tbody>

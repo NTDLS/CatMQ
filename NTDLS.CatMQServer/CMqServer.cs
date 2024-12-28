@@ -128,16 +128,17 @@ namespace NTDLS.CatMQServer
                                     BatchDeliveryInterval = mqKVP.Value.QueueConfiguration.BatchDeliveryInterval,
                                     ConsumptionScheme = mqKVP.Value.QueueConfiguration.ConsumptionScheme,
                                     CurrentEnqueuedMessageCount = m.Count,
-                                    SubscriberCount = sKVP.Count,
                                     DeliveryScheme = mqKVP.Value.QueueConfiguration.DeliveryScheme,
                                     DeliveryThrottle = mqKVP.Value.QueueConfiguration.DeliveryThrottle,
                                     MaxDeliveryAttempts = mqKVP.Value.QueueConfiguration.MaxDeliveryAttempts,
                                     MaxMessageAge = mqKVP.Value.QueueConfiguration.MaxMessageAge,
+                                    Persistence = mqKVP.Value.QueueConfiguration.Persistence,
                                     QueueName = mqKVP.Value.QueueConfiguration.QueueName,
+                                    SubscriberCount = sKVP.Count,
                                     TotalDeliveredMessages = mqKVP.Value.TotalDeliveredMessages,
+                                    TotalDeliveryFailures = mqKVP.Value.TotalDeliveryFailures,
                                     TotalEnqueuedMessages = mqKVP.Value.TotalEnqueuedMessages,
-                                    TotalExpiredMessages = mqKVP.Value.TotalExpiredMessages,
-                                    Persistence = mqKVP.Value.QueueConfiguration.Persistence
+                                    TotalExpiredMessages = mqKVP.Value.TotalExpiredMessages
                                 });
                             });
                         });
@@ -214,18 +215,22 @@ namespace NTDLS.CatMQServer
                     {
                         success = success && qKVP.Value.EnqueuedMessages.TryUse(m =>
                         {
-                            foreach (var message in m.Skip(offset).Take(take))
+                            success = success && qKVP.Value.Subscribers.TryUse(sKVP =>
                             {
-                                result.Add(new CMqEnqueuedMessageInformation
+                                foreach (var message in m.Skip(offset).Take(take))
                                 {
-                                    Timestamp = message.Timestamp,
-                                    SubscriberMessageDeliveries = message.SubscriberMessageDeliveries.Keys.ToHashSet(),
-                                    SatisfiedSubscribersConnectionIDs = message.SatisfiedSubscribersConnectionIDs,
-                                    ObjectType = message.ObjectType,
-                                    MessageJson = message.MessageJson,
-                                    MessageId = message.MessageId
-                                });
-                            }
+                                    result.Add(new CMqEnqueuedMessageInformation
+                                    {
+                                        Timestamp = message.Timestamp,
+                                        SubscriberCount = sKVP.Count,
+                                        SubscriberMessageDeliveries = message.SubscriberMessageDeliveries.Keys.ToHashSet(),
+                                        SatisfiedSubscribersConnectionIDs = message.SatisfiedSubscribersConnectionIDs,
+                                        ObjectType = message.ObjectType,
+                                        MessageJson = message.MessageJson,
+                                        MessageId = message.MessageId
+                                    });
+                                }
+                            });
                         });
 
                         if (!success)
@@ -462,6 +467,8 @@ namespace NTDLS.CatMQServer
                 {
                     //While the RockDB WAL logs data, it’s a good idea to flush the MemTable to disk periodically for additional safety.
                     _persistenceDatabase?.Flush(new FlushOptions());
+
+                    CheckpointPersistentMessageQueues();
                     lastCheckpoint = DateTime.UtcNow;
                 }
 
