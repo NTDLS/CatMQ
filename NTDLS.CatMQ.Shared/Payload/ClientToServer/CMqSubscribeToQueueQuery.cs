@@ -1,6 +1,6 @@
 ﻿using NTDLS.ReliableMessaging;
 
-namespace NTDLS.CatMQ.Shared.Payloads.Queries.ClientToServer
+namespace NTDLS.CatMQ.Shared.Payload.ClientToServer
 {
     public class CMqSubscribeToQueueQuery(string queueName)
         : IRmQuery<CMqSubscribeToQueueQueryReply>

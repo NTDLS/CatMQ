@@ -2,7 +2,7 @@
 using NTDLS.CatMQ.Server.Server;
 using NTDLS.CatMQ.Server.Server.QueryHandlers;
 using NTDLS.CatMQ.Shared;
-using NTDLS.CatMQ.Shared.Payloads.Queries.ServerToClient;
+using NTDLS.CatMQ.Shared.Payload.ServerToClient;
 using NTDLS.ReliableMessaging;
 using NTDLS.Semaphore;
 using RocksDbSharp;

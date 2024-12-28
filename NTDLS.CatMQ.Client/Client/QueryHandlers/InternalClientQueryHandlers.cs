@@ -1,5 +1,6 @@
 ﻿using Newtonsoft.Json;
-using NTDLS.CatMQ.Shared.Payloads.Queries.ServerToClient;
+using NTDLS.CatMQ.Shared;
+using NTDLS.CatMQ.Shared.Payload.ServerToClient;
 using NTDLS.ReliableMessaging;
 using NTDLS.Semaphore;
 using System.Reflection;

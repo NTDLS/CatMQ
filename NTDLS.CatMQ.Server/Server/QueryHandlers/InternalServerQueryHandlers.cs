@@ -1,4 +1,4 @@
-﻿using NTDLS.CatMQ.Shared.Payloads.Queries.ClientToServer;
+﻿using NTDLS.CatMQ.Shared.Payload.ClientToServer;
 using NTDLS.ReliableMessaging;
 using System.Net;
 
