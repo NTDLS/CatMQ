@@ -1,7 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using NTDLS.CatMQ.Server;
-using NTDLS.CatMQ.Server.Management;
 
 namespace CatMQ.Service.Pages
 {
