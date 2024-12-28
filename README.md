@@ -1,9 +1,5 @@
 # CatMQ
-
-![64](https://github.com/user-attachments/assets/b857b3c0-a3f0-4d49-94c6-cb884ad0400b)
-
 CatMQ is a high-performance and reliable persistent message queue designed for efficient inter-process communication, task queuing, load balancing, and data buffering over TCP/IP.
-
 
 ## Packages 📦
 - Server Nuget package: https://www.nuget.org/packages/NTDLS.CatMQ.Client
