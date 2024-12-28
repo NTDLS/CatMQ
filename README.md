@@ -96,16 +96,36 @@ private static bool Client_OnReceived(CMqClient client, string queueName, ICMqMe
 CatMQ is based heavily on internally built technologies that leverage the works by people
 much smarter than me. Eternally grateful to all those for making my development a walk in the park.
 
-- Light-weight pooling: [NTDLS.DelegateThreadPooling](https://github.com/NTDLS/NTDLS.DelegateThreadPooling).
+- Light-weight thread scheduling with sub-pooling: [NTDLS.DelegateThreadPooling](https://github.com/NTDLS/NTDLS.DelegateThreadPooling).
 - Nullabily and formatting: [NTDLS.Helpers](https://github.com/NTDLS/NTDLS.Helpers).
 - Based heavily on the standalone in-memory message queue: [NTDLS.MemoryQueue](https://github.com/NTDLS/NTDLS.MemoryQueue).
-- Messaging with compression, encryption, CRC and reliability notifications: [NTDLS.ReliableMessaging](https://github.com/NTDLS/NTDLS.ReliableMessaging).
+- Round-trip messaging with compression, encryption, checksum and reliability notifications: [NTDLS.ReliableMessaging](https://github.com/NTDLS/NTDLS.ReliableMessaging).
 - Stream framing for packets reconstruction and fragmentation: [NTDLS.StreamFraming](https://github.com/NTDLS/NTDLS.StreamFraming).
-- Indispensable polymorphic deserialization provided by [Newtonsoft.Json](https://github.com/JamesNK/Newtonsoft.Json) since Microsoft refused to add it for "reasons".
+- Resource protection and concurrency because threads like to bite: [NTDLS.Semaphore](https://github.com/NTDLS/NTDLS.Semaphore)
+- Polymorphic deserialization provided by [Newtonsoft.Json](https://github.com/JamesNK/Newtonsoft.Json) because Microsoft refused to add it for "reasons".
 - Mega-tight communication enabled by [protobuf-net](https://github.com/protobuf-net/protobuf-net).
 - Message persistence provided by [rocksdb-sharp](https://github.com/curiosity-ai/rocksdb-sharp).
 - Logging, because otherwise we'd be blind: [serilog](https://github.com/serilog/serilog).
 - Windows service magic: [Topshelf](https://github.com/Topshelf/Topshelf).
+
+## Screenshots
+
+### Home view
+
+![image](https://github.com/user-attachments/assets/a67b0b43-7566-4f03-9d63-13f7158c99ad)
+
+### Queue view
+
+![image](https://github.com/user-attachments/assets/7e90a9d1-3b7a-4b95-acc6-5c97ea02dcae)
+
+### Messages view
+
+![image](https://github.com/user-attachments/assets/ddd7d0c7-6836-48a4-a6db-8aa0e8a6acd3)
+
+### Message view
+
+![image](https://github.com/user-attachments/assets/b28f4f40-3fc6-4116-b656-0b866880d20e)
+
 
 ## License
 [MIT](https://choosealicense.com/licenses/mit/)
