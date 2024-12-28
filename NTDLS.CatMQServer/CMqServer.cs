@@ -386,8 +386,8 @@ namespace NTDLS.CatMQServer
 
                 #region Load persisted messages.
 
-                //The messages in RocksDB are not stored in order, so we need to load all messages into a dictonary by queue name
-                //  so we can then sort them by their time stamps and add them back to the appropriate queues.
+                //The keys in RocksDB are not stored in the order they were added, so we need to load all messages into a dictonary 
+                //  by queue name so we can then sort them by their time stamps and add them back to the appropriate queues.
 
                 var persistedQueueMessages = new Dictionary<string, List<EnqueuedMessage>>(StringComparer.OrdinalIgnoreCase);
                 RocksDb? persistenceDatabase = null;
@@ -432,6 +432,7 @@ namespace NTDLS.CatMQServer
                     {
                         foreach (var persistedQueueMessage in persistedQueueMessages)
                         {
+
                             if (mqd.TryGetValue(persistedQueueMessage.Key, out var messageQueue))
                             {
                                 messageQueue.EnqueuedMessages.Use(m =>
@@ -446,6 +447,8 @@ namespace NTDLS.CatMQServer
                         }
                     });
                 }
+
+                persistedQueueMessages.Clear();
 
                 #endregion
 
