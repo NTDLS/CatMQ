@@ -22,10 +22,12 @@
  AppUpdatesURL                    = http://www.NetworkDLS.com/
 
 [Files]
- Source: "..\CatMQService\bin\Release\net9.0\runtimes\*.*"; DestDir: "{app}\runtimes"; Flags: IgnoreVersion recursesubdirs;
- Source: "..\CatMQService\bin\Release\net9.0\*.exe"; DestDir: "{app}"; Flags: IgnoreVersion;
- Source: "..\CatMQService\bin\Release\net9.0\*.dll"; DestDir: "{app}"; Flags: IgnoreVersion;
- Source: "..\CatMQService\bin\Release\net9.0\*.json"; DestDir: "{app}"; Flags: IgnoreVersion;
+ Source: "C:\DropZone\CatMQ.Publish\runtimes\*.*"; DestDir: "{app}\runtimes"; Flags: IgnoreVersion recursesubdirs;
+ Source: "C:\DropZone\CatMQ.Publish\wwwroot\*.*"; DestDir: "{app}\wwwroot"; Flags: IgnoreVersion recursesubdirs;
+ Source: "C:\DropZone\CatMQ.Publish\*.exe"; DestDir: "{app}"; Flags: IgnoreVersion;
+ Source: "C:\DropZone\CatMQ.Publish\*.dll"; DestDir: "{app}"; Flags: IgnoreVersion;
+ Source: "C:\DropZone\CatMQ.Publish\*.json"; DestDir: "{app}"; Flags: IgnoreVersion;
+ Source: ".\config\*.json"; DestDir: "{app}"; Flags: IgnoreVersion;
   
 [Icons]
  Name: "{commondesktop}\CatMQ Manager"; Filename: "http://127.0.0.1:45783/";

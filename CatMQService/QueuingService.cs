@@ -73,7 +73,7 @@ namespace CatMQService
                .WithStaticAssets();
 
             Log.Verbose("Starting web service.");
-            app.Run();
+            app.RunAsync();
         }
 
         public void Stop()
