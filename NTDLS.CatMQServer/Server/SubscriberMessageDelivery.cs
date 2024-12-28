@@ -1,4 +1,4 @@
-﻿namespace NTDLS.CatMQ.Server
+﻿namespace NTDLS.CatMQServer.Server
 {
     /// <summary>
     /// Contains information about a delivery of a single message to a single subscriber.

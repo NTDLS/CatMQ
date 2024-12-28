@@ -1,16 +1,18 @@
-﻿using NTDLS.CatMQServer;
-using NTDLS.CatMQServer.Management;
+﻿using NTDLS.CatMQServer.Management;
 using NTDLS.CatMQShared;
 using NTDLS.Helpers;
 using NTDLS.Semaphore;
 
-namespace NTDLS.CatMQ.Server
+namespace NTDLS.CatMQServer.Server
 {
     /// <summary>
     /// A named message queue and its delivery thread.
     /// </summary>
-    internal class MessageQueue(CMqServer mqServer, CMqQueueConfiguration queueConfiguration)
+    internal class MessageQueue
     {
+        private readonly Thread _deliveryThread = new(DeliveryThreadProc);
+        private CMqServer? QueueServer { get; set; }
+
         internal AutoResetEvent DeliveryThreadWaitEvent = new(false);
         internal bool KeepRunning { get; set; } = false;
 
@@ -24,10 +26,7 @@ namespace NTDLS.CatMQ.Server
         /// </summary>
         internal PessimisticCriticalResource<List<EnqueuedMessage>> EnqueuedMessages { get; set; } = new();
 
-        private readonly Thread _deliveryThread = new(DeliveryThreadProc);
-        private CMqServer QueueServer = mqServer;
-
-        public CMqQueueConfiguration QueueConfiguration { get; private set; } = queueConfiguration;
+        public CMqQueueConfiguration QueueConfiguration { get; set; }
 
         /// <summary>
         /// The total number of messages that have been euqued into this queue.
@@ -46,9 +45,33 @@ namespace NTDLS.CatMQ.Server
         /// </summary>
         public ulong TotalDeliveryFailures { get; set; }
 
+        public MessageQueue()
+        {
+            QueueConfiguration = new(string.Empty);
+        }
+
+        public MessageQueue(CMqServer mqServer, CMqQueueConfiguration queueConfiguration)
+        {
+            QueueServer = mqServer;
+            QueueConfiguration = queueConfiguration;
+
+        }
+
         internal void SetServer(CMqServer mqServer)
         {
             QueueServer = mqServer;
+        }
+
+        /// <summary>
+        /// Sorts the messages in the queue by their timestamps.
+        /// This is only necessisary when loading meassages from the database at startup.
+        /// </summary>
+        internal void SortMessages()
+        {
+            EnqueuedMessages.Use(m =>
+            {
+                m.Sort((m1, m2) => m1.Timestamp.CompareTo(m2.Timestamp));
+            });
         }
 
         private static void DeliveryThreadProc(object? pMessageQueue)
@@ -57,6 +80,8 @@ namespace NTDLS.CatMQ.Server
 
             var lastStaleMessageScan = DateTime.UtcNow;
             var lastBatchDelivery = DateTime.UtcNow;
+
+            messageQueue.QueueServer.EnsureNotNull();
 
             while (messageQueue.KeepRunning)
             {

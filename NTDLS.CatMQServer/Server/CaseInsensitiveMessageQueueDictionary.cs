@@ -1,4 +1,4 @@
-﻿namespace NTDLS.CatMQ.Server
+﻿namespace NTDLS.CatMQServer.Server
 {
     internal class CaseInsensitiveMessageQueueDictionary : Dictionary<string, MessageQueue>
     {

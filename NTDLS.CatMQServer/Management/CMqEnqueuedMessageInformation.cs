@@ -1,6 +1,4 @@
-﻿using System.ComponentModel;
-
-namespace NTDLS.CatMQServer.Management
+﻿namespace NTDLS.CatMQServer.Management
 {
     /// <summary>
     /// Contains readonly information about messages.

@@ -1,9 +1,8 @@
-﻿using NTDLS.CatMQServer;
-using NTDLS.CatMQShared.Payloads.Queries.ClientToServer;
+﻿using NTDLS.CatMQShared.Payloads.Queries.ClientToServer;
 using NTDLS.ReliableMessaging;
 using System.Net;
 
-namespace NTDLS.CatMQ.Server.QueryHandlers
+namespace NTDLS.CatMQServer.Server.QueryHandlers
 {
     internal class InternalServerQueryHandlers(CMqServer mqServer)
         : IRmMessageHandler

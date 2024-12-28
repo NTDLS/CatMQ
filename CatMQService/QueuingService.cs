@@ -29,7 +29,7 @@ namespace CatMQService
 
             if (string.IsNullOrEmpty(persistencePath))
             {
-                var executablePath = Path.GetDirectoryName( Assembly.GetExecutingAssembly().Location);
+                var executablePath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
                 persistencePath = Path.Join(executablePath, "Data");
                 Directory.CreateDirectory(persistencePath);
             }

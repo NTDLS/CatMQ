@@ -1,7 +1,6 @@
-﻿using Newtonsoft.Json;
-using NTDLS.CatMQ.Server;
-using NTDLS.CatMQ.Server.QueryHandlers;
-using NTDLS.CatMQServer.Management;
+﻿using NTDLS.CatMQServer.Management;
+using NTDLS.CatMQServer.Server;
+using NTDLS.CatMQServer.Server.QueryHandlers;
 using NTDLS.CatMQShared;
 using NTDLS.CatMQShared.Payloads.Queries.ServerToClient;
 using NTDLS.ReliableMessaging;
@@ -9,6 +8,7 @@ using NTDLS.Semaphore;
 using RocksDbSharp;
 using System.Collections.ObjectModel;
 using System.Net;
+using System.Text.Json;
 
 namespace NTDLS.CatMQServer
 {
@@ -82,7 +82,8 @@ namespace NTDLS.CatMQServer
             {
                 //TODO: checkpoint this from time to time.
                 var persistedQueues = mqd.Where(q => q.Value.QueueConfiguration.Persistence == PMqPersistence.Persistent).Select(q => q.Value).ToList();
-                var persistedQueuesJson = JsonConvert.SerializeObject(persistedQueues);
+                //Serialize using System.Text.Json as opposed to Newtonsoft for efficiency.
+                var persistedQueuesJson = JsonSerializer.Serialize(persistedQueues);
                 File.WriteAllText(Path.Join(_configuration.PersistencePath, "queues.json"), persistedQueuesJson);
             }
         }
@@ -360,7 +361,8 @@ namespace NTDLS.CatMQServer
                 if (File.Exists(persistedQueuesFile))
                 {
                     var persistedQueuesJson = File.ReadAllText(persistedQueuesFile);
-                    var loadedPersistedQueues = JsonConvert.DeserializeObject<List<MessageQueue>>(persistedQueuesJson);
+                    //Deserialize using System.Text.Json as opposed to Newtonsoft for efficiency.
+                    var loadedPersistedQueues = JsonSerializer.Deserialize<List<MessageQueue>>(persistedQueuesJson);
 
                     if (loadedPersistedQueues != null)
                     {
@@ -386,10 +388,9 @@ namespace NTDLS.CatMQServer
 
                 #region Load persisted messages.
 
-                //The keys in RocksDB are not stored in the order they were added, so we need to load all messages into a dictonary 
-                //  by queue name so we can then sort them by their time stamps and add them back to the appropriate queues.
+                //The keys in RocksDB are not stored in the order they were added, so we
+                // need to load all messages into the messages queues then sort them in place.
 
-                var persistedQueueMessages = new Dictionary<string, List<EnqueuedMessage>>(StringComparer.OrdinalIgnoreCase);
                 RocksDb? persistenceDatabase = null;
 
                 string databaseFile = Path.Join(_configuration.PersistencePath, "messages");
@@ -400,55 +401,30 @@ namespace NTDLS.CatMQServer
 
                 if (persistedQueues != null)
                 {
-                    using (var iterator = persistenceDatabase.NewIterator())
+                    using var iterator = persistenceDatabase.NewIterator();
+                    _messageQueues.Use(mqd =>
                     {
                         for (iterator.SeekToFirst(); iterator.Valid(); iterator.Next())
                         {
-                            var persistedMessage = JsonConvert.DeserializeObject<EnqueuedMessage>(iterator.StringValue());
+                            //Deserialize using System.Text.Json as opposed to Newtonsoft for efficiency.
+                            var persistedMessage = JsonSerializer.Deserialize<EnqueuedMessage>(iterator.StringValue());
                             if (persistedMessage != null)
                             {
-                                if (persistedQueueMessages.TryGetValue(persistedMessage.QueueName, out var messageCollection))
+                                if (mqd.TryGetValue(persistedMessage.QueueName, out var messageQueue))
                                 {
-                                    messageCollection.Add(persistedMessage);
-                                }
-                                else
-                                {
-                                    persistedQueueMessages.Add(persistedMessage.QueueName, new List<EnqueuedMessage>() { persistedMessage });
-                                }
-                            }
-                        }
-                    }
-                }
-
-                #endregion
-
-                #region Enqueue persisted messages.
-
-                //Loop though the persistent queues (names), sort the messages by their time-stamps and add them to the queues.
-
-                if (persistedQueues != null)
-                {
-                    _messageQueues.Use(mqd =>
-                    {
-                        foreach (var persistedQueueMessage in persistedQueueMessages)
-                        {
-
-                            if (mqd.TryGetValue(persistedQueueMessage.Key, out var messageQueue))
-                            {
-                                messageQueue.EnqueuedMessages.Use(m =>
-                                {
-                                    var persistedMessages = persistedQueueMessage.Value.OrderBy(o => o.Timestamp);
-                                    foreach (var persistedMessage in persistedMessages)
+                                    messageQueue.EnqueuedMessages.Use(m =>
                                     {
                                         m.Add(persistedMessage);
-                                    }
-                                });
+                                    });
+                                }
                             }
                         }
+
+                        //Sort the message in the queues by their timestamps.
+                        var tasks = mqd.Values.Select(mq => Task.Run(() => mq.SortMessages()));
+                        Task.WhenAll(tasks).Wait();
                     });
                 }
-
-                persistedQueueMessages.Clear();
 
                 #endregion
 
@@ -711,7 +687,8 @@ namespace NTDLS.CatMQServer
                             var message = new EnqueuedMessage(queueKey, objectType, messageJson);
                             if (_persistenceDatabase != null)
                             {
-                                var persistedJson = JsonConvert.SerializeObject(message);
+                                //Serialize using System.Text.Json as opposed to Newtonsoft for efficiency.
+                                var persistedJson = JsonSerializer.Serialize(message);
                                 lock (_persistenceDatabase)
                                 {
                                     _persistenceDatabase.Put($"{queueKey}_{message.MessageId}", persistedJson);

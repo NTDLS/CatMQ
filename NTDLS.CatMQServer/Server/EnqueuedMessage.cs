@@ -1,6 +1,6 @@
-﻿using Newtonsoft.Json;
+﻿using System.Text.Json.Serialization;
 
-namespace NTDLS.CatMQ.Server
+namespace NTDLS.CatMQServer.Server
 {
     /// <summary>
     /// A message that is in the queue and waiting to be delivered to all subscribers.
@@ -35,13 +35,13 @@ namespace NTDLS.CatMQ.Server
         /// <summary>
         /// The list of connection IDs that the message has been successfully delivered to.
         /// </summary>
-        [JsonIgnore]
+        [JsonIgnore] //Serialize using System.Text.Json as opposed to Newtonsoft for efficiency.
         public Dictionary<Guid, SubscriberMessageDelivery> SubscriberMessageDeliveries { get; set; } = new();
 
         /// <summary>
         /// List of subscribers which have been delivered to or for which the retry-attempts have been reached.
         /// </summary>
-        [JsonIgnore]
+        [JsonIgnore] //Serialize using System.Text.Json as opposed to Newtonsoft for efficiency.
         public HashSet<Guid> SatisfiedSubscribersConnectionIDs { get; set; } = new();
     }
 }
