@@ -100,15 +100,16 @@ private static bool Client_OnReceived(CMqClient client, string queueName, ICMqMe
 CatMQ is based heavily on internally built technologies that leverage the works by people
 much smarter than me. Eternally grateful to all those for making my development a walk in the park.
 
-- Light-weight pooling: [NTDLS.DelegateThreadPooling](https://github.com/NTDLS/NTDLS.DelegateThreadPooling)
-- Nullabily and formatting: [NTDLS.Helpers](https://github.com/NTDLS/NTDLS.Helpers)
-- Based heavily on the standalone in-memory message queue: [NTDLS.MemoryQueue](https://github.com/NTDLS/NTDLS.MemoryQueue)
-- Messaging with compression, encryption, CRC and reliability notifications: [NTDLS.ReliableMessaging](https://github.com/NTDLS/NTDLS.ReliableMessaging)
-- Stream framing for packets reconstruction and fragmentation: [NTDLS.StreamFraming](https://github.com/NTDLS/NTDLS.StreamFraming)
-- Indispensable polymorphic deserialization provided by [Newtonsoft.Json](https://github.com/JamesNK/Newtonsoft.Json) since Microsoft refused to add it for "reasons".
-- Mega-tight communication enabled by [protobuf-net](https://github.com/protobuf-net/protobuf-net)
-- Message persistence provided by [rocksdb-sharp](https://github.com/curiosity-ai/rocksdb-sharp)
-
+- Light-weight pooling: [NTDLS.DelegateThreadPooling](https://github.com/NTDLS/NTDLS.DelegateThreadPooling).
+- Nullabily and formatting: [NTDLS.Helpers](https://github.com/NTDLS/NTDLS.Helpers).
+- Based heavily on the standalone in-memory message queue: [NTDLS.MemoryQueue](https://github.com/NTDLS/NTDLS.MemoryQueue).
+- Messaging with compression, encryption, CRC and reliability notifications: [NTDLS.ReliableMessaging](https://github.com/NTDLS/NTDLS.ReliableMessaging).
+- Stream framing for packets reconstruction and fragmentation: [NTDLS.StreamFraming](https://github.com/NTDLS/NTDLS.StreamFraming).
+- Indispensable polymorphic deserialization provided by [Newtonsoft.Json](https://github.com/JamesNK/Newtonsoft.Json) since Microsoft refused to add it for "reasons"..
+- Mega-tight communication enabled by [protobuf-net](https://github.com/protobuf-net/protobuf-net).
+- Message persistence provided by [rocksdb-sharp](https://github.com/curiosity-ai/rocksdb-sharp).
+- Logging, because otherwise we'd be blind: [serilog](https://github.com/serilog/serilog).
+- Windows service magic: [Topshelf](https://github.com/Topshelf/Topshelf).
 
 ## License
 [MIT](https://choosealicense.com/licenses/mit/)
