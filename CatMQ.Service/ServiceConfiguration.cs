@@ -1,11 +1,30 @@
 ﻿using NTDLS.CatMQ.Shared;
+using NTDLS.Helpers;
+using System.Reflection;
+using System.Text.Json;
 
 namespace CatMQ.Service
 {
     public class ServiceConfiguration
     {
+        private string? _dataPath;
+
         public bool EnableWebUI { get; set; } = true;
-        public string? DataPath { get; set; }
+        public string DataPath
+        {
+            get
+            {
+                if (string.IsNullOrEmpty(_dataPath))
+                {
+                    _dataPath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location).EnsureNotNull();
+                }
+                return _dataPath;
+            }
+            set
+            {
+                _dataPath = value;
+            }
+        }
         public int QueuePort { get; set; } = 45784;
         public string? WebUIURL { get; set; } = "https://localhost:45783";
 
@@ -34,5 +53,37 @@ namespace CatMQ.Service
         ///The growth rate of the auto-resizing for the receive buffer.
         /// </summary>
         public double ReceiveBufferGrowthRate { get; set; } = CMqDefaults.BUFFER_GROWTH_RATE;
+
+        public T Read<T>(string fileName, T defaultValue)
+        {
+            var filePath = Path.Combine(DataPath, fileName);
+            if (File.Exists(filePath))
+            {
+                var json = File.ReadAllText(filePath);
+                var obj = JsonSerializer.Deserialize<T>(json);
+                return obj ?? defaultValue;
+            }
+            return defaultValue;
+        }
+
+        public T? Read<T>(string fileName)
+        {
+            var filePath = Path.Combine(DataPath, fileName);
+            if (File.Exists(filePath))
+            {
+                var json = File.ReadAllText(filePath);
+                var obj = JsonSerializer.Deserialize<T>(json);
+                return obj;
+            }
+            return default;
+        }
+
+        public void Write<T>(string fileName, T obj)
+        {
+            var json = JsonSerializer.Serialize<T>(obj);
+
+            var filePath = Path.Combine(DataPath, fileName);
+            File.WriteAllText(filePath, json);
+        }
     }
 }

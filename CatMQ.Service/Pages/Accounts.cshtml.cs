@@ -1,3 +1,4 @@
+using CatMQ.Service.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
@@ -9,10 +10,13 @@ namespace CatMQ.Service.Pages
         private readonly ILogger<AccountsModel> _logger = logger;
         public string? ErrorMessage { get; set; }
 
+        public List<Account> Accounts { get; set; } = new();
+
         public void OnGet()
         {
             try
             {
+                Accounts = serviceConfiguration.Read<List<Account>>("accounts.json", new());
             }
             catch (Exception ex)
             {

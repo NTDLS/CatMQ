@@ -1,3 +1,4 @@
+using CatMQ.Service.Models;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
@@ -29,21 +30,22 @@ namespace CatMQ.Service.Pages
         {
             try
             {
-                var usersFile = Path.Join(serviceConfiguration.DataPath, "credentials.json");
+                var usersFile = Path.Join(serviceConfiguration.DataPath, "accounts.json");
                 if (System.IO.File.Exists(usersFile) == false)
                 {
-                    var defaultCredentials = new List<UserCredential>
+                    //Create a default accounts file with a default account.
+                    var defaultCredentials = new List<Account>
                     {
-                        new UserCredential
+                        new Account
                         {
                             Username = "admin",
                             PasswordHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("password"))).ToLower()
                         }
                     };
-                    System.IO.File.WriteAllText(usersFile, JsonConvert.SerializeObject(defaultCredentials));
+                    serviceConfiguration.Write("accounts.json", defaultCredentials);
                 }
 
-                var credentials = JsonConvert.DeserializeObject<List<UserCredential>>(System.IO.File.ReadAllText(usersFile)) ?? new();
+                var credentials = JsonConvert.DeserializeObject<List<Account>>(System.IO.File.ReadAllText(usersFile)) ?? new();
 
                 IsDefaultPassword = credentials.Any(o => o.Username.Equals("admin", StringComparison.OrdinalIgnoreCase)
                                                 && o.PasswordHash == Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("password"))).ToLower());
@@ -59,16 +61,16 @@ namespace CatMQ.Service.Pages
         {
             try
             {
-                var usersFile = Path.Join(serviceConfiguration.DataPath, "credentials.json");
-                var credentials = JsonConvert.DeserializeObject<List<UserCredential>>(System.IO.File.ReadAllText(usersFile)) ?? new();
-                var credential = credentials.FirstOrDefault(o => o.Username.Equals(Username, StringComparison.OrdinalIgnoreCase)
+                var accounts = serviceConfiguration.Read<List<Account>>("accounts.json", new());
+
+                var account = accounts.FirstOrDefault(o => o.Username.Equals(Username, StringComparison.OrdinalIgnoreCase)
                                 && o.PasswordHash == Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Password ?? string.Empty))).ToLower());
 
-                if (credential != null)
+                if (account != null)
                 {
                     var claims = new List<Claim>
                     {
-                        new Claim(ClaimTypes.Name, credential.Username)
+                        new Claim(ClaimTypes.Name, account.Username)
                     };
 
                     var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
