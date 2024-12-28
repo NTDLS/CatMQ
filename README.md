@@ -107,5 +107,24 @@ much smarter than me. Eternally grateful to all those for making my development 
 - Logging, because otherwise we'd be blind: [serilog](https://github.com/serilog/serilog).
 - Windows service magic: [Topshelf](https://github.com/Topshelf/Topshelf).
 
+## Screenshots
+
+### Home view
+
+![image](https://github.com/user-attachments/assets/a67b0b43-7566-4f03-9d63-13f7158c99ad)
+
+### Queue view
+
+![image](https://github.com/user-attachments/assets/7e90a9d1-3b7a-4b95-acc6-5c97ea02dcae)
+
+### Messages view
+
+![image](https://github.com/user-attachments/assets/ddd7d0c7-6836-48a4-a6db-8aa0e8a6acd3)
+
+### Message view
+
+![image](https://github.com/user-attachments/assets/b28f4f40-3fc6-4116-b656-0b866880d20e)
+
+
 ## License
 [MIT](https://choosealicense.com/licenses/mit/)
