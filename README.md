@@ -111,20 +111,16 @@ much smarter than me. Eternally grateful to all those for making my development 
 ## Screenshots
 
 ### Home view
-
-![image](https://github.com/user-attachments/assets/a67b0b43-7566-4f03-9d63-13f7158c99ad)
+![image](https://github.com/user-attachments/assets/992d0278-f5e3-4830-af6b-52637812714e)
 
 ### Queue view
-
-![image](https://github.com/user-attachments/assets/7e90a9d1-3b7a-4b95-acc6-5c97ea02dcae)
+![image](https://github.com/user-attachments/assets/bf9387ec-8a7e-4847-9d96-ba18cfc66cf6)
 
 ### Messages view
-
-![image](https://github.com/user-attachments/assets/ddd7d0c7-6836-48a4-a6db-8aa0e8a6acd3)
+![image](https://github.com/user-attachments/assets/2e3ebc0f-7b67-41b6-b398-2c7a5aad7f8f)
 
 ### Message view
-
-![image](https://github.com/user-attachments/assets/b28f4f40-3fc6-4116-b656-0b866880d20e)
+![image](https://github.com/user-attachments/assets/d43b89a6-398a-41d3-84dc-6a8b5e4b84de)
 
 
 ## License
