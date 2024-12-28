@@ -1,6 +1,7 @@
 ﻿using NTDLS.CatMQServer;
 using NTDLS.CatMQShared;
 using Serilog;
+using System.Reflection;
 using Topshelf.ServiceConfigurators;
 
 namespace CatMQService
@@ -24,9 +25,18 @@ namespace CatMQService
                     options.LoginPath = "/Login";
                 });
 
+            var persistencePath = configuration.GetValue<string>("MqServer:DataPath");
+
+            if (string.IsNullOrEmpty(persistencePath))
+            {
+                var executablePath = Path.GetDirectoryName( Assembly.GetExecutingAssembly().Location);
+                persistencePath = Path.Join(executablePath, "Data");
+                Directory.CreateDirectory(persistencePath);
+            }
+
             _mqServer = new CMqServer(new CMqServerConfiguration
             {
-                PersistencePath = configuration.GetValue<string>("MqServer:DataPath")
+                PersistencePath = persistencePath
             });
             _mqServer.OnException += MqServer_OnException;
 
