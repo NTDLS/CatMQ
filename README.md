@@ -96,11 +96,12 @@ private static bool Client_OnReceived(CMqClient client, string queueName, ICMqMe
 CatMQ is based heavily on internally built technologies that leverage the works by people
 much smarter than me. Eternally grateful to all those for making my development a walk in the park.
 
-- Light-weight pooling: [NTDLS.DelegateThreadPooling](https://github.com/NTDLS/NTDLS.DelegateThreadPooling).
+- Light-weight scheduling with sub-pooling: [NTDLS.DelegateThreadPooling](https://github.com/NTDLS/NTDLS.DelegateThreadPooling).
 - Nullabily and formatting: [NTDLS.Helpers](https://github.com/NTDLS/NTDLS.Helpers).
 - Based heavily on the standalone in-memory message queue: [NTDLS.MemoryQueue](https://github.com/NTDLS/NTDLS.MemoryQueue).
-- Messaging with compression, encryption, CRC and reliability notifications: [NTDLS.ReliableMessaging](https://github.com/NTDLS/NTDLS.ReliableMessaging).
+- Messaging with compression, encryption, checksum and reliability notifications: [NTDLS.ReliableMessaging](https://github.com/NTDLS/NTDLS.ReliableMessaging).
 - Stream framing for packets reconstruction and fragmentation: [NTDLS.StreamFraming](https://github.com/NTDLS/NTDLS.StreamFraming).
+- Resource protection and concurrency because threads like to bite: [NTDLS.Semaphore](https://github.com/NTDLS/NTDLS.Semaphore)
 - Indispensable polymorphic deserialization provided by [Newtonsoft.Json](https://github.com/JamesNK/Newtonsoft.Json) since Microsoft refused to add it for "reasons".
 - Mega-tight communication enabled by [protobuf-net](https://github.com/protobuf-net/protobuf-net).
 - Message persistence provided by [rocksdb-sharp](https://github.com/curiosity-ai/rocksdb-sharp).
