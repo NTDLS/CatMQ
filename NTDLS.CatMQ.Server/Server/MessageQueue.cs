@@ -29,7 +29,7 @@ namespace NTDLS.CatMQ.Server.Server
         public CMqQueueConfiguration QueueConfiguration { get; set; }
 
         /// <summary>
-        /// The total number of messages that have been euqued into this queue.
+        /// The total number of messages that have been queued into this queue.
         /// </summary>
         public ulong TotalEnqueuedMessages { get; set; }
         /// <summary>
@@ -64,7 +64,7 @@ namespace NTDLS.CatMQ.Server.Server
 
         /// <summary>
         /// Sorts the messages in the queue by their timestamps.
-        /// This is only necessisary when loading meassages from the database at startup.
+        /// This is only necessary when loading massages from the database at startup.
         /// </summary>
         internal void SortMessages()
         {
