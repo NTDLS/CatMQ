@@ -2,12 +2,11 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using NTDLS.CatMQ.Server;
 
 namespace CatMQ.Service.Pages
 {
     [AllowAnonymous]
-    public class LogoutModel(ILogger<LogoutModel> logger, CMqServer mqServer) : PageModel
+    public class LogoutModel(ILogger<LogoutModel> logger) : PageModel
     {
         private readonly ILogger<LogoutModel> _logger = logger;
 

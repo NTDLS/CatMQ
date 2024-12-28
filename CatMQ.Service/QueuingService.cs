@@ -54,7 +54,8 @@ namespace CatMQ.Service
                         options.LoginPath = "/Login";
                     });
 
-                builder.Services.AddSingleton<CMqServer>(_mqServer);
+                builder.Services.AddSingleton(_mqServer);
+                builder.Services.AddSingleton(serviceConfiguration);
 
                 // Add services to the container.
                 builder.Services.AddRazorPages();

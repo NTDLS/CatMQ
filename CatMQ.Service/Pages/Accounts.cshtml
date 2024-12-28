@@ -1,0 +1,42 @@
+﻿@page
+@using NTDLS.Helpers
+@model AccountsModel
+@{
+    ViewData["Title"] = "Accounts";
+}
+
+@if (Model.ErrorMessage != null)
+{
+    <div>
+        <p>@Model.ErrorMessage</p>
+    </div>
+}
+else
+{
+    <div>
+        <div class="container mt-4">
+            <table class="table table-striped table-bordered">
+                <thead class="table-light">
+                    <tr>
+                        <th colspan="6">Service Configuration</th>
+                    </tr>
+                </thead>
+                <thead class="table-light">
+                    <tr>
+                        <th>A</th>
+                        <th>B</th>
+                        <th>C</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>a</td>
+                        <td>b</td>
+                        <td>c</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+}

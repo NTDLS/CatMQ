@@ -4,7 +4,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Newtonsoft.Json;
-using NTDLS.CatMQ.Server;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
@@ -12,7 +11,7 @@ using System.Text;
 namespace CatMQ.Service.Pages
 {
     [AllowAnonymous]
-    public class LoginModel(ILogger<LoginModel> logger, CMqServer mqServer) : PageModel
+    public class LoginModel(ILogger<LoginModel> logger, ServiceConfiguration serviceConfiguration) : PageModel
     {
         private readonly ILogger<LoginModel> _logger = logger;
 
@@ -26,13 +25,11 @@ namespace CatMQ.Service.Pages
 
         public bool IsDefaultPassword { get; set; } = false;
 
-
         public void OnGet()
         {
             try
             {
-                var serverConfiguration = mqServer.GetConfiguration();
-                var usersFile = Path.Join(serverConfiguration.PersistencePath, "credentials.json");
+                var usersFile = Path.Join(serviceConfiguration.DataPath, "credentials.json");
                 if (System.IO.File.Exists(usersFile) == false)
                 {
                     var defaultCredentials = new List<UserCredential>
@@ -62,9 +59,7 @@ namespace CatMQ.Service.Pages
         {
             try
             {
-                var serverConfiguration = mqServer.GetConfiguration();
-
-                var usersFile = Path.Join(serverConfiguration.PersistencePath, "credentials.json");
+                var usersFile = Path.Join(serviceConfiguration.DataPath, "credentials.json");
                 var credentials = JsonConvert.DeserializeObject<List<UserCredential>>(System.IO.File.ReadAllText(usersFile)) ?? new();
                 var credential = credentials.FirstOrDefault(o => o.Username.Equals(Username, StringComparison.OrdinalIgnoreCase)
                                 && o.PasswordHash == Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Password ?? string.Empty))).ToLower());
