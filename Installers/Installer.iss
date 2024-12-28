@@ -8,7 +8,7 @@
  AppCopyright                     = Copyright © 1995-2025 NetworkDLS.
  DefaultDirName                   = {commonpf}\NetworkDLS\CatMQ
  DefaultGroupName                 = NetworkDLS\CatMQ
- UninstallDisplayIcon             = {app}\CatMQService.exe
+ UninstallDisplayIcon             = {app}\CatMQ.Service.exe
  SetupIconFile                    = "..\Images\Logo.ico"
  PrivilegesRequired               = admin
  Uninstallable                    = Yes
@@ -35,9 +35,9 @@
  Name: "{group}\CatMQ Manager"; Filename: "http://127.0.0.1:45783/"; IconFilename: "{app}\Logo.ico"
 
 [Run]
- Filename: "{app}\CatMQService.exe"; Parameters: "install"; Flags: runhidden; StatusMsg: "Installing service...";
- Filename: "{app}\CatMQService.exe"; Parameters: "start"; Flags: runhidden; StatusMsg: "Starting service...";
+ Filename: "{app}\CatMQ.Service.exe"; Parameters: "install"; Flags: runhidden; StatusMsg: "Installing service...";
+ Filename: "{app}\CatMQ.Service.exe"; Parameters: "start"; Flags: runhidden; StatusMsg: "Starting service...";
  Filename: "http://127.0.0.1:45783/"; Description: "Run CatMQ Manager now?"; Flags: postinstall nowait skipifsilent shellexec;
 
 [UninstallRun]
- Filename: "{app}\CatMQService.exe"; Parameters: "uninstall"; Flags: runhidden; StatusMsg: "Installing service..."; RunOnceId: "ServiceRemoval";
+ Filename: "{app}\CatMQ.Service.exe"; Parameters: "uninstall"; Flags: runhidden; StatusMsg: "Installing service..."; RunOnceId: "ServiceRemoval";
