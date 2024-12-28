@@ -38,7 +38,7 @@ namespace CatMQService
             {
                 PersistencePath = persistencePath
             });
-            _mqServer.OnException += MqServer_OnException;
+            _mqServer.OnLog += MqServer_OnLog;
 
 
             int portNumber = configuration.GetValue<int>("MqServer:Port");
@@ -86,9 +86,47 @@ namespace CatMQService
             }
         }
 
-        private void MqServer_OnException(CMqServer server, CMqQueueConfiguration? queue, Exception ex)
+        private void MqServer_OnLog(CMqServer server, ErrorLevel errorLevel, string message, Exception? ex = null)
         {
-            Log.Error(ex, "MqServer_OnException");
+            switch (errorLevel)
+            {
+                case ErrorLevel.Verbose:
+                    if (ex != null)
+                        Log.Verbose(ex, message);
+                    else
+                        Log.Verbose(message);
+                    break;
+                case ErrorLevel.Debug:
+                    if (ex != null)
+                        Log.Debug(ex, message);
+                    else
+                        Log.Debug(message);
+                    break;
+                case ErrorLevel.Information:
+                    if (ex != null)
+                        Log.Information(ex, message);
+                    else
+                        Log.Information(message);
+                    break;
+                case ErrorLevel.Warning:
+                    if (ex != null)
+                        Log.Warning(ex, message);
+                    else
+                        Log.Warning(message);
+                    break;
+                case ErrorLevel.Error:
+                    if (ex != null)
+                        Log.Error(ex, message);
+                    else
+                        Log.Error(message);
+                    break;
+                case ErrorLevel.Fatal:
+                    if (ex != null)
+                        Log.Fatal(ex, message);
+                    else
+                        Log.Error(message);
+                    break;
+            }
         }
     }
 }

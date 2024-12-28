@@ -27,12 +27,12 @@ namespace NTDLS.CatMQServer
         /// <summary>
         /// Delegate used to notify of queue server exceptions.
         /// </summary>
-        public delegate void OnExceptionEvent(CMqServer server, CMqQueueConfiguration? queue, Exception ex);
+        public delegate void OnLogEvent(CMqServer server, ErrorLevel errorLevel, string message, Exception? ex = null);
 
         /// <summary>
         /// Event used to notify of queue server exceptions.
         /// </summary>
-        public event OnExceptionEvent? OnException;
+        public event OnLogEvent? OnLog;
 
         /// <summary>
         /// Creates a new instance of the queue service.
@@ -80,8 +80,10 @@ namespace NTDLS.CatMQServer
         {
             if (string.IsNullOrEmpty(_configuration.PersistencePath) == false)
             {
-                //TODO: checkpoint this from time to time.
+                OnLog?.Invoke(this, ErrorLevel.Verbose, "Checkpoint persistent queues.");
+
                 var persistedQueues = mqd.Where(q => q.Value.QueueConfiguration.Persistence == PMqPersistence.Persistent).Select(q => q.Value).ToList();
+
                 //Serialize using System.Text.Json as opposed to Newtonsoft for efficiency.
                 var persistedQueuesJson = JsonSerializer.Serialize(persistedQueues);
                 File.WriteAllText(Path.Join(_configuration.PersistencePath, "queues.json"), persistedQueuesJson);
@@ -304,8 +306,11 @@ namespace NTDLS.CatMQServer
 
         #endregion
 
-        internal void InvokeOnException(CMqServer server, CMqQueueConfiguration? queue, Exception ex)
-            => OnException?.Invoke(server, queue, ex);
+        internal void InvokeOnLog(CMqServer server, Exception ex)
+            => OnLog?.Invoke(server, ErrorLevel.Error, ex.Message, ex);
+
+        internal void InvokeOnLog(CMqServer server, ErrorLevel errorLevel, string message)
+            => OnLog?.Invoke(server, errorLevel, message);
 
         private void RmServer_OnDisconnected(RmContext context)
         {
@@ -314,20 +319,20 @@ namespace NTDLS.CatMQServer
                 bool success = true;
 
                 //When a client disconnects, remove their subscriptions.
-                success = success && _messageQueues.TryUse(mqd =>
+                success = _messageQueues.TryUse(mqd =>
                 {
                     foreach (var mqKVP in mqd)
                     {
-                        success = success && mqKVP.Value.Subscribers.TryUse(s =>
+                        success = mqKVP.Value.Subscribers.TryUse(s =>
                         {
                             s.Remove(context.ConnectionId);
-                        });
+                        }) && success;
                         if (!success)
                         {
                             break;
                         }
                     }
-                });
+                }) && success;
 
                 if (success)
                 {
@@ -360,6 +365,8 @@ namespace NTDLS.CatMQServer
                 var persistedQueuesFile = Path.Join(_configuration.PersistencePath, "queues.json");
                 if (File.Exists(persistedQueuesFile))
                 {
+                    OnLog?.Invoke(this, ErrorLevel.Information, "Loading persistent queues.");
+
                     var persistedQueuesJson = File.ReadAllText(persistedQueuesFile);
                     //Deserialize using System.Text.Json as opposed to Newtonsoft for efficiency.
                     var loadedPersistedQueues = JsonSerializer.Deserialize<List<MessageQueue>>(persistedQueuesJson);
@@ -395,12 +402,16 @@ namespace NTDLS.CatMQServer
 
                 string databaseFile = Path.Join(_configuration.PersistencePath, "messages");
 
+                OnLog?.Invoke(this, ErrorLevel.Information, "Instanciating persistent database.");
+
                 var options = new DbOptions()
                     .SetCreateIfMissing(true);
                 persistenceDatabase = RocksDb.Open(options, databaseFile);
 
                 if (persistedQueues != null)
                 {
+                    OnLog?.Invoke(this, ErrorLevel.Information, "Loading persistent messages.");
+
                     using var iterator = persistenceDatabase.NewIterator();
                     _messageQueues.Use(mqd =>
                     {
@@ -421,6 +432,7 @@ namespace NTDLS.CatMQServer
                         }
 
                         //Sort the message in the queues by their timestamps.
+                        OnLog?.Invoke(this, ErrorLevel.Information, "Sorting persistent messages.");
                         var tasks = mqd.Values.Select(mq => Task.Run(() => mq.SortMessages()));
                         Task.WhenAll(tasks).Wait();
                     });
@@ -445,6 +457,7 @@ namespace NTDLS.CatMQServer
                 if (DateTime.UtcNow - lastCheckpoint > TimeSpan.FromSeconds(30))
                 {
                     //While the RockDB WAL logs data, it’s a good idea to flush the MemTable to disk periodically for additional safety.
+                    OnLog?.Invoke(this, ErrorLevel.Verbose, "Checkpoint persistent database.");
                     _persistenceDatabase?.Flush(new FlushOptions());
 
                     CheckpointPersistentMessageQueues();
@@ -461,9 +474,13 @@ namespace NTDLS.CatMQServer
         /// </summary>
         public void Stop()
         {
+            OnLog?.Invoke(this, ErrorLevel.Information, "Stopping service.");
+
             _keepRunning = false;
+            OnLog?.Invoke(this, ErrorLevel.Information, "Disposing database instance.");
             _persistenceDatabase?.Dispose();
             _persistenceDatabase = null;
+            OnLog?.Invoke(this, ErrorLevel.Information, "Stopping reliable messaging.");
             _rmServer.Stop();
 
             _messageQueues.Use(mqd =>
@@ -471,6 +488,7 @@ namespace NTDLS.CatMQServer
                 //Stop all message queues.
                 foreach (var mqKVP in mqd)
                 {
+                    OnLog?.Invoke(this, ErrorLevel.Information, $"Stopping queue [{mqKVP.Value.QueueConfiguration.QueueName}].");
                     mqKVP.Value.Stop();
                 }
 
@@ -501,14 +519,15 @@ namespace NTDLS.CatMQServer
         /// <summary>
         /// Removes a message from the persistent store.
         /// </summary>
-        internal void RemovePersistenceMessage(string queueName, Guid MessageId)
+        internal void RemovePersistenceMessage(string queueName, Guid messageId)
         {
             if (_persistenceDatabase != null)
             {
+                OnLog?.Invoke(this, ErrorLevel.Verbose, $"Removing persistent message from [{queueName}]: [{messageId}].");
                 string queueKey = queueName.ToLowerInvariant();
                 lock (_persistenceDatabase)
                 {
-                    _persistenceDatabase.Remove($"{queueKey}_{MessageId}");
+                    _persistenceDatabase.Remove($"{queueKey}_{messageId}");
                 }
             }
         }
@@ -522,6 +541,8 @@ namespace NTDLS.CatMQServer
         /// </summary>
         internal void CreateQueue(CMqQueueConfiguration queueConfiguration)
         {
+            OnLog?.Invoke(this, ErrorLevel.Verbose, $"Creating queue: [{queueConfiguration.QueueName}].");
+
             _messageQueues.Use(mqd =>
             {
                 string queueKey = queueConfiguration.QueueName.ToLowerInvariant();
@@ -552,6 +573,8 @@ namespace NTDLS.CatMQServer
         /// </summary>
         internal void DeleteQueue(string queueName)
         {
+            OnLog?.Invoke(this, ErrorLevel.Verbose, $"Deleting queue: [{queueName}].");
+
             string queueKey = queueName.ToLowerInvariant();
 
             while (true)
@@ -602,6 +625,8 @@ namespace NTDLS.CatMQServer
         /// </summary>
         internal void SubscribeToQueue(Guid connectionId, IPEndPoint? localEndpoint, IPEndPoint? remoteEndpoint, string queueName)
         {
+            OnLog?.Invoke(this, ErrorLevel.Verbose, $"Subscribing connection [{connectionId}] to queue: [{queueName}].");
+
             string queueKey = queueName.ToLowerInvariant();
 
             while (true)
@@ -641,6 +666,8 @@ namespace NTDLS.CatMQServer
         /// </summary>
         internal void UnsubscribeFromQueue(Guid connectionId, string queueName)
         {
+            OnLog?.Invoke(this, ErrorLevel.Verbose, $"Unsubscribing connection [{connectionId}] from queue: [{queueName}].");
+
             string queueKey = queueName.ToLowerInvariant();
 
             while (true)
@@ -669,8 +696,10 @@ namespace NTDLS.CatMQServer
         /// <summary>
         /// Removes a subscription from a queue for a given connection id.
         /// </summary>
-        internal void EnqueueMessage(string queueName, string objectType, string messageJson)
+        internal void EnqueueMessage(Guid connectionId, string queueName, string objectType, string messageJson)
         {
+            OnLog?.Invoke(this, ErrorLevel.Verbose, $"Enqueuing message from connection [{connectionId}] to queue: [{queueName}].");
+
             string queueKey = queueName.ToLowerInvariant();
 
             while (true)
@@ -718,6 +747,8 @@ namespace NTDLS.CatMQServer
         /// </summary>
         internal void PurgeQueue(string queueName)
         {
+            OnLog?.Invoke(this, ErrorLevel.Verbose, $"Purging queue: [{queueName}].");
+
             while (true)
             {
                 bool success = true;

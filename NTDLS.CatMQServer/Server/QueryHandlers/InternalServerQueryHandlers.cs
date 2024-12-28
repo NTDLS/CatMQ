@@ -82,7 +82,7 @@ namespace NTDLS.CatMQServer.Server.QueryHandlers
         {
             try
             {
-                _mqServer.EnqueueMessage(param.QueueName, param.ObjectType, param.MessageJson);
+                _mqServer.EnqueueMessage(context.ConnectionId, param.QueueName, param.ObjectType, param.MessageJson);
                 return new CMqEnqueueMessageToQueueReply(true);
             }
             catch (Exception ex)

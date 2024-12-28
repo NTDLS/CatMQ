@@ -212,7 +212,7 @@ namespace NTDLS.CatMQServer.Server
                             {
                                 messageQueue.TotalDeliveryFailures++;
                                 subscriber.FailedMessagesDeliveries++;
-                                messageQueue.QueueServer.InvokeOnException(messageQueue.QueueServer, messageQueue.QueueConfiguration, ex.GetBaseException());
+                                messageQueue.QueueServer.InvokeOnLog(messageQueue.QueueServer, ex.GetBaseException());
                             }
 
                             //If we have tried to deliver this message to this subscriber too many times, then mark this subscriber-message as satisfied.
@@ -276,7 +276,7 @@ namespace NTDLS.CatMQServer.Server
                 }
                 catch (Exception ex)
                 {
-                    messageQueue.QueueServer.InvokeOnException(messageQueue.QueueServer, messageQueue.QueueConfiguration, ex.GetBaseException());
+                    messageQueue.QueueServer.InvokeOnLog(messageQueue.QueueServer, ex.GetBaseException());
                 }
 
                 if (successfulDeliveries == 0)
