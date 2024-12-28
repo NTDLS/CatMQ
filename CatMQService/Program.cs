@@ -7,10 +7,15 @@ namespace CatMQService
     {
         static void Main(string[] args)
         {
+            // Load appsettings.json
+            var configuration = new ConfigurationBuilder()
+                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+                .Build();
+
+            // Configure Serilog using the configuration
             Log.Logger = new LoggerConfiguration()
-                 .WriteTo.Console()
-                 .MinimumLevel.Verbose()
-                 .CreateLogger();
+                .ReadFrom.Configuration(configuration)
+                .CreateLogger();
 
             HostFactory.Run(x =>
             {

@@ -118,13 +118,13 @@ namespace NTDLS.CatMQServer
                 bool success = true;
                 List<CMqQueueInformation>? result = new();
 
-                success = success && _messageQueues.TryUse(mqd =>
+                success = _messageQueues.TryUse(mqd =>
                 {
                     foreach (var mqKVP in mqd)
                     {
-                        success = success && mqKVP.Value.EnqueuedMessages.TryUse(m =>
+                        success = mqKVP.Value.EnqueuedMessages.TryUse(m =>
                         {
-                            success = success && mqKVP.Value.Subscribers.TryUse(sKVP =>
+                            success = mqKVP.Value.Subscribers.TryUse(sKVP =>
                             {
                                 result.Add(new CMqQueueInformation
                                 {
@@ -143,8 +143,8 @@ namespace NTDLS.CatMQServer
                                     TotalEnqueuedMessages = mqKVP.Value.TotalEnqueuedMessages,
                                     TotalExpiredMessages = mqKVP.Value.TotalExpiredMessages
                                 });
-                            });
-                        });
+                            }) && success;
+                        }) && success;
 
                         if (!success)
                         {
@@ -153,7 +153,7 @@ namespace NTDLS.CatMQServer
                             break;
                         }
                     }
-                });
+                }) && success;
 
                 if (success && result != null)
                 {
@@ -174,23 +174,23 @@ namespace NTDLS.CatMQServer
                 bool success = true;
                 var result = new List<CMqSubscriberInformation>();
 
-                success = success && _messageQueues.TryUse(mqd =>
+                success = _messageQueues.TryUse(mqd =>
                 {
                     if (mqd.TryGetValue(queueName, out var messageQueue))
                     {
-                        success = success && messageQueue.Subscribers.TryUse(sKVP =>
+                        success = messageQueue.Subscribers.TryUse(sKVP =>
                         {
                             foreach (var subscriber in sKVP)
                             {
                                 result.Add(subscriber.Value);
                             }
-                        });
+                        }) && success;
                     }
                     else
                     {
                         throw new Exception($"Queue not found: [{queueName}].");
                     }
-                });
+                }) && success;
 
                 if (success)
                 {
@@ -211,14 +211,14 @@ namespace NTDLS.CatMQServer
                 bool success = true;
                 List<CMqEnqueuedMessageInformation>? result = new();
 
-                success = success && _messageQueues.TryUse(mqd =>
+                success = _messageQueues.TryUse(mqd =>
                 {
                     var filteredQueues = mqd.Where(o => o.Value.QueueConfiguration.QueueName.Equals(queueName, StringComparison.OrdinalIgnoreCase));
                     foreach (var qKVP in filteredQueues)
                     {
-                        success = success && qKVP.Value.EnqueuedMessages.TryUse(m =>
+                        success = qKVP.Value.EnqueuedMessages.TryUse(m =>
                         {
-                            success = success && qKVP.Value.Subscribers.TryUse(sKVP =>
+                            success = qKVP.Value.Subscribers.TryUse(sKVP =>
                             {
                                 foreach (var message in m.Skip(offset).Take(take))
                                 {
@@ -233,8 +233,8 @@ namespace NTDLS.CatMQServer
                                         MessageId = message.MessageId
                                     });
                                 }
-                            });
-                        });
+                            }) && success;
+                        }) && success;
 
                         if (!success)
                         {
@@ -243,7 +243,7 @@ namespace NTDLS.CatMQServer
                             break;
                         }
                     }
-                });
+                }) && success;
 
                 if (success && result != null)
                 {
@@ -264,11 +264,11 @@ namespace NTDLS.CatMQServer
                 bool success = true;
                 CMqEnqueuedMessageInformation? result = null;
 
-                success = success && _messageQueues.TryUse(mqd =>
+                success = _messageQueues.TryUse(mqd =>
                 {
                     if (mqd.TryGetValue(queueName, out var messageQueue))
                     {
-                        success = success && messageQueue.EnqueuedMessages.TryUse(m =>
+                        success = messageQueue.EnqueuedMessages.TryUse(m =>
                         {
                             var message = m.Where(o => o.MessageId == messageId).FirstOrDefault();
                             if (message != null)
@@ -287,13 +287,13 @@ namespace NTDLS.CatMQServer
                             {
                                 throw new Exception($"Message not found: [{messageId}].");
                             }
-                        });
+                        }) && success;
                     }
                     else
                     {
                         throw new Exception($"Queue not found: [{queueName}].");
                     }
-                });
+                }) && success;
 
                 if (success && result != null)
                 {
@@ -581,11 +581,11 @@ namespace NTDLS.CatMQServer
             {
                 bool success = true;
 
-                success = success && _messageQueues.TryUse(mqd =>
+                success = _messageQueues.TryUse(mqd =>
                 {
                     if (mqd.TryGetValue(queueKey, out var messageQueue))
                     {
-                        success = success && messageQueue.EnqueuedMessages.TryUse(m =>
+                        success = messageQueue.EnqueuedMessages.TryUse(m =>
                         {
                             messageQueue.Stop();
                             mqd.Remove(queueKey);
@@ -600,7 +600,7 @@ namespace NTDLS.CatMQServer
                                     }
                                 }
                             }
-                        });
+                        }) && success;
 
                         if (success)
                         {
@@ -610,7 +610,7 @@ namespace NTDLS.CatMQServer
                             }
                         }
                     }
-                });
+                }) && success;
 
                 if (success)
                 {
@@ -633,11 +633,11 @@ namespace NTDLS.CatMQServer
             {
                 bool success = true;
 
-                success = success && _messageQueues.TryUse(mqd =>
+                success = _messageQueues.TryUse(mqd =>
                 {
                     if (mqd.TryGetValue(queueKey, out var messageQueue))
                     {
-                        success = success && messageQueue.Subscribers.TryUse(s =>
+                        success = messageQueue.Subscribers.TryUse(s =>
                         {
                             if (s.ContainsKey(connectionId) == false)
                             {
@@ -649,9 +649,9 @@ namespace NTDLS.CatMQServer
                                     RemotePort = remoteEndpoint?.Port
                                 });
                             }
-                        });
+                        }) && success;
                     }
-                });
+                }) && success;
 
                 if (success)
                 {
@@ -674,16 +674,16 @@ namespace NTDLS.CatMQServer
             {
                 bool success = true;
 
-                success = success && _messageQueues.TryUse(mqd =>
+                success = _messageQueues.TryUse(mqd =>
                 {
                     if (mqd.TryGetValue(queueKey, out var messageQueue))
                     {
-                        success = success && messageQueue.Subscribers.TryUse(s =>
+                        success = messageQueue.Subscribers.TryUse(s =>
                         {
                             s.Remove(connectionId);
-                        });
+                        }) && success;
                     }
-                });
+                }) && success;
 
                 if (success)
                 {
@@ -706,11 +706,11 @@ namespace NTDLS.CatMQServer
             {
                 bool success = true;
 
-                success = success && _messageQueues.TryUse(mqd =>
+                success = _messageQueues.TryUse(mqd =>
                 {
                     if (mqd.TryGetValue(queueKey, out var messageQueue))
                     {
-                        success = success && messageQueue.EnqueuedMessages.TryUse(m =>
+                        success = messageQueue.EnqueuedMessages.TryUse(m =>
                         {
                             messageQueue.TotalEnqueuedMessages++;
                             var message = new EnqueuedMessage(queueKey, objectType, messageJson);
@@ -726,13 +726,13 @@ namespace NTDLS.CatMQServer
 
                             m.Add(message);
                             messageQueue.DeliveryThreadWaitEvent.Set();
-                        });
+                        }) && success;
                     }
                     else
                     {
                         throw new Exception($"Queue not found: [{queueName}].");
                     }
-                });
+                }) && success;
 
                 if (success)
                 {
@@ -753,12 +753,12 @@ namespace NTDLS.CatMQServer
             {
                 bool success = true;
 
-                success = success && _messageQueues.TryUse(mqd =>
+                success = _messageQueues.TryUse(mqd =>
                 {
                     string queueKey = queueName.ToLowerInvariant();
                     if (mqd.TryGetValue(queueKey, out var messageQueue))
                     {
-                        success = success && messageQueue.EnqueuedMessages.TryUse(m =>
+                        success = messageQueue.EnqueuedMessages.TryUse(m =>
                         {
                             if (_persistenceDatabase != null)
                             {
@@ -771,13 +771,13 @@ namespace NTDLS.CatMQServer
                                 }
                             }
                             m.Clear();
-                        });
+                        }) && success;
                     }
                     else
                     {
                         throw new Exception($"Queue not found: [{queueName}].");
                     }
-                });
+                }) && success;
 
                 if (success)
                 {

@@ -40,7 +40,6 @@ namespace CatMQService
             });
             _mqServer.OnLog += MqServer_OnLog;
 
-
             int portNumber = configuration.GetValue<int>("MqServer:Port");
             Log.Verbose($"Starting message queue service on port: {portNumber}.");
             _mqServer.Start(portNumber);
