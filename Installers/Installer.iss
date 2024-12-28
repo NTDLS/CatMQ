@@ -28,10 +28,11 @@
  Source: "C:\DropZone\CatMQ.Publish\*.dll"; DestDir: "{app}"; Flags: IgnoreVersion;
  Source: "C:\DropZone\CatMQ.Publish\*.json"; DestDir: "{app}"; Flags: IgnoreVersion;
  Source: ".\config\*.json"; DestDir: "{app}"; Flags: IgnoreVersion;
-  
+ Source: "..\Images\Logo.ico"; DestDir: "{app}"; Flags: IgnoreVersion;
+
 [Icons]
- Name: "{commondesktop}\CatMQ Manager"; Filename: "http://127.0.0.1:45783/";
- Name: "{group}\CatMQ Manager"; Filename: "http://127.0.0.1:45783/";
+ Name: "{commondesktop}\CatMQ Manager"; Filename: "http://127.0.0.1:45783/"; IconFilename: "{app}\Logo.ico"
+ Name: "{group}\CatMQ Manager"; Filename: "http://127.0.0.1:45783/"; IconFilename: "{app}\Logo.ico"
 
 [Run]
  Filename: "{app}\CatMQService.exe"; Parameters: "install"; Flags: runhidden; StatusMsg: "Installing service...";
