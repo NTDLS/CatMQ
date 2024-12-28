@@ -17,11 +17,10 @@ namespace CatMQ.Service
             string configurationFile = Path.Join(executablePath, "CatMQ.Service.Config.json");
             if (File.Exists(configurationFile) == false)
             {
+                //Create a default configuration file.
                 File.WriteAllText(configurationFile, JsonSerializer.Serialize(new ServiceConfiguration(), new JsonSerializerOptions { WriteIndented = true }));
             }
             var serviceConfiguration = JsonSerializer.Deserialize<ServiceConfiguration>(File.ReadAllText(configurationFile)).EnsureNotNull();
-
-            var builder = WebApplication.CreateBuilder();
 
             if (string.IsNullOrEmpty(serviceConfiguration.DataPath))
             {
@@ -47,6 +46,8 @@ namespace CatMQ.Service
 
             if (serviceConfiguration.EnableWebUI && serviceConfiguration.WebUIURL != null)
             {
+                var builder = WebApplication.CreateBuilder();
+
                 builder.Services.AddAuthentication("CookieAuth")
                     .AddCookie("CookieAuth", options =>
                     {
