@@ -34,8 +34,8 @@ namespace CatMQService
                 });
                 x.RunAsLocalSystem();
 
-                x.SetDescription("Cat MQ message queuing service.");
-                x.SetDisplayName("CatMQService");
+                x.SetDescription("A high-performance and reliable persistent message queue designed for efficient inter-process communication, task queuing, load balancing, and data buffering over TCP/IP.");
+                x.SetDisplayName("CatMQ Service");
                 x.SetServiceName("CatMQService");
             });
         }

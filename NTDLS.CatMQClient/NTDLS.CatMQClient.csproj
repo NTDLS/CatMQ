@@ -9,7 +9,7 @@
     <Title>NTDLS.CatMQClient</Title>
     <Copyright>Copyright © 2025 NetworkDLS</Copyright>
     <Description>
-      An in-memory, persistent message queue designed for efficient inter-process communication, task queuing, load balancing, and data buffering over TCP/IP
+      A high-performance and reliable persistent message queue designed for efficient inter-process communication, task queuing, load balancing, and data buffering over TCP/IP.
     </Description>
     <PackageProjectUrl>https://github.com/NTDLS/NTDLS.CatMQ</PackageProjectUrl>
     <RepositoryUrl>https://github.com/NTDLS/NTDLS.CatMQ</RepositoryUrl>
