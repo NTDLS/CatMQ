@@ -1,23 +1,41 @@
+using CatMQ.Service.Models.Page;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc.RazorPages;
-using NTDLS.CatMQ.Server;
-using NTDLS.CatMQ.Server.Management;
+using Microsoft.AspNetCore.Mvc;
 
 namespace CatMQ.Service.Pages
 {
     [Authorize]
-    public class ConfigurationModel(ILogger<ConfigurationModel> logger, CMqServer mqServer) : PageModel
+    public class ConfigurationModel(ILogger<ConfigurationModel> logger, ServiceConfiguration serviceConfiguration) : BasePageModel
     {
         private readonly ILogger<ConfigurationModel> _logger = logger;
-        public string? ErrorMessage { get; set; }
-        public CMqServerInformation ServerConfig = new();
+
+        [BindProperty]
+        public ServiceConfiguration ServerConfig { get; set; } = new();
+
+        public IActionResult OnPost()
+        {
+            try
+            {
+                if (ModelState.IsValid)
+                {
+                    serviceConfiguration.Write("CatMQ.Service.Config.json", ServerConfig);
+                    SuccessMessage = "Saved!<br />You will need to restart the service for these changes to take affect.";
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "GetQueues");
+                ErrorMessage = ex.Message;
+            }
+
+            return Page();
+        }
 
         public void OnGet()
         {
             try
             {
-                ServerConfig = mqServer.GetConfiguration();
-
+                ServerConfig = serviceConfiguration.Read("CatMQ.Service.Config.json", new ServiceConfiguration());
             }
             catch (Exception ex)
             {

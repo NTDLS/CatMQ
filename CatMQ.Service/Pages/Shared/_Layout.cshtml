@@ -52,9 +52,58 @@
             </div>
         </nav>
     </header>
-    <div class="container" style="margin-top:80px;")>
+    <div class="container" style="margin-top:80px;" )>
         <main role="main" class="pb-3">
-            @RenderBody()
+            @if (Model.SuccessMessage != null)
+            {
+                <div id="success-alert" class="alert alert-success alert-dismissible fade show" role="alert">
+                    <p class="fw-bold">@Html.Raw(Model.SuccessMessage)</p>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+
+                <script>
+                    document.addEventListener("DOMContentLoaded", function () {
+                        setTimeout(function () {
+                            let alertElement = document.getElementById('success-alert');
+                            if (alertElement) {
+                                // Add fade-out effect
+                                alertElement.classList.remove('show');
+                                alertElement.classList.add('fade');
+
+                                // Remove the alert completely after the fade-out animation
+                                setTimeout(() => alertElement.remove(), 300);
+                            }
+                        }, 5000);
+                    });
+                </script>
+            }
+
+            @if (Model.WarningMessage != null)
+            {
+                <div id="success-alert" class="alert alert-warning alert-dismissible fade show" role="alert">
+                    <p class="fw-bold">@Html.Raw(Model.WarningMessage)</p>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            }
+
+            @if (Model.ErrorMessage != null)
+            {
+                <div class="alert alert-dismissible fade show" role="alert">
+                    <div class="card bg-danger-subtle text-dark">
+                        <div class="card-header">
+                            <h4>Error</h4>
+                        </div>
+                        <div class="card-body text-dark">
+                            <p>@Html.Raw(Model.ErrorMessage)</p>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    </div>
+                </div>
+            }
+            else
+            {
+                @RenderBody()
+            }
         </main>
     </div>
 

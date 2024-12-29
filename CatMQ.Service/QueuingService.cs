@@ -35,7 +35,7 @@ namespace CatMQ.Service
                 AsynchronousQueryWaiting = serviceConfiguration.AsynchronousQueryWaiting,
                 InitialReceiveBufferSize = serviceConfiguration.InitialReceiveBufferSize,
                 MaxReceiveBufferSize = serviceConfiguration.MaxReceiveBufferSize,
-                QueryTimeout = serviceConfiguration.QueryTimeout,
+                QueryTimeoutSeconds = serviceConfiguration.QueryTimeoutSeconds,
                 ReceiveBufferGrowthRate = serviceConfiguration.ReceiveBufferGrowthRate,
             });
             _mqServer.OnLog += MqServer_OnLog;

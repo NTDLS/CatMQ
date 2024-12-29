@@ -15,7 +15,7 @@ namespace NTDLS.CatMQ.Server
         /// <summary>
         /// The default amount of time to wait for a query to reply before throwing a timeout exception.
         /// </summary>
-        public TimeSpan QueryTimeout { get; set; } = TimeSpan.FromSeconds(30);
+        public int QueryTimeoutSeconds { get; set; } = CMqDefaults.QUERY_TIMEOUT_SECONDS;
         /// <summary>
         /// The initial size in bytes of the receive buffer.
         /// If the buffer ever gets full while receiving data it will be automatically resized up to MaxReceiveBufferSize.

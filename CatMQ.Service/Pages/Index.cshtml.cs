@@ -1,5 +1,5 @@
+using CatMQ.Service.Models.Page;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc.RazorPages;
 using NTDLS.CatMQ.Server;
 using NTDLS.CatMQ.Server.Management;
 
@@ -7,12 +7,11 @@ namespace CatMQ.Service.Pages
 {
     [Authorize]
 
-    public class IndexModel(ILogger<IndexModel> logger, CMqServer mqServer) : PageModel
+    public class IndexModel(ILogger<IndexModel> logger, CMqServer mqServer) : BasePageModel
     {
         private readonly ILogger<IndexModel> _logger = logger;
         public List<CMqQueueInformation> Queues { get; private set; } = new();
         public CMqServerInformation ServerConfig = new();
-        public string? ErrorMessage { get; set; }
 
         public void OnGet()
         {

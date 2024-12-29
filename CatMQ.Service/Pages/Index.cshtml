@@ -25,7 +25,7 @@ else
                     <tr>
                         <th>Listen Port</th>
                         <th>Asynchronous Query Waiting</th>
-                        <th>Query Timeout</th>
+                        <th>Query Timeout (s)</th>
                         <th>Initial Receive Buffer</th>
                         <th>Max. Receive Buffer Size</th>
                         <th>Receive Buffer Growth Rate</th>
@@ -35,7 +35,7 @@ else
                     <tr>
                         <td>@Model.ServerConfig.ListenPort</td>
                         <td>@Model.ServerConfig.AsynchronousQueryWaiting</td>
-                        <td>@Model.ServerConfig.QueryTimeout</td>
+                        <td>@Model.ServerConfig.QueryTimeoutSeconds.ToString("n0")</td>
                         <td>@Formatters.FileSize(Model.ServerConfig.InitialReceiveBufferSize, 2)</td>
                         <td>@Formatters.FileSize(Model.ServerConfig.MaxReceiveBufferSize, 1)</td>
                         <td>@((Model.ServerConfig.ReceiveBufferGrowthRate * 100).ToString("n0"))%</td>

@@ -1,16 +1,14 @@
+using CatMQ.Service.Models.Page;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace CatMQ.Service.Pages
 {
     [AllowAnonymous]
-    public class LogoutModel(ILogger<LogoutModel> logger) : PageModel
+    public class LogoutModel(ILogger<LogoutModel> logger) : BasePageModel
     {
         private readonly ILogger<LogoutModel> _logger = logger;
-
-        public string? ErrorMessage { get; set; }
 
         public async Task<IActionResult> OnGetAsync()
         {

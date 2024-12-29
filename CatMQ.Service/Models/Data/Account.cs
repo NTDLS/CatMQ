@@ -1,4 +1,4 @@
-﻿namespace CatMQ.Service.Models
+﻿namespace CatMQ.Service.Models.Data
 {
     public class Account
     {

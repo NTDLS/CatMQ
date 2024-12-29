@@ -1,9 +1,9 @@
-using CatMQ.Service.Models;
+using CatMQ.Service.Models.Data;
+using CatMQ.Service.Models.Page;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.RazorPages;
 using Newtonsoft.Json;
 using System.Security.Claims;
 using System.Security.Cryptography;
@@ -12,7 +12,7 @@ using System.Text;
 namespace CatMQ.Service.Pages
 {
     [AllowAnonymous]
-    public class LoginModel(ILogger<LoginModel> logger, ServiceConfiguration serviceConfiguration) : PageModel
+    public class LoginModel(ILogger<LoginModel> logger, ServiceConfiguration serviceConfiguration) : BasePageModel
     {
         private readonly ILogger<LoginModel> _logger = logger;
 
@@ -21,8 +21,6 @@ namespace CatMQ.Service.Pages
 
         [BindProperty]
         public string? Password { get; set; }
-
-        public string? ErrorMessage { get; set; }
 
         public bool IsDefaultPassword { get; set; } = false;
 
@@ -81,7 +79,7 @@ namespace CatMQ.Service.Pages
                     return RedirectToPage("/Index");
                 }
 
-                ErrorMessage = "Invalid username or password";
+                WarningMessage = "Invalid username or password";
             }
             catch (Exception ex)
             {

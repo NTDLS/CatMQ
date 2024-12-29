@@ -1,15 +1,13 @@
-using CatMQ.Service.Models;
+using CatMQ.Service.Models.Data;
+using CatMQ.Service.Models.Page;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace CatMQ.Service.Pages
 {
     [Authorize]
-    public class AccountsModel(ILogger<AccountsModel> logger, ServiceConfiguration serviceConfiguration) : PageModel
+    public class AccountsModel(ILogger<AccountsModel> logger, ServiceConfiguration serviceConfiguration) : BasePageModel
     {
         private readonly ILogger<AccountsModel> _logger = logger;
-        public string? ErrorMessage { get; set; }
-
         public List<Account> Accounts { get; set; } = new();
 
         public void OnGet()

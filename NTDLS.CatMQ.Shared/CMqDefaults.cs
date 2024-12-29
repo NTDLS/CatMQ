@@ -16,5 +16,15 @@
         ///The growth rate of the auto-resizing for the buffer in decimal percentages.
         /// </summary>
         public const double BUFFER_GROWTH_RATE = 0.2;
+
+        /// <summary>
+        /// The default amount of time to wait for a query to reply before throwing a timeout exception.
+        /// </summary>
+        public const int QUERY_TIMEOUT_SECONDS = 30;
+
+        /// <summary>
+        /// The port which the queue service will listen on.
+        /// </summary>
+        public const int LISTEN_PORT = 45784;
     }
 }
