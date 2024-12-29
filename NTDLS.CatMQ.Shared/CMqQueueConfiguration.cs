@@ -43,6 +43,6 @@
         /// <summary>
         /// Whether the queue is persisted or ephemeral.
         /// </summary>
-        public PMqPersistence Persistence { get; set; } = PMqPersistence.Ephemeral;
+        public PMqPersistenceScheme PersistenceScheme { get; set; } = PMqPersistenceScheme.Ephemeral;
     }
 }

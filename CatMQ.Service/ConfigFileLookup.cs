@@ -3,7 +3,7 @@
     public enum ConfigFile
     {
         Accounts,
-        ServiceConfig
+        Service
     }
 
     internal static class ConfigFileLookup
@@ -11,7 +11,7 @@
         private static readonly Dictionary<ConfigFile, string> _configFiles = new()
         {
             { ConfigFile.Accounts, "accounts.json" },
-            { ConfigFile.ServiceConfig, "CatMQ.Service.Config.json" }
+            { ConfigFile.Service, "service.json" }
         };
 
         public static string GetFileName(ConfigFile configFile)

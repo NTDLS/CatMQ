@@ -45,33 +45,36 @@ namespace NTDLS.CatMQ.Server.Management
         /// <summary>
         /// The current number of messages that are enqueued in this message queue.
         /// </summary>
-        public int CurrentEnqueuedMessageCount { get; internal set; }
+        public int CurrentMessageCount { get; internal set; }
 
         /// <summary>
         /// The number of subscriber for this queue.
         /// </summary>
-        public int SubscriberCount { get; set; }
+        public int CurrentSubscriberCount { get; set; }
 
         /// <summary>
-        /// The total number of messages that have been euqued into this queue.
+        /// The total number of messages that have been enqueued into this queue.
         /// </summary>
-        public ulong TotalEnqueuedMessages { get; internal set; }
+        public ulong ReceivedMessageCount { get; internal set; }
+
         /// <summary>
         /// The total number of messages that have been removed from this queue due to age expiration.
         /// </summary>
-        public ulong TotalExpiredMessages { get; internal set; }
+        public ulong ExpiredMessageCount { get; internal set; }
+
         /// <summary>
         /// The total number of messages that have been delivered from this queue to subscribers.
         /// </summary>
-        public ulong TotalDeliveredMessages { get; internal set; }
+        public ulong DeliveredMessageCount { get; internal set; }
+
         /// <summary>
         /// The total number of messages that have failed to deliver from this queue to subscribers.
         /// </summary>
-        public ulong TotalDeliveryFailures { get; internal set; }
+        public ulong DeliveryFailureCount { get; internal set; }
 
         /// <summary>
         /// Whether the queue is persisted or ephemeral.
         /// </summary>
-        public PMqPersistence Persistence { get; set; } = PMqPersistence.Ephemeral;
+        public PMqPersistenceScheme PersistenceScheme { get; set; } = PMqPersistenceScheme.Ephemeral;
     }
 }

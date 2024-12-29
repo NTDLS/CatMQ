@@ -29,21 +29,24 @@ namespace NTDLS.CatMQ.Server.Server
         public CMqQueueConfiguration QueueConfiguration { get; set; }
 
         /// <summary>
-        /// The total number of messages that have been queued into this queue.
+        /// The total number of messages that have been enqueued into this queue.
         /// </summary>
-        public ulong TotalEnqueuedMessages { get; set; }
+        public ulong ReceivedMessageCount { get; set; }
+
         /// <summary>
         /// The total number of messages that have been removed from this queue due to age expiration.
         /// </summary>
-        public ulong TotalExpiredMessages { get; set; }
+        public ulong ExpiredMessageCount { get; set; }
+
         /// <summary>
         /// The total number of messages that have been delivered from this queue to subscribers.
         /// </summary>
-        public ulong TotalDeliveredMessages { get; set; }
+        public ulong DeliveredMessageCount { get; set; }
+
         /// <summary>
         /// The total number of messages that have failed to deliver from this queue to subscribers.
         /// </summary>
-        public ulong TotalDeliveryFailures { get; set; }
+        public ulong DeliveryFailureCount { get; set; }
 
         public MessageQueue()
         {
@@ -122,7 +125,7 @@ namespace NTDLS.CatMQ.Server.Server
                                     messageQueue.QueueServer.RemovePersistenceMessage(messageQueue.QueueConfiguration.QueueName, messageId);
                                 }
 
-                                messageQueue.TotalExpiredMessages += (ulong)m.RemoveAll(o => expiredMessageIDs.Contains(o.MessageId));
+                                messageQueue.ExpiredMessageCount += (ulong)m.RemoveAll(o => expiredMessageIDs.Contains(o.MessageId));
 
                                 //There could be a lot of messages in the queue, so lets use lastStaleMessageScan
                                 //  to not needlessly compare the timestamps each-and-every loop.
@@ -189,7 +192,7 @@ namespace NTDLS.CatMQ.Server.Server
                                     successfulDeliveryAndConsume = true;
                                 }
 
-                                messageQueue.TotalDeliveredMessages++;
+                                messageQueue.DeliveredMessageCount++;
                                 subscriber.SuccessfulMessagesDeliveries++;
 
                                 if (messageQueue.KeepRunning == false)
@@ -210,7 +213,7 @@ namespace NTDLS.CatMQ.Server.Server
                             }
                             catch (Exception ex) //Delivery failure.
                             {
-                                messageQueue.TotalDeliveryFailures++;
+                                messageQueue.DeliveryFailureCount++;
                                 subscriber.FailedMessagesDeliveries++;
                                 messageQueue.QueueServer.InvokeOnLog(messageQueue.QueueServer, ex.GetBaseException());
                             }

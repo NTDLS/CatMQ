@@ -82,11 +82,11 @@ namespace NTDLS.CatMQ.Server
             {
                 OnLog?.Invoke(this, ErrorLevel.Verbose, "Checkpoint persistent queues.");
 
-                var persistedQueues = mqd.Where(q => q.Value.QueueConfiguration.Persistence == PMqPersistence.Persistent).Select(q => q.Value).ToList();
+                var persistedQueues = mqd.Where(q => q.Value.QueueConfiguration.PersistenceScheme == PMqPersistenceScheme.Persistent).Select(q => q.Value).ToList();
 
                 //Serialize using System.Text.Json as opposed to Newtonsoft for efficiency.
                 var persistedQueuesJson = JsonSerializer.Serialize(persistedQueues);
-                File.WriteAllText(Path.Join(_configuration.PersistencePath, "queues.json"), persistedQueuesJson);
+                File.WriteAllText(Path.Join(_configuration.PersistencePath,  "queues.json"), persistedQueuesJson);
             }
         }
 
@@ -130,18 +130,20 @@ namespace NTDLS.CatMQ.Server
                                 {
                                     BatchDeliveryInterval = mqKVP.Value.QueueConfiguration.BatchDeliveryInterval,
                                     ConsumptionScheme = mqKVP.Value.QueueConfiguration.ConsumptionScheme,
-                                    CurrentEnqueuedMessageCount = m.Count,
                                     DeliveryScheme = mqKVP.Value.QueueConfiguration.DeliveryScheme,
                                     DeliveryThrottle = mqKVP.Value.QueueConfiguration.DeliveryThrottle,
                                     MaxDeliveryAttempts = mqKVP.Value.QueueConfiguration.MaxDeliveryAttempts,
                                     MaxMessageAge = mqKVP.Value.QueueConfiguration.MaxMessageAge,
-                                    Persistence = mqKVP.Value.QueueConfiguration.Persistence,
+                                    PersistenceScheme = mqKVP.Value.QueueConfiguration.PersistenceScheme,
                                     QueueName = mqKVP.Value.QueueConfiguration.QueueName,
-                                    SubscriberCount = sKVP.Count,
-                                    TotalDeliveredMessages = mqKVP.Value.TotalDeliveredMessages,
-                                    TotalDeliveryFailures = mqKVP.Value.TotalDeliveryFailures,
-                                    TotalEnqueuedMessages = mqKVP.Value.TotalEnqueuedMessages,
-                                    TotalExpiredMessages = mqKVP.Value.TotalExpiredMessages
+
+                                    CurrentSubscriberCount = sKVP.Count,
+                                    CurrentMessageCount = m.Count,
+
+                                    ReceivedMessageCount = mqKVP.Value.ReceivedMessageCount,
+                                    DeliveredMessageCount = mqKVP.Value.DeliveredMessageCount,
+                                    DeliveryFailureCount = mqKVP.Value.DeliveryFailureCount,
+                                    ExpiredMessageCount = mqKVP.Value.ExpiredMessageCount
                                 });
                             }) && success;
                         }) && success;
@@ -362,7 +364,7 @@ namespace NTDLS.CatMQ.Server
 
                 List<MessageQueue>? persistedQueues = null;
 
-                var persistedQueuesFile = Path.Join(_configuration.PersistencePath, "queues.json");
+                var persistedQueuesFile = Path.Join(_configuration.PersistencePath,  "queues.json");
                 if (File.Exists(persistedQueuesFile))
                 {
                     OnLog?.Invoke(this, ErrorLevel.Information, "Loading persistent queues.");
@@ -551,7 +553,7 @@ namespace NTDLS.CatMQ.Server
                     var messageQueue = new MessageQueue(this, queueConfiguration);
                     mqd.Add(queueKey, messageQueue);
 
-                    if (queueConfiguration.Persistence == PMqPersistence.Persistent)
+                    if (queueConfiguration.PersistenceScheme == PMqPersistenceScheme.Persistent)
                     {
                         if (string.IsNullOrEmpty(_configuration.PersistencePath) == false)
                         {
@@ -712,7 +714,7 @@ namespace NTDLS.CatMQ.Server
                     {
                         success = messageQueue.EnqueuedMessages.TryUse(m =>
                         {
-                            messageQueue.TotalEnqueuedMessages++;
+                            messageQueue.ReceivedMessageCount++;
                             var message = new EnqueuedMessage(queueKey, objectType, messageJson);
                             if (_persistenceDatabase != null)
                             {

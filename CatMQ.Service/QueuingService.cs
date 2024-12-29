@@ -14,20 +14,14 @@ namespace CatMQ.Service
         public void Start()
         {
             var executablePath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-            string configurationFile = Path.Join(executablePath, ConfigFileLookup.GetFileName(ConfigFile.ServiceConfig));
+            var configurationFile = Path.Join(executablePath, "data", ConfigFileLookup.GetFileName(ConfigFile.Service));
             if (File.Exists(configurationFile) == false)
             {
                 //Create a default configuration file.
-                File.WriteAllText(configurationFile, JsonSerializer.Serialize(new ServiceConfiguration(), new JsonSerializerOptions { WriteIndented = true }));
+                var defaultConfig = new ServiceConfiguration();
+                defaultConfig.Write(ConfigFile.Service, defaultConfig);
             }
             var serviceConfiguration = JsonSerializer.Deserialize<ServiceConfiguration>(File.ReadAllText(configurationFile)).EnsureNotNull();
-
-            if (string.IsNullOrEmpty(serviceConfiguration.DataPath))
-            {
-                //If no data path was specified, use the executable directory.
-                serviceConfiguration.DataPath = Path.Join(executablePath, "Data");
-                Directory.CreateDirectory(serviceConfiguration.DataPath);
-            }
 
             _mqServer = new CMqServer(new CMqServerConfiguration
             {

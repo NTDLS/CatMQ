@@ -33,7 +33,7 @@
     /// <summary>
     /// Whether the queue is persisted or ephemeral.
     /// </summary>
-    public enum PMqPersistence
+    public enum PMqPersistenceScheme
     {
         /// <summary>
         /// Undelivered messages are lost when the the service stops.

@@ -19,7 +19,7 @@
                     <th>Subscribers</th>
                     <th>Depth</th>
                     <th>Received</th>
-                    <th>Sent</th>
+                    <th>Delivered</th>
                     <th>Expired</th>
                     <th>Failures</th>
                 </tr>
@@ -29,12 +29,12 @@
                 {
                     <tr>
                         <td><a href="/queue/@queue.QueueName">@queue.QueueName</a></td>
-                        <td>@queue.SubscriberCount.ToString("n0")</td>
-                        <td><a href="/messages/@queue.QueueName">@queue.CurrentEnqueuedMessageCount.ToString("n0")</a></td>
-                        <td>@queue.TotalEnqueuedMessages.ToString("n0")</td>
-                        <td>@queue.TotalDeliveredMessages.ToString("n0")</td>
-                        <td>@queue.TotalExpiredMessages.ToString("n0")</td>
-                        <td>@queue.TotalDeliveryFailures.ToString("n0")</td>
+                        <td>@queue.CurrentSubscriberCount.ToString("n0")</td>
+                        <td><a href="/messages/@queue.QueueName">@queue.CurrentMessageCount.ToString("n0")</a></td>
+                        <td>@queue.ReceivedMessageCount.ToString("n0")</td>
+                        <td>@queue.DeliveredMessageCount.ToString("n0")</td>
+                        <td>@queue.ExpiredMessageCount.ToString("n0")</td>
+                        <td>@queue.DeliveryFailureCount.ToString("n0")</td>
                     </tr>
                 }
             </tbody>

@@ -16,7 +16,7 @@
             </thead>
             <thead class="table-light">
                 <tr>
-                    <th>Persistence</th>
+                    <th>Persistence Schema</th>
                     <th>Consumption Scheme</th>
                     <th>Delivery Scheme</th>
                     <th>Batch Delivery Interval</th>
@@ -27,7 +27,7 @@
             </thead>
             <tbody>
                 <tr>
-                    <td>@Model.Queue.Persistence</td>
+                    <td>@Model.Queue.PersistenceScheme</td>
                     <td>@Model.Queue.ConsumptionScheme</td>
                     <td>@Model.Queue.DeliveryScheme</td>
                     <td>@Model.Queue.BatchDeliveryInterval</td>
@@ -49,19 +49,19 @@
                     <th>Subscribers</th>
                     <th>Depth</th>
                     <th>Received</th>
-                    <th>Sent</th>
+                    <th>Delivered</th>
                     <th>Expired</th>
                     <th>Failures</th>
                 </tr>
             </thead>
             <tbody>
                 <tr>
-                    <td>@Model.Queue.SubscriberCount.ToString("n0")</td>
-                    <td><a href="/messages/@Model.Queue.QueueName">@Model.Queue.CurrentEnqueuedMessageCount.ToString("n0")</a></td>
-                    <td>@Model.Queue.TotalEnqueuedMessages.ToString("n0")</td>
-                    <td>@Model.Queue.TotalDeliveredMessages.ToString("n0")</td>
-                    <td>@Model.Queue.TotalExpiredMessages.ToString("n0")</td>
-                    <td>@Model.Queue.TotalDeliveryFailures.ToString("n0")</td>
+                    <td>@Model.Queue.CurrentSubscriberCount.ToString("n0")</td>
+                    <td><a href="/messages/@Model.Queue.QueueName">@Model.Queue.CurrentMessageCount.ToString("n0")</a></td>
+                    <td>@Model.Queue.ReceivedMessageCount.ToString("n0")</td>
+                    <td>@Model.Queue.DeliveredMessageCount.ToString("n0")</td>
+                    <td>@Model.Queue.ExpiredMessageCount.ToString("n0")</td>
+                    <td>@Model.Queue.DeliveryFailureCount.ToString("n0")</td>
                 </tr>
             </tbody>
         </table>

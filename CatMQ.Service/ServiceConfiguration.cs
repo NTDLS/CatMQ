@@ -20,7 +20,16 @@ namespace CatMQ.Service
             {
                 if (string.IsNullOrEmpty(_dataPath))
                 {
-                    _dataPath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location).EnsureNotNull();
+                    lock (this)
+                    {
+                        if (string.IsNullOrEmpty(_dataPath))
+                        {
+                            var dataPath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location).EnsureNotNull();
+                            dataPath = Path.Join(dataPath, "data");
+                            Directory.CreateDirectory(dataPath);
+                            _dataPath = dataPath;
+                        }
+                    }
                 }
                 return _dataPath;
             }
