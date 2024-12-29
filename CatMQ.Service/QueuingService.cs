@@ -14,7 +14,7 @@ namespace CatMQ.Service
         public void Start()
         {
             var executablePath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-            string configurationFile = Path.Join(executablePath, "CatMQ.Service.Config.json");
+            string configurationFile = Path.Join(executablePath, ConfigFileLookup.GetFileName(ConfigFile.ServiceConfig));
             if (File.Exists(configurationFile) == false)
             {
                 //Create a default configuration file.

@@ -30,13 +30,13 @@
  Source: "..\Images\Logo.ico"; DestDir: "{app}"; Flags: IgnoreVersion;
 
 [Icons]
- Name: "{commondesktop}\CatMQ Manager"; Filename: "https://localhost:45783/"; IconFilename: "{app}\Logo.ico"
- Name: "{group}\CatMQ Manager"; Filename: "https://localhost:45783/"; IconFilename: "{app}\Logo.ico"
+ Name: "{commondesktop}\CatMQ Manager"; Filename: "http://localhost:45783/"; IconFilename: "{app}\Logo.ico"
+ Name: "{group}\CatMQ Manager"; Filename: "http://localhost:45783/"; IconFilename: "{app}\Logo.ico"
 
 [Run]
  Filename: "{app}\CatMQ.Service.exe"; Parameters: "install"; Flags: runhidden; StatusMsg: "Installing service...";
  Filename: "{app}\CatMQ.Service.exe"; Parameters: "start"; Flags: runhidden; StatusMsg: "Starting service...";
- Filename: "https://localhost:45783/"; Description: "Run CatMQ Manager now?"; Flags: postinstall nowait skipifsilent shellexec;
+ Filename: "http://localhost:45783/"; Description: "Run CatMQ Manager now?"; Flags: postinstall nowait skipifsilent shellexec;
 
 [UninstallRun]
  Filename: "{app}\CatMQ.Service.exe"; Parameters: "uninstall"; Flags: runhidden; StatusMsg: "Installing service..."; RunOnceId: "ServiceRemoval";
