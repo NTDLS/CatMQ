@@ -5,79 +5,70 @@
     ViewData["Title"] = "Home";
 }
 
-@if (Model.ErrorMessage != null)
-{
-    <div>
-        <p>@Model.ErrorMessage</p>
+<div>
+    <div class="container mt-4">
+        <table class="table table-striped table-bordered">
+            <thead class="table-light">
+                <tr>
+                    <th colspan="6">Service Configuration</th>
+                </tr>
+            </thead>
+            <thead class="table-light">
+                <tr>
+                    <th>Listen Port</th>
+                    <th>Asynchronous Query Waiting</th>
+                    <th>Query Timeout (s)</th>
+                    <th>Initial Receive Buffer</th>
+                    <th>Max. Receive Buffer Size</th>
+                    <th>Receive Buffer Growth Rate</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>@Model.ServerConfig.ListenPort</td>
+                    <td>@Model.ServerConfig.AsynchronousQueryWaiting</td>
+                    <td>@Model.ServerConfig.QueryTimeoutSeconds.ToString("n0")</td>
+                    <td>@Formatters.FileSize(Model.ServerConfig.InitialReceiveBufferSize, 2)</td>
+                    <td>@Formatters.FileSize(Model.ServerConfig.MaxReceiveBufferSize, 1)</td>
+                    <td>@((Model.ServerConfig.ReceiveBufferGrowthRate * 100).ToString("n0"))%</td>
+                </tr>
+            </tbody>
+        </table>
     </div>
-}
-else
-{
-    <div>
-        <div class="container mt-4">
-            <table class="table table-striped table-bordered">
-                <thead class="table-light">
-                    <tr>
-                        <th colspan="6">Service Configuration</th>
-                    </tr>
-                </thead>
-                <thead class="table-light">
-                    <tr>
-                        <th>Listen Port</th>
-                        <th>Asynchronous Query Waiting</th>
-                        <th>Query Timeout (s)</th>
-                        <th>Initial Receive Buffer</th>
-                        <th>Max. Receive Buffer Size</th>
-                        <th>Receive Buffer Growth Rate</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>@Model.ServerConfig.ListenPort</td>
-                        <td>@Model.ServerConfig.AsynchronousQueryWaiting</td>
-                        <td>@Model.ServerConfig.QueryTimeoutSeconds.ToString("n0")</td>
-                        <td>@Formatters.FileSize(Model.ServerConfig.InitialReceiveBufferSize, 2)</td>
-                        <td>@Formatters.FileSize(Model.ServerConfig.MaxReceiveBufferSize, 1)</td>
-                        <td>@((Model.ServerConfig.ReceiveBufferGrowthRate * 100).ToString("n0"))%</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
 
-        <div class="container mt-4">
-            <table class="table table-striped table-bordered">
-                <thead class="table-light">
+    <div class="container mt-4">
+        <table class="table table-striped table-bordered">
+            <thead class="table-light">
+                <tr>
+                    <th colspan="7">Queues</th>
+                </tr>
+            </thead>
+            <thead class="table-light">
+                <tr>
+                    <th>Name</th>
+                    <th>Subscribers</th>
+                    <th>Current Messages</th>
+                    <th>Total Messages</th>
+                    <th>Total Delivered</th>
+                    <th>Expired Messages</th>
+                    <th>Delivery Failures</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var queue in Model.Queues)
+                {
                     <tr>
-                        <th colspan="7">Queues</th>
+                        <td><a href="/queue/@queue.QueueName">@queue.QueueName</a></td>
+                        <td>@queue.SubscriberCount.ToString("n0")</td>
+                        <td><a href="/messages/@queue.QueueName">@queue.CurrentEnqueuedMessageCount.ToString("n0")</a></td>
+                        <td>@queue.TotalEnqueuedMessages.ToString("n0")</td>
+                        <td>@queue.TotalDeliveredMessages.ToString("n0")</td>
+                        <td>@queue.TotalExpiredMessages.ToString("n0")</td>
+                        <td>@queue.TotalDeliveryFailures.ToString("n0")</td>
                     </tr>
-                </thead>
-                <thead class="table-light">
-                    <tr>
-                        <th>Name</th>
-                        <th>Subscribers</th>
-                        <th>Current Messages</th>
-                        <th>Total Messages</th>
-                        <th>Total Delivered</th>
-                        <th>Expired Messages</th>
-                        <th>Delivery Failures</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var queue in Model.Queues)
-                    {
-                        <tr>
-                            <td><a href="/queue/@queue.QueueName">@queue.QueueName</a></td>
-                            <td>@queue.SubscriberCount.ToString("n0")</td>
-                            <td><a href="/messages/@queue.QueueName">@queue.CurrentEnqueuedMessageCount.ToString("n0")</a></td>
-                            <td>@queue.TotalEnqueuedMessages.ToString("n0")</td>
-                            <td>@queue.TotalDeliveredMessages.ToString("n0")</td>
-                            <td>@queue.TotalExpiredMessages.ToString("n0")</td>
-                            <td>@queue.TotalDeliveryFailures.ToString("n0")</td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
-
+                }
+            </tbody>
+        </table>
     </div>
-}
+
+</div>
