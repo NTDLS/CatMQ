@@ -13,7 +13,7 @@
         /// <summary>
         /// When true, query replies are queued in a thread pool. Otherwise, queries block other activities.
         /// </summary>
-        public bool AsynchronousQueryWaiting { get; set; } = true;
+        public bool AsynchronousAcknowledgment { get; set; } = true;
 
         /// <summary>
         /// The default amount of time to wait for a query to reply before throwing a timeout exception.

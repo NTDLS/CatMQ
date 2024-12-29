@@ -16,17 +16,17 @@
             <thead class="table-light">
                 <tr>
                     <th>Listen Port</th>
-                    <th>Asynchronous Query Waiting</th>
-                    <th>Query Timeout (s)</th>
-                    <th>Initial Receive Buffer</th>
-                    <th>Max. Receive Buffer Size</th>
-                    <th>Receive Buffer Growth Rate</th>
+                    <th>Asynchronous Ack</th>
+                    <th>Ack Timeout (s)</th>
+                    <th>Initial Buffer</th>
+                    <th>Max. Buffer</th>
+                    <th>Buffer Growth Rate</th>
                 </tr>
             </thead>
             <tbody>
                 <tr>
                     <td>@Model.ServerConfig.ListenPort</td>
-                    <td>@Model.ServerConfig.AsynchronousQueryWaiting</td>
+                    <td>@Model.ServerConfig.AsynchronousAcknowledgment</td>
                     <td>@Model.ServerConfig.QueryTimeoutSeconds.ToString("n0")</td>
                     <td>@Formatters.FileSize(Model.ServerConfig.InitialReceiveBufferSize, 2)</td>
                     <td>@Formatters.FileSize(Model.ServerConfig.MaxReceiveBufferSize, 1)</td>
