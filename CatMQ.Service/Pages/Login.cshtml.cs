@@ -28,7 +28,7 @@ namespace CatMQ.Service.Pages
         {
             try
             {
-                var usersFile = Path.Join(serviceConfiguration.DataPath, "accounts.json");
+                var usersFile = Path.Join(serviceConfiguration.DataPath, ConfigFileLookup.GetFileName(ConfigFile.Accounts));
                 if (System.IO.File.Exists(usersFile) == false)
                 {
                     //Create a default accounts file with a default account.
@@ -36,11 +36,12 @@ namespace CatMQ.Service.Pages
                     {
                         new Account
                         {
+                            Id = Guid.NewGuid(),
                             Username = "admin",
                             PasswordHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("password"))).ToLower()
                         }
                     };
-                    serviceConfiguration.Write("accounts.json", defaultCredentials);
+                    serviceConfiguration.Write(ConfigFile.Accounts, defaultCredentials);
                 }
 
                 var credentials = JsonConvert.DeserializeObject<List<Account>>(System.IO.File.ReadAllText(usersFile)) ?? new();
@@ -59,7 +60,7 @@ namespace CatMQ.Service.Pages
         {
             try
             {
-                var accounts = serviceConfiguration.Read<List<Account>>("accounts.json", new());
+                var accounts = serviceConfiguration.Read<List<Account>>(ConfigFile.Accounts, new());
 
                 var account = accounts.FirstOrDefault(o => o.Username.Equals(Username, StringComparison.OrdinalIgnoreCase)
                                 && o.PasswordHash == Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Password ?? string.Empty))).ToLower());

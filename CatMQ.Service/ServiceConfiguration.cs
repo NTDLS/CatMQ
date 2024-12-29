@@ -76,9 +76,9 @@ namespace CatMQ.Service
         [Range(0.1, 2, ErrorMessage = "Receive Buffer Growth Rate must be between 0.1 and 2.0.")]
         public double ReceiveBufferGrowthRate { get; set; } = CMqDefaults.BUFFER_GROWTH_RATE;
 
-        public T Read<T>(string fileName, T defaultValue)
+        public T Read<T>(ConfigFile configFile, T defaultValue)
         {
-            var filePath = Path.Combine(DataPath, fileName);
+            var filePath = Path.Combine(DataPath, ConfigFileLookup.GetFileName(configFile));
             if (File.Exists(filePath))
             {
                 var json = File.ReadAllText(filePath);
@@ -88,9 +88,9 @@ namespace CatMQ.Service
             return defaultValue;
         }
 
-        public T? Read<T>(string fileName)
+        public T? Read<T>(ConfigFile configFile)
         {
-            var filePath = Path.Combine(DataPath, fileName);
+            var filePath = Path.Combine(DataPath, ConfigFileLookup.GetFileName(configFile));
             if (File.Exists(filePath))
             {
                 var json = File.ReadAllText(filePath);
@@ -100,11 +100,11 @@ namespace CatMQ.Service
             return default;
         }
 
-        public void Write<T>(string fileName, T obj)
+        public void Write<T>(ConfigFile configFile, T obj)
         {
             var json = JsonSerializer.Serialize<T>(obj, new JsonSerializerOptions { WriteIndented = true });
 
-            var filePath = Path.Combine(DataPath, fileName);
+            var filePath = Path.Combine(DataPath, ConfigFileLookup.GetFileName(configFile));
             File.WriteAllText(filePath, json);
         }
     }

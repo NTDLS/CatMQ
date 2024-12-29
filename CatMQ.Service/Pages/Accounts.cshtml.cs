@@ -14,7 +14,7 @@ namespace CatMQ.Service.Pages
         {
             try
             {
-                Accounts = serviceConfiguration.Read<List<Account>>("accounts.json", new());
+                Accounts = serviceConfiguration.Read<List<Account>>(ConfigFile.Accounts, new());
             }
             catch (Exception ex)
             {

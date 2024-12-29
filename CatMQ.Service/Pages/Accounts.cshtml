@@ -19,7 +19,9 @@
                 @foreach (var account in Model.Accounts)
                 {
                     <tr>
-                        <td>@account.Username</td>
+                        <td>
+                            <a href="/Account/@account.Username">@account.Username</a>
+                        </td>
                         <td>b</td>
                         <td>c</td>
                     </tr>

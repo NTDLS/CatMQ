@@ -18,7 +18,7 @@ namespace CatMQ.Service.Pages
             {
                 if (ModelState.IsValid)
                 {
-                    serviceConfiguration.Write("CatMQ.Service.Config.json", ServerConfig);
+                    serviceConfiguration.Write(ConfigFile.ServiceConfig, ServerConfig);
                     SuccessMessage = "Saved!<br />You will need to restart the service for these changes to take affect.";
                 }
             }
@@ -35,7 +35,7 @@ namespace CatMQ.Service.Pages
         {
             try
             {
-                ServerConfig = serviceConfiguration.Read("CatMQ.Service.Config.json", new ServiceConfiguration());
+                ServerConfig = serviceConfiguration.Read(ConfigFile.ServiceConfig, new ServiceConfiguration());
             }
             catch (Exception ex)
             {
