@@ -1,9 +1,7 @@
 ﻿using NTDLS.CatMQ.Server;
 using NTDLS.CatMQ.Shared;
-using NTDLS.Helpers;
 using Serilog;
-using System.Reflection;
-using System.Text.Json;
+using static CatMQ.Service.Configs;
 
 namespace CatMQ.Service
 {
@@ -13,15 +11,7 @@ namespace CatMQ.Service
 
         public void Start()
         {
-            var executablePath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-            var configurationFile = Path.Join(executablePath, "data", ConfigFileLookup.GetFileName(ConfigFile.Service));
-            if (File.Exists(configurationFile) == false)
-            {
-                //Create a default configuration file.
-                var defaultConfig = new ServiceConfiguration();
-                defaultConfig.Write(ConfigFile.Service, defaultConfig);
-            }
-            var serviceConfiguration = JsonSerializer.Deserialize<ServiceConfiguration>(File.ReadAllText(configurationFile)).EnsureNotNull();
+            var serviceConfiguration = Configs.Read(ConfigFile.Service, new ServiceConfiguration());
 
             _mqServer = new CMqServer(new CMqServerConfiguration
             {
@@ -29,7 +19,7 @@ namespace CatMQ.Service
                 AsynchronousAcknowledgment = serviceConfiguration.AsynchronousAcknowledgment,
                 InitialReceiveBufferSize = serviceConfiguration.InitialReceiveBufferSize,
                 MaxReceiveBufferSize = serviceConfiguration.MaxReceiveBufferSize,
-                QueryTimeoutSeconds = serviceConfiguration.QueryTimeoutSeconds,
+                AcknowledgmentTimeoutSeconds = serviceConfiguration.AcknowledgmentTimeoutSeconds,
                 ReceiveBufferGrowthRate = serviceConfiguration.ReceiveBufferGrowthRate,
             });
             _mqServer.OnLog += MqServer_OnLog;

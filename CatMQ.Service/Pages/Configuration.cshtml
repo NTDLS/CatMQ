@@ -75,9 +75,9 @@
                     </div>
 
                     <div class="mb-3">
-                        <label for="queryTimeout" class="form-label fw-bold">Query Timeout (s)</label>
-                        <span asp-validation-for="ServerConfig.QueryTimeoutSeconds" class="text-danger"></span>
-                        <input type="number" id="queryTimeout" class="form-control" asp-for="ServerConfig.QueryTimeoutSeconds" min="1">
+                        <label for="acknowledgmentTimeoutSeconds" class="form-label fw-bold">Query Timeout (s)</label>
+                        <span asp-validation-for="ServerConfig.AcknowledgmentTimeoutSeconds" class="text-danger"></span>
+                        <input type="number" id="acknowledgmentTimeoutSeconds" class="form-control" asp-for="ServerConfig.AcknowledgmentTimeoutSeconds" min="1">
                     </div>
                     <div class="mb-3">
                         <label for="initialReceiveBufferSize" class="form-label fw-bold">Initial Receive Buffer Size (bytes)</label>
@@ -99,7 +99,7 @@
             </div>
             <br />
 
-            <button type="submit" class="btn btn-primary">Submit</button>
+            <button type="submit" class="btn btn-primary">Save</button>
         </form>
     </div>
 </div>

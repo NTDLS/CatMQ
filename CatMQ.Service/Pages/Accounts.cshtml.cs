@@ -1,11 +1,12 @@
 using CatMQ.Service.Models.Data;
 using CatMQ.Service.Models.Page;
 using Microsoft.AspNetCore.Authorization;
+using static CatMQ.Service.Configs;
 
 namespace CatMQ.Service.Pages
 {
     [Authorize]
-    public class AccountsModel(ILogger<AccountsModel> logger, ServiceConfiguration serviceConfiguration) : BasePageModel
+    public class AccountsModel(ILogger<AccountsModel> logger) : BasePageModel
     {
         private readonly ILogger<AccountsModel> _logger = logger;
         public List<Account> Accounts { get; set; } = new();
@@ -14,7 +15,7 @@ namespace CatMQ.Service.Pages
         {
             try
             {
-                Accounts = serviceConfiguration.Read<List<Account>>(ConfigFile.Accounts, new());
+                Accounts = Configs.Read<List<Account>>(ConfigFile.Accounts, new());
             }
             catch (Exception ex)
             {

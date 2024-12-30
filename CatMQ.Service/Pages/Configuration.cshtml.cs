@@ -1,11 +1,12 @@
 using CatMQ.Service.Models.Page;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using static CatMQ.Service.Configs;
 
 namespace CatMQ.Service.Pages
 {
     [Authorize]
-    public class ConfigurationModel(ILogger<ConfigurationModel> logger, ServiceConfiguration serviceConfiguration) : BasePageModel
+    public class ConfigurationModel(ILogger<ConfigurationModel> logger) : BasePageModel
     {
         private readonly ILogger<ConfigurationModel> _logger = logger;
 
@@ -18,7 +19,7 @@ namespace CatMQ.Service.Pages
             {
                 if (ModelState.IsValid)
                 {
-                    serviceConfiguration.Write(ConfigFile.Service, ServerConfig);
+                    Configs.Write(ConfigFile.Service, ServerConfig);
                     SuccessMessage = "Saved!<br />You will need to restart the service for these changes to take affect.";
                 }
             }
@@ -35,7 +36,7 @@ namespace CatMQ.Service.Pages
         {
             try
             {
-                ServerConfig = serviceConfiguration.Read(ConfigFile.Service, new ServiceConfiguration());
+                ServerConfig = Configs.Read(ConfigFile.Service, new ServiceConfiguration());
             }
             catch (Exception ex)
             {

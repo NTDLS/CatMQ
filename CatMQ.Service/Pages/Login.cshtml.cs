@@ -8,11 +8,12 @@ using Newtonsoft.Json;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using static CatMQ.Service.Configs;
 
 namespace CatMQ.Service.Pages
 {
     [AllowAnonymous]
-    public class LoginModel(ILogger<LoginModel> logger, ServiceConfiguration serviceConfiguration) : BasePageModel
+    public class LoginModel(ILogger<LoginModel> logger) : BasePageModel
     {
         private readonly ILogger<LoginModel> _logger = logger;
 
@@ -28,8 +29,7 @@ namespace CatMQ.Service.Pages
         {
             try
             {
-                var usersFile = Path.Join(serviceConfiguration.DataPath, ConfigFileLookup.GetFileName(ConfigFile.Accounts));
-                if (System.IO.File.Exists(usersFile) == false)
+                if (!Configs.Exists(ConfigFile.Accounts))
                 {
                     //Create a default accounts file with a default account.
                     var defaultCredentials = new List<Account>
@@ -41,13 +41,13 @@ namespace CatMQ.Service.Pages
                             PasswordHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("password"))).ToLower()
                         }
                     };
-                    serviceConfiguration.Write(ConfigFile.Accounts, defaultCredentials);
+                    Configs.Write(ConfigFile.Accounts, defaultCredentials);
                 }
 
-                var credentials = JsonConvert.DeserializeObject<List<Account>>(System.IO.File.ReadAllText(usersFile)) ?? new();
+                var credentials = Configs.Read<List<Account>>(ConfigFile.Accounts);
 
                 IsDefaultPassword = credentials.Any(o => o.Username.Equals("admin", StringComparison.OrdinalIgnoreCase)
-                                                && o.PasswordHash == Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("password"))).ToLower());
+                                        && o.PasswordHash == Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("password"))).ToLower());
             }
             catch (Exception ex)
             {
@@ -60,7 +60,7 @@ namespace CatMQ.Service.Pages
         {
             try
             {
-                var accounts = serviceConfiguration.Read<List<Account>>(ConfigFile.Accounts, new());
+                var accounts = Configs.Read<List<Account>>(ConfigFile.Accounts, new());
 
                 var account = accounts.FirstOrDefault(o => o.Username.Equals(Username, StringComparison.OrdinalIgnoreCase)
                                 && o.PasswordHash == Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Password ?? string.Empty))).ToLower());

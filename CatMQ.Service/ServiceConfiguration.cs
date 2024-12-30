@@ -60,7 +60,7 @@ namespace CatMQ.Service
         /// </summary>
         [Required(ErrorMessage = "Query Timeout Seconds is required.")]
         [Range(1, 3600, ErrorMessage = "Query Timeout Seconds must be between 1 and 3,600.")]
-        public int QueryTimeoutSeconds { get; set; } = CMqDefaults.QUERY_TIMEOUT_SECONDS;
+        public int AcknowledgmentTimeoutSeconds { get; set; } = CMqDefaults.ACK_TIMEOUT_SECONDS;
 
         /// <summary>
         /// The initial size in bytes of the receive buffer.
@@ -84,37 +84,5 @@ namespace CatMQ.Service
         [Required(ErrorMessage = "Receive Buffer Growth Rate is required.")]
         [Range(0.1, 2, ErrorMessage = "Receive Buffer Growth Rate must be between 0.1 and 2.0.")]
         public double ReceiveBufferGrowthRate { get; set; } = CMqDefaults.BUFFER_GROWTH_RATE;
-
-        public T Read<T>(ConfigFile configFile, T defaultValue)
-        {
-            var filePath = Path.Combine(DataPath, ConfigFileLookup.GetFileName(configFile));
-            if (File.Exists(filePath))
-            {
-                var json = File.ReadAllText(filePath);
-                var obj = JsonSerializer.Deserialize<T>(json);
-                return obj ?? defaultValue;
-            }
-            return defaultValue;
-        }
-
-        public T? Read<T>(ConfigFile configFile)
-        {
-            var filePath = Path.Combine(DataPath, ConfigFileLookup.GetFileName(configFile));
-            if (File.Exists(filePath))
-            {
-                var json = File.ReadAllText(filePath);
-                var obj = JsonSerializer.Deserialize<T>(json);
-                return obj;
-            }
-            return default;
-        }
-
-        public void Write<T>(ConfigFile configFile, T obj)
-        {
-            var json = JsonSerializer.Serialize<T>(obj, new JsonSerializerOptions { WriteIndented = true });
-
-            var filePath = Path.Combine(DataPath, ConfigFileLookup.GetFileName(configFile));
-            File.WriteAllText(filePath, json);
-        }
     }
 }

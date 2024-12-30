@@ -20,7 +20,7 @@
         /// <summary>
         /// The default amount of time to wait for a query to reply before throwing a timeout exception.
         /// </summary>
-        public const int QUERY_TIMEOUT_SECONDS = 30;
+        public const int ACK_TIMEOUT_SECONDS = 30;
 
         /// <summary>
         /// The port which the queue service will listen on.

@@ -46,7 +46,7 @@ namespace NTDLS.CatMQ.Server
                 AsynchronousQueryWaiting = configuration.AsynchronousAcknowledgment,
                 InitialReceiveBufferSize = configuration.InitialReceiveBufferSize,
                 MaxReceiveBufferSize = configuration.MaxReceiveBufferSize,
-                QueryTimeout = TimeSpan.FromSeconds(configuration.QueryTimeoutSeconds),
+                QueryTimeout = TimeSpan.FromSeconds(configuration.AcknowledgmentTimeoutSeconds),
                 ReceiveBufferGrowthRate = configuration.ReceiveBufferGrowthRate,
             };
 
@@ -99,7 +99,7 @@ namespace NTDLS.CatMQ.Server
             return new CMqServerInformation
             {
                 AsynchronousAcknowledgment = _configuration.AsynchronousAcknowledgment,
-                QueryTimeoutSeconds = _configuration.QueryTimeoutSeconds,
+                AcknowledgmentTimeoutSeconds = _configuration.AcknowledgmentTimeoutSeconds,
                 InitialReceiveBufferSize = _configuration.InitialReceiveBufferSize,
                 MaxReceiveBufferSize = _configuration.MaxReceiveBufferSize,
                 ReceiveBufferGrowthRate = _configuration.ReceiveBufferGrowthRate,
