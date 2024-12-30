@@ -86,7 +86,7 @@ namespace NTDLS.CatMQ.Server
 
                 //Serialize using System.Text.Json as opposed to Newtonsoft for efficiency.
                 var persistedQueuesJson = JsonSerializer.Serialize(persistedQueues);
-                File.WriteAllText(Path.Join(_configuration.PersistencePath,  "queues.json"), persistedQueuesJson);
+                File.WriteAllText(Path.Join(_configuration.PersistencePath, "queues.json"), persistedQueuesJson);
             }
         }
 
@@ -364,7 +364,7 @@ namespace NTDLS.CatMQ.Server
 
                 List<MessageQueue>? persistedQueues = null;
 
-                var persistedQueuesFile = Path.Join(_configuration.PersistencePath,  "queues.json");
+                var persistedQueuesFile = Path.Join(_configuration.PersistencePath, "queues.json");
                 if (File.Exists(persistedQueuesFile))
                 {
                     OnLog?.Invoke(this, ErrorLevel.Information, "Loading persistent queues.");

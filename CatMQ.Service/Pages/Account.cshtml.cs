@@ -2,6 +2,8 @@ using CatMQ.Service.Models.Data;
 using CatMQ.Service.Models.Page;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Cryptography;
+using System.Text;
 using static CatMQ.Service.Configs;
 
 namespace CatMQ.Service.Pages
@@ -17,6 +19,11 @@ namespace CatMQ.Service.Pages
         [BindProperty]
         public Account Account { get; set; } = new();
 
+        public List<TimeZoneItem> TimeZones { get; set; } = new();
+
+        [BindProperty]
+        public string? Password { get; set; }
+
         public IActionResult OnPost()
         {
             try
@@ -25,12 +32,21 @@ namespace CatMQ.Service.Pages
                 {
                     var accounts = Configs.Read<List<Account>>(ConfigFile.Accounts, new());
 
+                    if (!string.IsNullOrEmpty(Password))
+                    {
+                        Account.PasswordHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Password ?? string.Empty))).ToLower();
+                    }
+                    else
+                    {
+                        Account.PasswordHash = accounts.FirstOrDefault(o => o.Id == Account.Id)?.PasswordHash; //Preserve old password hash.
+                    }
+
                     accounts.RemoveAll(o => o.Id == Account.Id);
                     accounts.Add(Account);
 
                     Configs.Write(ConfigFile.Accounts, accounts);
 
-                    SuccessMessage = "Saved!<br />You will need to restart the service for these changes to take affect.";
+                    SuccessMessage = "Saved!";
                 }
             }
             catch (Exception ex)
@@ -39,6 +55,8 @@ namespace CatMQ.Service.Pages
                 ErrorMessage = ex.Message;
             }
 
+            TimeZones = TimeZoneItem.GetAll();
+
             return Page();
         }
 
@@ -46,6 +64,8 @@ namespace CatMQ.Service.Pages
         {
             try
             {
+                TimeZones = TimeZoneItem.GetAll();
+
                 Account = Configs.Read<List<Account>>(ConfigFile.Accounts, new())
                     .Where(o => o.Username.Equals(AccountName, StringComparison.OrdinalIgnoreCase)).FirstOrDefault()
                     ?? throw new Exception("Account was not found.");

@@ -11,8 +11,8 @@
             <thead class="table-light">
                 <tr>
                     <th>Username</th>
-                    <th>B</th>
-                    <th>C</th>
+                    <th>Person Name</th>
+                    <th>Time-zone</th>
                 </tr>
             </thead>
             <tbody>
@@ -22,8 +22,12 @@
                         <td>
                             <a href="/Account/@account.Username">@account.Username</a>
                         </td>
-                        <td>b</td>
-                        <td>c</td>
+                        <td>
+                            @account.FirstName  @account.LastName
+                        </td>
+                        <td>
+                            @account.TimeZone
+                        </td>
                     </tr>
                 }
             </tbody>

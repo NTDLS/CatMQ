@@ -1,5 +1,4 @@
 ﻿using NTDLS.Helpers;
-using NTDLS.Semaphore;
 using System.Reflection;
 using System.Text.Json;
 

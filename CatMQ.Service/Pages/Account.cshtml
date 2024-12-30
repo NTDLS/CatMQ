@@ -40,6 +40,21 @@
                         <input type="text" id="lastName" class="form-control" asp-for="Account.LastName">
                     </div>
 
+
+                    <div class="mb-3">
+                        <label for="timeZone" class="form-label fw-bold">Time Zone</label>
+                        <span asp-validation-for="Account.TimeZone" class="text-danger"></span>
+                        <select id="timeZone" class="form-select" asp-for="Account.TimeZone" asp-items="@(new SelectList(Model.TimeZones, "Value", "Text"))">
+                            <option value="">Select a time zone</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="password" class="form-label fw-bold">Change Password</label>
+                        <span asp-validation-for="Password" class="text-danger"></span>
+                        <input type="text" id="password" class="form-control" asp-for="Password" autocomplete="new-password-no-auto-fill">
+                    </div>
+
                 </div>
             </div>
             <br />
