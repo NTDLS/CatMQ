@@ -14,16 +14,11 @@ So, we built one. __Welcome to CatMQ: a reliable yet slim message queue.__
 - Client Nuget package: https://www.nuget.org/packages/NTDLS.CatMQ.Client
 - Dedicated server install and web UI: https://github.com/NTDLS/CatMQ/releases
 
-## Running the server
-The server can either be run in-process using the nuget package NTDLS.CatMQ.Server or by downloading
-and installing the [dedicated CatMQ Service](https://github.com/NTDLS/CatMQ/releases), which is a platform
-independent service that includes a web management interface.
+## Server
+Running the server is as simple as downloading and installing the [dedicated CatMQ Service](https://github.com/NTDLS/CatMQ/releases), which is a platform independent service that includes a web management interface.
 
-### Server
-Running the server is quite simple, but configurable. The server does not have to be dedicated either,
-it can be one of the process that is involved in inner-process-communication.
-
-Alternatively, you can just install the dedicated server which includes a management web UI.
+Alternatively, the server can be run in-process using the nuget package NTDLS.CatMQ.Server.
+Running the server in-process is simple and configurable. The server process does not have to be dedicated as it can also be one of the processes that is involved in inner-process-communication.
 
 ```csharp
 internal class Program
@@ -43,10 +38,11 @@ internal class Program
 }
 ```
 
-## Connecting a client to a server
+## Client
+
 With the client, we can interact with the server. Create/delete/purge queues, subscribe
-and of course send and received messages. Messages are sent by simply passing a serializable
-class that inherits from ICMqMessage.
+and of course send and receive messages. Messages are sent by simply passing a serializable
+class instanct that inherits ICMqMessage.
 
 
 ```csharp
