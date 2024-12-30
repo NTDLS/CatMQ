@@ -119,7 +119,7 @@ __(yes, that's over 1-billion messages).__ 👀
 ![image](https://github.com/user-attachments/assets/48ed2204-0efa-4ee0-8b8a-50f557f74d24)
 
 ### Queue view
-![image](https://github.com/user-attachments/assets/0abc8369-32f3-43e5-9412-fefc772228dd)
+![image](https://github.com/user-attachments/assets/2e636a0c-1955-4940-9f0d-74c8c239e64c)
 
 ### Messages view
 ![image](https://github.com/user-attachments/assets/5782e58e-66f7-4f7b-9d2e-8098cb02e616)
