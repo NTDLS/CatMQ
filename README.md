@@ -111,17 +111,16 @@ much smarter than me. Eternally grateful to all those for making my development 
 ## Screenshots
 
 ### Home view
-![image](https://github.com/user-attachments/assets/992d0278-f5e3-4830-af6b-52637812714e)
+![image](https://github.com/user-attachments/assets/ef983736-9246-47ec-a40e-45999b3fad36)
 
 ### Queue view
-![image](https://github.com/user-attachments/assets/bf9387ec-8a7e-4847-9d96-ba18cfc66cf6)
+![image](https://github.com/user-attachments/assets/0abc8369-32f3-43e5-9412-fefc772228dd)
 
 ### Messages view
-![image](https://github.com/user-attachments/assets/2e3ebc0f-7b67-41b6-b398-2c7a5aad7f8f)
+![image](https://github.com/user-attachments/assets/5782e58e-66f7-4f7b-9d2e-8098cb02e616)
 
 ### Message view
-![image](https://github.com/user-attachments/assets/d43b89a6-398a-41d3-84dc-6a8b5e4b84de)
-
+![image](https://github.com/user-attachments/assets/4c61a930-4ecb-48cb-aa90-c7bd528c7ae8)
 
 ## License
 [MIT](https://choosealicense.com/licenses/mit/)
