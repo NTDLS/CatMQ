@@ -22,11 +22,11 @@
  AppUpdatesURL                    = http://www.NetworkDLS.com/
 
 [Files]
- Source: "C:\DropZone\CatMQ.Publish\runtimes\*.*"; DestDir: "{app}\runtimes"; Flags: IgnoreVersion recursesubdirs;
- Source: "C:\DropZone\CatMQ.Publish\wwwroot\*.*"; DestDir: "{app}\wwwroot"; Flags: IgnoreVersion recursesubdirs;
- Source: "C:\DropZone\CatMQ.Publish\*.exe"; DestDir: "{app}"; Flags: IgnoreVersion;
- Source: "C:\DropZone\CatMQ.Publish\*.dll"; DestDir: "{app}"; Flags: IgnoreVersion;
- Source: "C:\DropZone\CatMQ.Publish\*.json"; DestDir: "{app}"; Flags: IgnoreVersion;
+ Source: "publish\runtimes\*.*"; DestDir: "{app}\runtimes"; Flags: IgnoreVersion recursesubdirs;
+ Source: "publish\wwwroot\*.*"; DestDir: "{app}\wwwroot"; Flags: IgnoreVersion recursesubdirs;
+ Source: "publish\*.exe"; DestDir: "{app}"; Flags: IgnoreVersion;
+ Source: "publish\*.dll"; DestDir: "{app}"; Flags: IgnoreVersion;
+ Source: "publish\*.json"; DestDir: "{app}"; Flags: IgnoreVersion;
  Source: "..\Images\Logo.ico"; DestDir: "{app}"; Flags: IgnoreVersion;
 
 [Icons]
