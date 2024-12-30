@@ -110,8 +110,8 @@ much smarter than me. Eternally grateful to all those for making my development 
 
 ## Screenshots
 
-### Home view
-![image](https://github.com/user-attachments/assets/ef983736-9246-47ec-a40e-45999b3fad36)
+### Home view (yess, that's over 1-billion messages).
+![image](https://github.com/user-attachments/assets/48ed2204-0efa-4ee0-8b8a-50f557f74d24)
 
 ### Queue view
 ![image](https://github.com/user-attachments/assets/0abc8369-32f3-43e5-9412-fefc772228dd)
