@@ -37,6 +37,7 @@ namespace CatMQ.Service.Pages
                         {
                             Id = Guid.NewGuid(),
                             Username = "admin",
+                            Description = "default account",
                             PasswordHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("password"))).ToLower()
                         }
                     };
