@@ -1,8 +1,8 @@
-﻿@page "/DeleteApiKey/{AccountId}/{ApiKeyId}"
+﻿@page "/DeleteAccount/{AccountId}"
 @using NTDLS.Helpers
-@model DeleteApiKeyModel
+@model DeleteAccountModel
 @{
-    ViewData["Title"] = "Delete API Key";
+    ViewData["Title"] = "Delete Account";
     var redirectTimeout = 5;
 }
 
@@ -32,7 +32,7 @@
                     <h4>@ViewData["Title"]</h4>
                 </div>
                 <div class="card-body">
-                    The API key has been deleted.
+                    The account has been deleted.
                     <p>
                         <a href="@Model.RedirectURL">Continue now</a> or you will be redirected in <span id="countdown">@redirectTimeout</span> seconds.
                     </p>

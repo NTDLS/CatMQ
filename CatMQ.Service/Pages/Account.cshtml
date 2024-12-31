@@ -41,13 +41,16 @@
                     </div>
 
                     <button type="submit" class="btn btn-primary">Save</button>
+                    @Html.Raw(ConfirmActionHelper.GenerateDangerLink(
+                             $"Deleting account '{@Model.Account.Username}' will also remove any associated API keys. Continue?",
+                             "Delete", $"/DeleteAccount/{@Model.AccountId}"))
                 </div>
             </div>
             <br />
 
         </form>
 
-        <form method="post" asp-page-handler="AddAPIKey">
+        <form method="post" asp-page-handler="CreateAPIKey">
             <div class="card">
                 <div class="card-header">
                     <h4>API Keys</h4>
@@ -78,19 +81,15 @@
                                         <td>
                                             @Html.Raw(
                                                 ConfirmActionHelper.GenerateDangerLink(
-                                                        $"Deleting api key {apiKey.Key} will cause trouble! Continue?",
-                                                        "Delete",
-                                                        $"/DeleteApiKey/{@Model.AccountId}/{@apiKey.Id}",
-                                                        "DeleteApiKey")
-                                            )
+                                                        $"Deleting API key '{apiKey.Key}' is not reversable. Continue?",
+                                                        "Delete", $"/DeleteApiKey/{@Model.AccountId}/{@apiKey.Id}"))
                                         </td>
-
                                     </tr>
                                 }
                             </tbody>
                         </table>
                     }
-                    <button type="submit" class="btn btn-primary">Add</button>
+                    <button type="submit" class="btn btn-primary">Create API Key</button>
                 </div>
             </div>
         </form>

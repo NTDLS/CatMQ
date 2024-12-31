@@ -6,14 +6,11 @@ using System.Reflection;
 namespace CatMQ.Service.Pages
 {
     [Authorize]
-    public class DeleteApiKeyModel(ILogger<DeleteApiKeyModel> logger) : BasePageModel
+    public class DeleteAccountModel(ILogger<DeleteAccountModel> logger) : BasePageModel
     {
-        private readonly ILogger<DeleteApiKeyModel> _logger = logger;
+        private readonly ILogger<DeleteAccountModel> _logger = logger;
 
         public string? RedirectURL { get; set; }
-
-        [BindProperty]
-        public Guid? ApiKeyId { get; set; }
 
         [BindProperty]
         public Guid? AccountId { get; set; }
@@ -23,17 +20,14 @@ namespace CatMQ.Service.Pages
 
         public IActionResult OnPost()
         {
-            RedirectURL = $"/Account/{AccountId}";
+            RedirectURL = $"/Accounts";
 
             try
             {
                 if (UserSelection?.Equals("true") == true)
                 {
                     var accounts = Configs.GetAccounts();
-
-                    var account = accounts.Where(o => o.Id.Equals(AccountId)).Single()
-                        .ApiKeys.RemoveAll(o => o.Id == ApiKeyId);
-
+                    accounts.RemoveAll(o => o.Id.Equals(AccountId));
                     Configs.PutAccounts(accounts);
                 }
                 else

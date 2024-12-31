@@ -38,15 +38,23 @@ namespace CatMQ.Service.Pages
         {
             try
             {
+                if (!string.IsNullOrEmpty(Password))
+                {
+                    if (!Utility.IsPasswordComplex(Password, out var errorMessage))
+                    {
+                        ModelState.AddModelError(nameof(Password), errorMessage);
+                    }
+                    else
+                    {
+                        Account.PasswordHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Password ?? string.Empty))).ToLower();
+                    }
+                }
+
                 if (ModelState.IsValid)
                 {
                     var accounts = Configs.GetAccounts();
 
-                    if (!string.IsNullOrEmpty(Password))
-                    {
-                        Account.PasswordHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Password ?? string.Empty))).ToLower();
-                    }
-                    else
+                    if (string.IsNullOrEmpty(Password))
                     {
                         Account.PasswordHash = accounts.FirstOrDefault(o => o.Id == AccountId)?.PasswordHash; //Preserve old password hash.
                     }
@@ -73,21 +81,7 @@ namespace CatMQ.Service.Pages
             return Page();
         }
 
-        public IActionResult OnPostDeleteApiKey()
-        {
-            try
-            {
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, MethodBase.GetCurrentMethod()?.Name ?? string.Empty);
-                ErrorMessage = ex.Message;
-            }
-
-            return Page();
-        }
-
-        public IActionResult OnPostAddAPIKey()
+        public IActionResult OnPostCreateAPIKey()
         {
             try
             {
@@ -100,30 +94,24 @@ namespace CatMQ.Service.Pages
                     Account.ApiKeys.Add(new AccountApiKey()
                     {
                         Id = Guid.NewGuid(),
-                        Key = KeyGen.CreateApiKey(),
+                        Key = Utility.CreateApiKey(),
                         Description = string.Empty
                     });
 
-                    accounts.RemoveAll(o => o.Id == AccountId);
-                    accounts.Add(Account);
-
                     Configs.PutAccounts(accounts);
 
-                    SuccessMessage = "Saved!";
+                    SuccessMessage = "API Key Created!";
                 }
 
                 TimeZones = TimeZoneItem.GetAll();
 
-                Account = Configs.GetAccounts().Where(o => o.Id.Equals(AccountId)).FirstOrDefault()
-                    ?? throw new Exception("Account was not found.");
+                Account = Configs.GetAccounts().Where(o => o.Id.Equals(AccountId)).Single();
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, MethodBase.GetCurrentMethod()?.Name ?? string.Empty);
                 ErrorMessage = ex.Message;
             }
-
-            //return $"<a class=\"btn btn-danger btn-thin\" href=\"{basePath}/Utility/ConfirmAction?{param}\">{linkLabel}</a>";
 
             return Page();
         }
@@ -134,8 +122,7 @@ namespace CatMQ.Service.Pages
             {
                 TimeZones = TimeZoneItem.GetAll();
 
-                Account = Configs.GetAccounts().Where(o => o.Id.Equals(AccountId)).FirstOrDefault()
-                    ?? throw new Exception("Account was not found.");
+                Account = Configs.GetAccounts().Where(o => o.Id.Equals(AccountId)).Single();
             }
             catch (Exception ex)
             {

@@ -7,30 +7,27 @@
 
 <div>
     <div class="container mt-4">
-        <table class="table table-striped table-bordered">
-            <thead class="table-light">
-                <tr>
-                    <th>Username</th>
-                    <th>Description</th>
-                    <th>Time-zone</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var account in Model.Accounts)
-                {
+        <form method="post">
+            <table class="table table-striped table-bordered">
+                <thead class="table-light">
                     <tr>
-                        <td>
-                            <a href="/Account/@account.Id">@account.Username</a>
-                        </td>
-                        <td>
-                            @account.Description
-                        </td>
-                        <td>
-                            @account.TimeZone
-                        </td>
+                        <th>Username</th>
+                        <th>Description</th>
+                        <th>Time-zone</th>
                     </tr>
-                }
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    @foreach (var account in Model.Accounts)
+                    {
+                        <tr>
+                            <td><a href="/Account/@account.Id">@account.Username</a></td>
+                            <td>@account.Description</td>
+                            <td>@account.TimeZone</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <a href="/CreateAccount" class="btn btn-primary">Create Account</a>
+        </form>
     </div>
 </div>

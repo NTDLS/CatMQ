@@ -1,0 +1,50 @@
+﻿@page "/CreateAccount"
+@using NTDLS.Helpers
+@model CreateAccountModel
+@{
+    ViewData["Title"] = "Create Account";
+}
+
+<div>
+    <div class="container mt-4">
+        <form method="post">
+            <div class="card">
+                <div class="card-header">
+                    <h4>Account</h4>
+                </div>
+                <div class="card-body">
+
+                    <div class="mb-3">
+                        <label for="username" class="form-label fw-bold">Username</label>
+                        <span asp-validation-for="Account.Username" class="text-danger"></span>
+                        <input type="text" id="username" class="form-control" asp-for="Account.Username">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="description" class="form-label fw-bold">Description</label>
+                        <span asp-validation-for="Account.Description" class="text-danger"></span>
+                        <input type="text" id="description" class="form-control" asp-for="Account.Description">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="timeZone" class="form-label fw-bold">Time Zone</label>
+                        <span asp-validation-for="Account.TimeZone" class="text-danger"></span>
+                        <select id="timeZone" class="form-select" asp-for="Account.TimeZone" asp-items="@(new SelectList(Model.TimeZones, "Value", "Text"))">
+                            <option value="">Select a time zone</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="password" class="form-label fw-bold">Change Password</label>
+                        <span asp-validation-for="Password" class="text-danger"></span>
+                        <input type="text" id="password" class="form-control" asp-for="Password" autocomplete="new-password-no-auto-fill">
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </div>
+            </div>
+            <br />
+        </form>
+
+    </div>
+</div>
