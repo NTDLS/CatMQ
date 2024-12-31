@@ -2,9 +2,9 @@ using CatMQ.Service.Models.Data;
 using CatMQ.Service.Models.Page;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
-using static CatMQ.Service.Configs;
 
 namespace CatMQ.Service.Pages
 {
@@ -14,7 +14,7 @@ namespace CatMQ.Service.Pages
         private readonly ILogger<AccountModel> _logger = logger;
 
         [BindProperty(SupportsGet = true)]
-        public string AccountName { get; set; } = string.Empty;
+        public Guid AccountId { get; set; }
 
         [BindProperty]
         public Account Account { get; set; } = new();
@@ -24,13 +24,23 @@ namespace CatMQ.Service.Pages
         [BindProperty]
         public string? Password { get; set; }
 
-        public IActionResult OnPost()
+        [BindProperty]
+        public Guid? ApiKeyId { get; set; }
+
+        #region Confirm Action.
+
+        [BindProperty]
+        public string? UserSelection { get; set; }
+
+        #endregion
+
+        public IActionResult OnPostSaveAccount()
         {
             try
             {
                 if (ModelState.IsValid)
                 {
-                    var accounts = Configs.Read<List<Account>>(ConfigFile.Accounts, new());
+                    var accounts = Configs.GetAccounts();
 
                     if (!string.IsNullOrEmpty(Password))
                     {
@@ -38,24 +48,82 @@ namespace CatMQ.Service.Pages
                     }
                     else
                     {
-                        Account.PasswordHash = accounts.FirstOrDefault(o => o.Id == Account.Id)?.PasswordHash; //Preserve old password hash.
+                        Account.PasswordHash = accounts.FirstOrDefault(o => o.Id == AccountId)?.PasswordHash; //Preserve old password hash.
                     }
 
-                    accounts.RemoveAll(o => o.Id == Account.Id);
+                    Account.ApiKeys = accounts.FirstOrDefault(o => o.Id == AccountId)?.ApiKeys ?? new(); //Preserve old api keys.
+                    Account.Id = AccountId; //Preserve accountId.
+
+                    accounts.RemoveAll(o => o.Id == AccountId);
                     accounts.Add(Account);
 
-                    Configs.Write(ConfigFile.Accounts, accounts);
+                    Configs.PutAccounts(accounts);
 
                     SuccessMessage = "Saved!";
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "GetQueues");
+                _logger.LogError(ex, MethodBase.GetCurrentMethod()?.Name ?? string.Empty);
                 ErrorMessage = ex.Message;
             }
 
             TimeZones = TimeZoneItem.GetAll();
+
+            return Page();
+        }
+
+        public IActionResult OnPostDeleteApiKey()
+        {
+            try
+            {
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, MethodBase.GetCurrentMethod()?.Name ?? string.Empty);
+                ErrorMessage = ex.Message;
+            }
+
+            return Page();
+        }
+
+        public IActionResult OnPostAddAPIKey()
+        {
+            try
+            {
+                var accounts = Configs.GetAccounts();
+
+                if (ModelState.IsValid)
+                {
+                    Account = Configs.GetAccounts().Where(o => o.Id.Equals(AccountId)).Single();
+
+                    Account.ApiKeys.Add(new AccountApiKey()
+                    {
+                        Id = Guid.NewGuid(),
+                        Key = KeyGen.CreateApiKey(),
+                        Description = string.Empty
+                    });
+
+                    accounts.RemoveAll(o => o.Id == AccountId);
+                    accounts.Add(Account);
+
+                    Configs.PutAccounts(accounts);
+
+                    SuccessMessage = "Saved!";
+                }
+
+                TimeZones = TimeZoneItem.GetAll();
+
+                Account = Configs.GetAccounts().Where(o => o.Id.Equals(AccountId)).FirstOrDefault()
+                    ?? throw new Exception("Account was not found.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, MethodBase.GetCurrentMethod()?.Name ?? string.Empty);
+                ErrorMessage = ex.Message;
+            }
+
+            //return $"<a class=\"btn btn-danger btn-thin\" href=\"{basePath}/Utility/ConfirmAction?{param}\">{linkLabel}</a>";
 
             return Page();
         }
@@ -66,13 +134,12 @@ namespace CatMQ.Service.Pages
             {
                 TimeZones = TimeZoneItem.GetAll();
 
-                Account = Configs.Read<List<Account>>(ConfigFile.Accounts, new())
-                    .Where(o => o.Username.Equals(AccountName, StringComparison.OrdinalIgnoreCase)).FirstOrDefault()
+                Account = Configs.GetAccounts().Where(o => o.Id.Equals(AccountId)).FirstOrDefault()
                     ?? throw new Exception("Account was not found.");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "GetQueues");
+                _logger.LogError(ex, MethodBase.GetCurrentMethod()?.Name ?? string.Empty);
                 ErrorMessage = ex.Message;
             }
         }

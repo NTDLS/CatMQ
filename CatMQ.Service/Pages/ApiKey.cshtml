@@ -1,0 +1,34 @@
+﻿@page "/apikey/{AccountId}/{ApiKeyId}"
+@using NTDLS.Helpers
+@model ApiKeyModel
+@{
+    ViewData["Title"] = "API Key";
+}
+
+<div>
+    <div class="container mt-4">
+        <form method="post">
+            <div class="card">
+                <div class="card-header">
+                    <h4>API Key</h4>
+                </div>
+                <div class="card-body">
+
+                    <div class="mb-3">
+                        <label for="key" class="form-label fw-bold">Key</label>
+                        <span asp-validation-for="AccountApiKey.Key" class="text-danger"></span>
+                        <input type="text" id="key" class="form-control" asp-for="AccountApiKey.Key" readonly>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="description" class="form-label fw-bold">Description</label>
+                        <span asp-validation-for="AccountApiKey.Description" class="text-danger"></span>
+                        <input type="text" id="description" class="form-control" asp-for="AccountApiKey.Description">
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>

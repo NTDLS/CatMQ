@@ -1,7 +1,7 @@
 using CatMQ.Service.Models.Data;
 using CatMQ.Service.Models.Page;
 using Microsoft.AspNetCore.Authorization;
-using static CatMQ.Service.Configs;
+using System.Reflection;
 
 namespace CatMQ.Service.Pages
 {
@@ -15,11 +15,11 @@ namespace CatMQ.Service.Pages
         {
             try
             {
-                Accounts = Configs.Read<List<Account>>(ConfigFile.Accounts, new());
+                Accounts = Configs.GetAccounts();
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "GetQueues");
+                _logger.LogError(ex, MethodBase.GetCurrentMethod()?.Name ?? string.Empty);
                 ErrorMessage = ex.Message;
             }
         }

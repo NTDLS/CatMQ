@@ -1,4 +1,6 @@
-﻿using NTDLS.Helpers;
+﻿using CatMQ.Service.Models.Data;
+using Microsoft.Extensions.Caching.Memory;
+using NTDLS.Helpers;
 using System.Reflection;
 using System.Text.Json;
 
@@ -6,19 +8,21 @@ namespace CatMQ.Service
 {
     public static class Configs
     {
-        public enum ConfigFile
+        private static readonly MemoryCache _cache = new(new MemoryCacheOptions());
+
+        public enum FileType
         {
             Accounts,
             Service
         }
 
-        private static readonly Dictionary<ConfigFile, string> _configFiles = new()
+        private static readonly Dictionary<FileType, string> _configFiles = new()
         {
-            { ConfigFile.Accounts, "accounts.json" },
-            { ConfigFile.Service, "service.json" }
+            { FileType.Accounts, "accounts.json" },
+            { FileType.Service, "service.json" }
         };
 
-        public static string GetFileName(ConfigFile configFile)
+        public static string GetFileName(FileType configFile)
         {
             if (_configFiles.TryGetValue(configFile, out var fileName))
             {
@@ -28,18 +32,34 @@ namespace CatMQ.Service
             throw new Exception($"Undefined file type: [{configFile}].");
         }
 
-        public static bool Exists(ConfigFile configFile)
-        {
-            return File.Exists(GetFileName(configFile));
-        }
+        public static bool Exists(FileType configFile)
+            => File.Exists(GetFileName(configFile));
 
-        public static T Read<T>(ConfigFile configFile, T defaultValue)
+        public static List<Account> GetAccounts()
+            => Read<List<Account>>(FileType.Accounts);
+
+        public static ServiceConfiguration GetServiceConfig()
+           => Read<ServiceConfiguration>(FileType.Service, new());
+
+        public static void PutAccounts(List<Account> value)
+            => Write(FileType.Accounts, value);
+
+        public static void PutServiceConfig(ServiceConfiguration value)
+           => Write(FileType.Service, value);
+
+        private static T Read<T>(FileType fileType, T defaultValue)
         {
-            var filePath = GetFileName(configFile);
+            if (_cache.TryGetValue<T>(fileType, out var cached) && cached != null)
+            {
+                return cached;
+            }
+
+            var filePath = GetFileName(fileType);
             if (File.Exists(filePath))
             {
                 var json = File.ReadAllText(filePath);
                 var obj = JsonSerializer.Deserialize<T>(json);
+                _cache.Set(fileType, obj);
                 return obj ?? defaultValue;
             }
 
@@ -49,26 +69,34 @@ namespace CatMQ.Service
                 Directory.CreateDirectory(directoryName);
             }
 
-            Write(configFile, defaultValue); //Create default file.
+            Write(fileType, defaultValue); //Create default file.
             return defaultValue;
         }
 
-        public static T Read<T>(ConfigFile configFile)
+        private static T Read<T>(FileType fileType)
         {
-            var filePath = GetFileName(configFile);
+            if (_cache.TryGetValue<T>(fileType, out var cached) && cached != null)
+            {
+                return cached;
+            }
+
+            var filePath = GetFileName(fileType);
             if (File.Exists(filePath))
             {
                 var json = File.ReadAllText(filePath);
                 var obj = JsonSerializer.Deserialize<T>(json).EnsureNotNull();
+                _cache.Set(fileType, obj);
                 return obj;
             }
             throw new FileNotFoundException("Configuration file was not found", filePath);
         }
 
-        public static void Write<T>(ConfigFile configFile, T obj)
+        private static void Write<T>(FileType fileType, T obj)
         {
-            var filePath = GetFileName(configFile);
-            var json = JsonSerializer.Serialize<T>(obj, new JsonSerializerOptions { WriteIndented = true });
+            _cache.Set(fileType, obj);
+
+            var filePath = GetFileName(fileType);
+            var json = JsonSerializer.Serialize(obj, new JsonSerializerOptions { WriteIndented = true });
 
             var directoryName = Path.GetDirectoryName(filePath);
             if (directoryName != null && !Directory.Exists(directoryName))
@@ -76,7 +104,7 @@ namespace CatMQ.Service
                 Directory.CreateDirectory(directoryName);
             }
 
-            File.WriteAllText(GetFileName(configFile), json);
+            File.WriteAllText(GetFileName(fileType), json);
         }
     }
 }

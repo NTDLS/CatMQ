@@ -541,7 +541,7 @@ namespace NTDLS.CatMQ.Server
         /// <summary>
         /// Creates a new empty queue if it does not already exist.
         /// </summary>
-        internal void CreateQueue(CMqQueueConfiguration queueConfiguration)
+        public void CreateQueue(CMqQueueConfiguration queueConfiguration)
         {
             OnLog?.Invoke(this, ErrorLevel.Verbose, $"Creating queue: [{queueConfiguration.QueueName}].");
 
@@ -573,7 +573,7 @@ namespace NTDLS.CatMQ.Server
         /// <summary>
         /// Deletes an existing queue.
         /// </summary>
-        internal void DeleteQueue(string queueName)
+        public void DeleteQueue(string queueName)
         {
             OnLog?.Invoke(this, ErrorLevel.Verbose, $"Deleting queue: [{queueName}].");
 
@@ -698,9 +698,9 @@ namespace NTDLS.CatMQ.Server
         /// <summary>
         /// Removes a subscription from a queue for a given connection id.
         /// </summary>
-        internal void EnqueueMessage(Guid connectionId, string queueName, string objectType, string messageJson)
+        public void EnqueueMessage(string queueName, string objectType, string messageJson)
         {
-            OnLog?.Invoke(this, ErrorLevel.Verbose, $"Enqueuing message from connection [{connectionId}] to queue: [{queueName}].");
+            OnLog?.Invoke(this, ErrorLevel.Verbose, $"Enqueuing message to queue: [{queueName}].");
 
             string queueKey = queueName.ToLowerInvariant();
 
@@ -747,7 +747,7 @@ namespace NTDLS.CatMQ.Server
         /// <summary>
         /// Removes all messages from the given queue.
         /// </summary>
-        internal void PurgeQueue(string queueName)
+        public void PurgeQueue(string queueName)
         {
             OnLog?.Invoke(this, ErrorLevel.Verbose, $"Purging queue: [{queueName}].");
 

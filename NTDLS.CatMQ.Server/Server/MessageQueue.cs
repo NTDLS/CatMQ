@@ -50,7 +50,7 @@ namespace NTDLS.CatMQ.Server.Server
 
         public MessageQueue()
         {
-            QueueConfiguration = new(string.Empty);
+            QueueConfiguration = new();
         }
 
         public MessageQueue(CMqServer mqServer, CMqQueueConfiguration queueConfiguration)

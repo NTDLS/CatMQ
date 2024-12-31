@@ -1,7 +1,7 @@
 ﻿using NTDLS.CatMQ.Server;
 using NTDLS.CatMQ.Shared;
 using Serilog;
-using static CatMQ.Service.Configs;
+using System.Text.Json.Serialization;
 
 namespace CatMQ.Service
 {
@@ -11,7 +11,7 @@ namespace CatMQ.Service
 
         public void Start()
         {
-            var serviceConfiguration = Configs.Read(ConfigFile.Service, new ServiceConfiguration());
+            var serviceConfiguration = Configs.GetServiceConfig();
 
             _mqServer = new CMqServer(new CMqServerConfiguration
             {
@@ -28,7 +28,7 @@ namespace CatMQ.Service
             _mqServer.Start(serviceConfiguration.QueuePort);
             Log.Verbose("Message queue service started.");
 
-            if (serviceConfiguration.EnableWebUI && serviceConfiguration.WebUIURL != null)
+            if (serviceConfiguration.WebListenURL != null && (serviceConfiguration.EnableWebApi || serviceConfiguration.EnableWebUI))
             {
                 var builder = WebApplication.CreateBuilder();
 
@@ -41,12 +41,31 @@ namespace CatMQ.Service
                 builder.Services.AddSingleton(_mqServer);
                 builder.Services.AddSingleton(serviceConfiguration);
 
-                // Add services to the container.
-                builder.Services.AddRazorPages();
+                if (serviceConfiguration.EnableWebUI)
+                {
+                    builder.Services.AddRazorPages();
+                }
 
-                builder.WebHost.UseUrls(serviceConfiguration.WebUIURL);
+                if (serviceConfiguration.EnableWebApi)
+                {
+                    builder.Services.AddControllers()
+                        .AddJsonOptions(options =>
+                    {
+                        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+                    });
+                }
+
+                builder.WebHost.UseUrls(serviceConfiguration.WebListenURL);
 
                 var app = builder.Build();
+
+                app.UseRouting();
+
+                if (serviceConfiguration.EnableWebApi)
+                {
+                    app.UseMiddleware<ApiKeyMiddleware>();
+                    app.MapControllerRoute(name: "default", pattern: "/{controller=api}");
+                }
 
                 // Configure the HTTP request pipeline.
                 if (!app.Environment.IsDevelopment())
@@ -57,12 +76,14 @@ namespace CatMQ.Service
                 }
 
                 //app.UseHttpsRedirection();
-                app.UseRouting();
                 app.UseAuthentication();
                 app.UseAuthorization();
                 app.MapStaticAssets();
-                app.MapRazorPages()
-                   .WithStaticAssets();
+
+                if (serviceConfiguration.EnableWebUI)
+                {
+                    app.MapRazorPages().WithStaticAssets();
+                }
 
                 Log.Verbose("Starting web service.");
                 app.RunAsync();

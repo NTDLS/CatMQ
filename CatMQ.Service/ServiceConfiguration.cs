@@ -9,7 +9,14 @@ namespace CatMQ.Service
     {
         private string? _dataPath;
 
-        [Required(ErrorMessage = "Enable Web UI is required.")]
+        /// <summary>
+        /// Whether ot not the web APIs are enabled.
+        /// </summary>
+        public bool EnableWebApi { get; set; } = true;
+
+        /// <summary>
+        /// Whether or not the web UI is enabled.
+        /// </summary>
         public bool EnableWebUI { get; set; } = true;
 
         [Required(ErrorMessage = "Data Path is required.")]
@@ -46,7 +53,7 @@ namespace CatMQ.Service
         public int QueuePort { get; set; } = CMqDefaults.LISTEN_PORT;
 
         [Required(ErrorMessage = "Web UI URL is required.")]
-        public string? WebUIURL { get; set; } = "http://localhost:45783";
+        public string? WebListenURL { get; set; } = "http://localhost:45783";
 
         /// <summary>
         /// When true, query replies are queued in a thread pool. Otherwise, queries block other activities.

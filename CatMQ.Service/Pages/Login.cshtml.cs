@@ -4,10 +4,10 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Reflection;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
-using static CatMQ.Service.Configs;
 
 namespace CatMQ.Service.Pages
 {
@@ -28,7 +28,7 @@ namespace CatMQ.Service.Pages
         {
             try
             {
-                if (!Configs.Exists(ConfigFile.Accounts))
+                if (!Configs.Exists(Configs.FileType.Accounts))
                 {
                     //Create a default accounts file with a default account.
                     var defaultCredentials = new List<Account>
@@ -40,17 +40,17 @@ namespace CatMQ.Service.Pages
                             PasswordHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("password"))).ToLower()
                         }
                     };
-                    Configs.Write(ConfigFile.Accounts, defaultCredentials);
+                    Configs.PutAccounts(defaultCredentials);
                 }
 
-                var credentials = Configs.Read<List<Account>>(ConfigFile.Accounts);
+                var accounts = Configs.GetAccounts();
 
-                IsDefaultPassword = credentials.Any(o => o.Username.Equals("admin", StringComparison.OrdinalIgnoreCase)
+                IsDefaultPassword = accounts.Any(o => o.Username.Equals("admin", StringComparison.OrdinalIgnoreCase)
                                         && o.PasswordHash == Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("password"))).ToLower());
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Login");
+                _logger.LogError(ex, MethodBase.GetCurrentMethod()?.Name ?? string.Empty);
                 ErrorMessage = ex.Message;
             }
         }
@@ -59,7 +59,7 @@ namespace CatMQ.Service.Pages
         {
             try
             {
-                var accounts = Configs.Read<List<Account>>(ConfigFile.Accounts, new());
+                var accounts = Configs.GetAccounts();
 
                 var account = accounts.FirstOrDefault(o => o.Username.Equals(Username, StringComparison.OrdinalIgnoreCase)
                                 && o.PasswordHash == Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Password ?? string.Empty))).ToLower());
@@ -83,7 +83,7 @@ namespace CatMQ.Service.Pages
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Login");
+                _logger.LogError(ex, MethodBase.GetCurrentMethod()?.Name ?? string.Empty);
                 ErrorMessage = ex.Message;
             }
             return Page();

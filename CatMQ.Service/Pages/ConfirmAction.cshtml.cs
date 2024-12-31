@@ -6,21 +6,29 @@ using System.Reflection;
 namespace CatMQ.Service.Pages
 {
     [Authorize]
-    public class ConfigurationModel(ILogger<ConfigurationModel> logger) : BasePageModel
+    public class ConfirmActionModel(ILogger<ConfirmActionModel> logger) : BasePageModel
     {
-        private readonly ILogger<ConfigurationModel> _logger = logger;
+        private readonly ILogger<ConfirmActionModel> _logger = logger;
 
-        [BindProperty]
-        public ServiceConfiguration ServerConfig { get; set; } = new();
 
-        public IActionResult OnPost()
+        [BindProperty(SupportsGet = true)]
+        public string AspHandler { get; set; } = string.Empty;
+
+        [BindProperty(SupportsGet = true)]
+        public string PostBackTo { get; set; } = string.Empty;
+
+        [BindProperty(SupportsGet = true)]
+        public string Message { get; set; } = string.Empty;
+
+        [BindProperty(SupportsGet = true)]
+        public string Style { get; set; } = string.Empty;
+
+        public IActionResult OnPostSaveAccount()
         {
             try
             {
                 if (ModelState.IsValid)
                 {
-                    Configs.PutServiceConfig(ServerConfig);
-                    SuccessMessage = "Saved!<br />You will need to restart the service for these changes to take affect.";
                 }
             }
             catch (Exception ex)
@@ -36,7 +44,6 @@ namespace CatMQ.Service.Pages
         {
             try
             {
-                ServerConfig = Configs.GetServiceConfig();
             }
             catch (Exception ex)
             {

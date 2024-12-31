@@ -1,14 +1,21 @@
-﻿namespace NTDLS.CatMQ.Shared
+﻿using NTDLS.Helpers;
+
+namespace NTDLS.CatMQ.Shared
 {
     /// <summary>
     /// Defines a queue configuration.
     /// </summary>
-    public class CMqQueueConfiguration(string queueName)
+    public class CMqQueueConfiguration
     {
+        private string? _queueName;
         /// <summary>
         /// The name of the queue.
         /// </summary>
-        public string QueueName { get; set; } = queueName;
+        public string QueueName
+        {
+            get => _queueName.EnsureNotNull();
+            set => _queueName = value;
+        }
 
         /// <summary>
         /// The interval in which the queue will deliver all of its contents to the subscribers. 0 = immediate.
@@ -44,5 +51,14 @@
         /// Whether the queue is persisted or ephemeral.
         /// </summary>
         public PMqPersistenceScheme PersistenceScheme { get; set; } = PMqPersistenceScheme.Ephemeral;
+
+        public CMqQueueConfiguration()
+        {
+        }
+
+        public CMqQueueConfiguration(string queueName)
+        {
+            QueueName = queueName;
+        }
     }
 }
