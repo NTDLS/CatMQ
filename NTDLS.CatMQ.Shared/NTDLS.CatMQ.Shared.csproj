@@ -4,7 +4,7 @@
     <TargetFrameworks>net8.0;net9.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <version>1.0.3</version>
+    <version>1.0.4</version>
     <ApplicationIcon>Logo.ico</ApplicationIcon>
   </PropertyGroup>
 
@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="NTDLS.ReliableMessaging" Version="1.11.3" />
+    <PackageReference Include="NTDLS.ReliableMessaging" Version="1.11.4" />
   </ItemGroup>
 
 </Project>
