@@ -132,7 +132,7 @@ curl --location 'http://127.0.0.1:45783/api/CreateQueue' \
 ```
 
 ### Example enqueuing a message with WebAPI via cURL
-**URL:** */api/Enqueue/{queueName}/{assemblyQualfiedTypeName}*
+**URL:** */api/Enqueue/{queueName}/{assemblyQualifiedTypeName}*
 ```
 curl --location 'http://127.0.0.1:45783/api/Enqueue/MyFirstQueue/Test.QueueClient.Program%2BMyMessage%2C%20Test.QueueClient' \
 --header 'x-catmq-api-Key: kk4IajpGUJHMR1dFlzXmvnt0VlvGhp' \
