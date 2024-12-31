@@ -107,12 +107,14 @@ When enabled, CatMQ also allows managing queues by the way of Web API, you'll fi
 - Purge/{queueName}
 - DeleteQueue/{queueName}
 
-**Example creating a queue using default settings with WebAPI via cURL**
+### Example creating a queue using default settings with WebAPI via cURL
+**URL:** */api/CreateQueue/{queueName}*
 ```
 curl --location --request POST 'http://127.0.0.1:45783/api/CreateQueue/MyDefault'
 ```
 
-**Example creating a queue with WebAPI via cURL**
+### Example creating a queue using custom settings with WebAPI via cURL
+**URL:** */api/CreateQueue/{queueName}*
 ```
 curl --location 'http://127.0.0.1:45783/api/CreateQueue' \
 --header 'x-catmq-api-Key: kk4IajpGUJHMR1dFlzXmvnt0VlvGhp' \
@@ -128,6 +130,28 @@ curl --location 'http://127.0.0.1:45783/api/CreateQueue' \
     "PersistenceScheme": "Persistent"
 }'
 ```
+
+### Example enqueuing a message with WebAPI via cURL
+**URL:** */api/Enqueue/{queueName}/{assemblyQualfiedTypeName}*
+```
+curl --location 'http://127.0.0.1:45783/api/Enqueue/MyFirstQueue/Test.QueueClient.Program%2BMyMessage%2C%20Test.QueueClient' \
+--header 'x-catmq-api-Key: kk4IajpGUJHMR1dFlzXmvnt0VlvGhp' \
+--header 'Content-Type: application/json' \
+--data '{
+    "Text": "This is a test message"
+}'
+```
+
+## Notes about Assembly Qualified Type names
+Messages are automatically deserialized by the QueueClient, so its necessary to provide the fully assembly qualified type name when enqueuing a message.
+
+**Assembly Qualified Type Name format:**
+- Test.QueueClient.MyMessage, Test.QueueClient
+- Explanation: {ClassName}, {AssemblyName}
+
+**Assembly Qualified Type Name format for nested classes:**
+- Test.QueueClient.Program+MyMessage, Test.QueueClient
+- Explanation: {EnclosingClass}+{Class}, {AssemblyName}
 
 ## Technologies
 CatMQ is based heavily on internally built technologies that leverage the works by people
