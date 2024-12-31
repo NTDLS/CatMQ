@@ -18,7 +18,7 @@
         /// <summary>
         /// The full assembly qualified name of the type of MessageJson.
         /// </summary>
-        public string ObjectType { get; internal set; } = string.Empty;
+        public string AssemblyQualifiedTypeName { get; internal set; } = string.Empty;
 
         /// <summary>
         /// The message payload that needs to be sent to the subscriber.

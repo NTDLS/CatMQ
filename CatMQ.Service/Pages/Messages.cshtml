@@ -40,7 +40,7 @@
                     <tr>
                         <td><a href="/message/@Model.QueueName/@queue.MessageId">@queue.MessageId</a></td>
                         <td>@queue.Timestamp</td>
-                        <td>@queue.ObjectType</td>
+                        <td>@queue.AssemblyQualifiedTypeName</td>
                         <td>@queue.SubscriberCount.ToString("n0")</td>
                         <td>@queue.SubscriberMessageDeliveries.Count.ToString("n0")</td>
                         <td>@queue.SatisfiedSubscribersConnectionIDs.Count.ToString("n0")</td>

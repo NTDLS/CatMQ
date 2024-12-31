@@ -14,6 +14,15 @@ namespace Test.QueueClient
         {
             var client = new CMqClient(); //Create an instance of the client.
             client.Connect("127.0.0.1", 45784); //Connect to the queue server.
+
+            Console.WriteLine("Waiting for connection...");
+            while (client.IsConnected == false)
+            {
+                Thread.Sleep(1);
+            }
+
+            Console.WriteLine("Connected...");
+
             client.OnReceived += Client_OnReceived; //Wire up an event to listen for messages.
 
             //Create a queue. These are highly configurable.
@@ -24,7 +33,16 @@ namespace Test.QueueClient
 
             //Subscribe to the queue we just created.
             //For a simplified sample, this will cause this process to receive the messages we send.
-            client.Subscribe("MyFirstQueue");
+
+            try
+            {
+                client.Subscribe("MyFirstQueue");
+                Console.WriteLine("Subscribed...");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
 
             //Enqueue a few messages, note that the message is just a class and it must inherit from ICMqMessage.
             for (int i = 0; i < 10; i++)

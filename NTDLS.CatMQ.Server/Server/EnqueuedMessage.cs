@@ -5,7 +5,7 @@ namespace NTDLS.CatMQ.Server.Server
     /// <summary>
     /// A message that is in the queue and waiting to be delivered to all subscribers.
     /// </summary>
-    internal class EnqueuedMessage(string queueName, string objectType, string messageJson)
+    internal class EnqueuedMessage(string queueName, string assemblyQualifiedTypeName, string messageJson)
     {
         /// <summary>
         /// The name of the queue which contains this message.
@@ -25,7 +25,7 @@ namespace NTDLS.CatMQ.Server.Server
         /// <summary>
         /// The full assembly qualified name of the type of MessageJson.
         /// </summary>
-        public string ObjectType { get; set; } = objectType;
+        public string AssemblyQualifiedTypeName { get; set; } = assemblyQualifiedTypeName;
 
         /// <summary>
         /// The message payload that needs to be sent to the subscriber.

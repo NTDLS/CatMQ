@@ -14,9 +14,12 @@ namespace CatMQ.Service.Controllers
             _mqServer = mqServer;
         }
 
-        [HttpPost("Enqueue/{queueName}/{objectType}")]
-        public IActionResult Enqueue(string queueName, string objectType, [FromBody] string messageJson)
+        [HttpPost("Enqueue/{queueName}/{assemblyQualifiedTypeName}")]
+        [Consumes("text/plain", "application/json")]
+        public IActionResult Enqueue(string queueName, string assemblyQualifiedTypeName, [FromBody] dynamic messageJson)
         {
+            string jsonText = messageJson.ToString();
+            _mqServer.EnqueueMessage(queueName, assemblyQualifiedTypeName, jsonText);
             return Ok();
         }
 

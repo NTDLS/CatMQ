@@ -230,7 +230,7 @@ namespace NTDLS.CatMQ.Server
                                         SubscriberCount = sKVP.Count,
                                         SubscriberMessageDeliveries = message.SubscriberMessageDeliveries.Keys.ToHashSet(),
                                         SatisfiedSubscribersConnectionIDs = message.SatisfiedSubscribersConnectionIDs,
-                                        ObjectType = message.ObjectType,
+                                        AssemblyQualifiedTypeName = message.AssemblyQualifiedTypeName,
                                         MessageJson = message.MessageJson,
                                         MessageId = message.MessageId
                                     });
@@ -280,7 +280,7 @@ namespace NTDLS.CatMQ.Server
                                     Timestamp = message.Timestamp,
                                     SubscriberMessageDeliveries = message.SubscriberMessageDeliveries.Keys.ToHashSet(),
                                     SatisfiedSubscribersConnectionIDs = message.SatisfiedSubscribersConnectionIDs,
-                                    ObjectType = message.ObjectType,
+                                    AssemblyQualifiedTypeName = message.AssemblyQualifiedTypeName,
                                     MessageJson = message.MessageJson,
                                     MessageId = message.MessageId
                                 };
@@ -510,7 +510,7 @@ namespace NTDLS.CatMQ.Server
         /// </summary>
         internal bool DeliverMessage(Guid connectionId, string queueName, EnqueuedMessage enqueuedMessage)
         {
-            var result = _rmServer.Query(connectionId, new CMqMessageDeliveryQuery(queueName, enqueuedMessage.ObjectType, enqueuedMessage.MessageJson)).Result;
+            var result = _rmServer.Query(connectionId, new CMqMessageDeliveryQuery(queueName, enqueuedMessage.AssemblyQualifiedTypeName, enqueuedMessage.MessageJson)).Result;
             if (string.IsNullOrEmpty(result.ErrorMessage) == false)
             {
                 throw new Exception(result.ErrorMessage);
@@ -653,6 +653,10 @@ namespace NTDLS.CatMQ.Server
                             }
                         }) && success;
                     }
+                    else
+                    {
+                        throw new Exception("The specified queue does not exist.");
+                    }
                 }) && success;
 
                 if (success)
@@ -698,7 +702,7 @@ namespace NTDLS.CatMQ.Server
         /// <summary>
         /// Removes a subscription from a queue for a given connection id.
         /// </summary>
-        public void EnqueueMessage(string queueName, string objectType, string messageJson)
+        public void EnqueueMessage(string queueName, string assemblyQualifiedTypeName, string messageJson)
         {
             OnLog?.Invoke(this, ErrorLevel.Verbose, $"Enqueuing message to queue: [{queueName}].");
 
@@ -715,7 +719,7 @@ namespace NTDLS.CatMQ.Server
                         success = messageQueue.EnqueuedMessages.TryUse(m =>
                         {
                             messageQueue.ReceivedMessageCount++;
-                            var message = new EnqueuedMessage(queueKey, objectType, messageJson);
+                            var message = new EnqueuedMessage(queueKey, assemblyQualifiedTypeName, messageJson);
                             if (_persistenceDatabase != null)
                             {
                                 //Serialize using System.Text.Json as opposed to Newtonsoft for efficiency.

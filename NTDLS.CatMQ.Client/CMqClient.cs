@@ -331,7 +331,9 @@ namespace NTDLS.CatMQ.Client
             where T : ICMqMessage
         {
             var messageJson = JsonConvert.SerializeObject(message, _typeNameHandlingAll);
-            var objectType = message.GetType()?.AssemblyQualifiedName ?? string.Empty;
+            var assemblyQualifiedName = message.GetType()?.AssemblyQualifiedName ?? string.Empty;
+            var parts = assemblyQualifiedName.Split(','); //We only want the first two parts, not the version and such.
+            var objectType = parts.Length > 1 ? $"{parts[0]},{parts[1].Trim()}" : assemblyQualifiedName;
 
             var result = _rmClient.Query(new CMqEnqueueMessageToQueue(queueName, objectType, messageJson)).Result;
             if (result.IsSuccess == false)
