@@ -100,41 +100,41 @@ namespace CatMQ.Service
             }
         }
 
-        private void MqServer_OnLog(CMqServer server, ErrorLevel errorLevel, string message, Exception? ex = null)
+        private void MqServer_OnLog(CMqServer server, CMqErrorLevel errorLevel, string message, Exception? ex = null)
         {
             switch (errorLevel)
             {
-                case ErrorLevel.Verbose:
+                case CMqErrorLevel.Verbose:
                     if (ex != null)
                         Log.Verbose(ex, message);
                     else
                         Log.Verbose(message);
                     break;
-                case ErrorLevel.Debug:
+                case CMqErrorLevel.Debug:
                     if (ex != null)
                         Log.Debug(ex, message);
                     else
                         Log.Debug(message);
                     break;
-                case ErrorLevel.Information:
+                case CMqErrorLevel.Information:
                     if (ex != null)
                         Log.Information(ex, message);
                     else
                         Log.Information(message);
                     break;
-                case ErrorLevel.Warning:
+                case CMqErrorLevel.Warning:
                     if (ex != null)
                         Log.Warning(ex, message);
                     else
                         Log.Warning(message);
                     break;
-                case ErrorLevel.Error:
+                case CMqErrorLevel.Error:
                     if (ex != null)
                         Log.Error(ex, message);
                     else
                         Log.Error(message);
                     break;
-                case ErrorLevel.Fatal:
+                case CMqErrorLevel.Fatal:
                     if (ex != null)
                         Log.Fatal(ex, message);
                     else

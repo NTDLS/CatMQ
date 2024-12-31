@@ -40,27 +40,27 @@ namespace NTDLS.CatMQ.Shared
         /// <summary>
         /// Determines when to remove messages from the queue as they are distributed to subscribers.
         /// </summary>
-        public PMqConsumptionScheme ConsumptionScheme { get; set; } = PMqConsumptionScheme.SuccessfulDeliveryToAllSubscribers;
+        public CMqConsumptionScheme ConsumptionScheme { get; set; } = CMqConsumptionScheme.SuccessfulDeliveryToAllSubscribers;
 
         /// <summary>
         /// Determines how messages are distributed to subscribers.
         /// </summary>
-        public PMqDeliveryScheme DeliveryScheme { get; set; } = PMqDeliveryScheme.Random;
+        public CMqDeliveryScheme DeliveryScheme { get; set; } = CMqDeliveryScheme.Random;
 
         /// <summary>
         /// Whether the queue is persisted or ephemeral.
         /// </summary>
-        public PMqPersistenceScheme PersistenceScheme { get; set; } = PMqPersistenceScheme.Ephemeral;
+        public CMqPersistenceScheme PersistenceScheme { get; set; } = CMqPersistenceScheme.Ephemeral;
 
         /// <summary>
-        /// Instanciates a new instance of CMqQueueConfiguration.
+        /// Instantiates a new instance of CMqQueueConfiguration.
         /// </summary>
         public CMqQueueConfiguration()
         {
         }
 
         /// <summary>
-        /// Instanciates a new instance of CMqQueueConfiguration.
+        /// Instantiates a new instance of CMqQueueConfiguration.
         /// </summary>
         /// <param name="queueName"></param>
         public CMqQueueConfiguration(string queueName)

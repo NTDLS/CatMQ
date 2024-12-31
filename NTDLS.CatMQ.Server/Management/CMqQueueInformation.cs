@@ -35,12 +35,12 @@ namespace NTDLS.CatMQ.Server.Management
         /// <summary>
         /// Determines when to remove messages from the queue as they are distributed to subscribers.
         /// </summary>
-        public PMqConsumptionScheme ConsumptionScheme { get; internal set; } = PMqConsumptionScheme.SuccessfulDeliveryToAllSubscribers;
+        public CMqConsumptionScheme ConsumptionScheme { get; internal set; } = CMqConsumptionScheme.SuccessfulDeliveryToAllSubscribers;
 
         /// <summary>
         /// Determines how messages are distributed to subscribers.
         /// </summary>
-        public PMqDeliveryScheme DeliveryScheme { get; internal set; } = PMqDeliveryScheme.Random;
+        public CMqDeliveryScheme DeliveryScheme { get; internal set; } = CMqDeliveryScheme.Random;
 
         /// <summary>
         /// The current number of messages that are enqueued in this message queue.
@@ -75,6 +75,6 @@ namespace NTDLS.CatMQ.Server.Management
         /// <summary>
         /// Whether the queue is persisted or ephemeral.
         /// </summary>
-        public PMqPersistenceScheme PersistenceScheme { get; set; } = PMqPersistenceScheme.Ephemeral;
+        public CMqPersistenceScheme PersistenceScheme { get; set; } = CMqPersistenceScheme.Ephemeral;
     }
 }

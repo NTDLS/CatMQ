@@ -3,7 +3,7 @@
     /// <summary>
     /// Determines when to remove messages from the queue as they are distributed to subscribers.
     /// </summary>
-    public enum PMqConsumptionScheme
+    public enum CMqConsumptionScheme
     {
         /// <summary>
         /// The messages are delivered to each subscriber, the message is removed once it is delivered to all subscribers even if they do not consume it.
@@ -18,7 +18,7 @@
     /// <summary>
     /// Determines how messages are distributed to subscribers.
     /// </summary>
-    public enum PMqDeliveryScheme
+    public enum CMqDeliveryScheme
     {
         /// <summary>
         /// Messages are delivered to the subscribers in the order which they were subscribed.
@@ -33,7 +33,7 @@
     /// <summary>
     /// Whether the queue is persisted or ephemeral.
     /// </summary>
-    public enum PMqPersistenceScheme
+    public enum CMqPersistenceScheme
     {
         /// <summary>
         /// Undelivered messages are lost when the the service stops.
@@ -48,7 +48,7 @@
     /// <summary>
     /// Used for message and error logging.
     /// </summary>
-    public enum ErrorLevel
+    public enum CMqErrorLevel
     {
         /// <summary>
         /// Use for detailed diagnostic information.

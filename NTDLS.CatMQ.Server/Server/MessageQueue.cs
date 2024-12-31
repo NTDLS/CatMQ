@@ -146,7 +146,7 @@ namespace NTDLS.CatMQ.Server.Server
 
                                     yetToBeDeliveredSubscribers = s.Where(o => yetToBeDeliveredSubscriberIds.Contains(o.Key)).Select(o => o.Value).ToList();
 
-                                    if (messageQueue.QueueConfiguration.DeliveryScheme == PMqDeliveryScheme.Random)
+                                    if (messageQueue.QueueConfiguration.DeliveryScheme == CMqDeliveryScheme.Random)
                                     {
                                         yetToBeDeliveredSubscribers = yetToBeDeliveredSubscribers.OrderBy(_ => Guid.NewGuid()).ToList();
                                     }
@@ -205,7 +205,7 @@ namespace NTDLS.CatMQ.Server.Server
                                 successfulDeliveries++;
 
                                 if (successfulDeliveryAndConsume
-                                    && messageQueue.QueueConfiguration.ConsumptionScheme == PMqConsumptionScheme.FirstConsumedSubscriber)
+                                    && messageQueue.QueueConfiguration.ConsumptionScheme == CMqConsumptionScheme.FirstConsumedSubscriber)
                                 {
                                     //Message was delivered and consumed, break the delivery loop so the message can be removed from the queue.
                                     break;
@@ -254,7 +254,7 @@ namespace NTDLS.CatMQ.Server.Server
                         {
                             messageQueue.Subscribers.Use(s => //This lock is already held.
                             {
-                                if (successfulDeliveryAndConsume && messageQueue.QueueConfiguration.ConsumptionScheme == PMqConsumptionScheme.FirstConsumedSubscriber)
+                                if (successfulDeliveryAndConsume && messageQueue.QueueConfiguration.ConsumptionScheme == CMqConsumptionScheme.FirstConsumedSubscriber)
                                 {
                                     //The message was consumed by a subscriber, remove it from the message list.
                                     messageQueue.QueueServer.RemovePersistenceMessage(messageQueue.QueueConfiguration.QueueName, topMessage.MessageId);

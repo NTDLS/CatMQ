@@ -28,7 +28,7 @@ namespace Test.QueueClient
             //Create a queue. These are highly configurable.
             client.CreateQueue(new CMqQueueConfiguration("MyFirstQueue")
             {
-                PersistenceScheme = PMqPersistenceScheme.Ephemeral
+                PersistenceScheme = CMqPersistenceScheme.Ephemeral
             });
 
             //Subscribe to the queue we just created.

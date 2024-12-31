@@ -5,7 +5,7 @@ namespace Test.Stress
 {
     internal class Program
     {
-        private static Random _random = new();
+        private static readonly Random _random = new();
 
         internal class MyMessage(string text) : ICMqMessage
         {
@@ -53,7 +53,7 @@ namespace Test.Stress
                 Console.WriteLine($"Creating queue: '{queueName}'.");
                 client.CreateQueue(new CMqQueueConfiguration(queueName)
                 {
-                    PersistenceScheme = PMqPersistenceScheme.Persistent
+                    PersistenceScheme = CMqPersistenceScheme.Persistent
                 });
 
                 if (_random.Next(1, 100) > 50) //We don't always subscribe to our own queue.
@@ -91,7 +91,7 @@ namespace Test.Stress
         {
             if (message is MyMessage myMessage)
             {
-                //Console.WriteLine($"Received: '{myMessage.Text}'");
+                Console.WriteLine($"Received: '{myMessage.Text}'");
             }
             else
             {
