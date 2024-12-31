@@ -52,10 +52,17 @@ namespace NTDLS.CatMQ.Shared
         /// </summary>
         public PMqPersistenceScheme PersistenceScheme { get; set; } = PMqPersistenceScheme.Ephemeral;
 
+        /// <summary>
+        /// Instanciates a new instance of CMqQueueConfiguration.
+        /// </summary>
         public CMqQueueConfiguration()
         {
         }
 
+        /// <summary>
+        /// Instanciates a new instance of CMqQueueConfiguration.
+        /// </summary>
+        /// <param name="queueName"></param>
         public CMqQueueConfiguration(string queueName)
         {
             QueueName = queueName;
