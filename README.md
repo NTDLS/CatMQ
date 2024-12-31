@@ -110,7 +110,8 @@ When enabled, CatMQ also allows managing queues by the way of Web API, you'll fi
 ### Example creating a queue using default settings with WebAPI via cURL
 **URL:** */api/CreateQueue/{queueName}*
 ```
-curl --location --request POST 'http://127.0.0.1:45783/api/CreateQueue/MyDefault'
+curl --location --request POST 'http://127.0.0.1:45783/api/CreateQueue/MyDefault' \
+--header 'x-catmq-api-Key: kk4IajpGUJHMR1dFlzXmvnt0VlvGhp'
 ```
 
 ### Example creating a queue using custom settings with WebAPI via cURL
