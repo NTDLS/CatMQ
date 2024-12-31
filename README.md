@@ -1,21 +1,24 @@
 # CatMQ
 CatMQ is a high-performance and reliable persistent message queue designed for efficient inter-process communication, task queuing, load balancing, and data buffering over TCP/IP.
 
+## Another Message Queue?! Why?
+CatMQ is not “fully featured”, as in it does not natively support clustering, it is not multi-protocol (no AMQP nor MQTT), and it is not friendly to non-dot-net subscribers.
+Ok, then what’s the deal?
+Well, we needed a MQ that was slim, straight forward and free of fat-runtimes such as java or additional dependencies such as erlang. We went on an internet fishing expedition and came up empty.
+
+So, we built one. __Welcome to CatMQ: a reliable yet slim message queue.__
+
+
 ## Packages 📦
 - Server Nuget package: https://www.nuget.org/packages/NTDLS.CatMQ.Server
 - Client Nuget package: https://www.nuget.org/packages/NTDLS.CatMQ.Client
 - Dedicated server install and web UI: https://github.com/NTDLS/CatMQ/releases
 
-## Running the server
-The server can either be run in-process using the nuget package NTDLS.CatMQ.Server or by downloading
-and installing the [dedicated CatMQ Service](https://github.com/NTDLS/CatMQ/releases), which is a platform
-independent service that includes a web management interface.
+## Server
+Running the server is as simple as downloading and installing the [dedicated CatMQ Service](https://github.com/NTDLS/CatMQ/releases), which is a platform independent service that includes a web management interface.
 
-### Server
-Running the server is quite simple, but configurable. The server does not have to be dedicated either,
-it can be one of the process that is involved in inner-process-communication.
-
-Alternatively, you can just install the dedicated server which includes a management web UI.
+Alternatively, the server can be run in-process using the nuget package NTDLS.CatMQ.Server.
+Running the server in-process is simple and configurable. The server process does not have to be dedicated as it can also be one of the processes that is involved in inner-process-communication.
 
 ```csharp
 internal class Program
@@ -35,10 +38,11 @@ internal class Program
 }
 ```
 
-## Connecting a client to a server
+## Client
+
 With the client, we can interact with the server. Create/delete/purge queues, subscribe
-and of course send and received messages. Messages are sent by simply passing a serializable
-class that inherits from ICMqMessage.
+and of course send and receive messages. Messages are sent by simply passing a serializable
+class instanct that inherits ICMqMessage.
 
 
 ```csharp
@@ -111,17 +115,17 @@ much smarter than me. Eternally grateful to all those for making my development 
 ## Screenshots
 
 ### Home view
-![image](https://github.com/user-attachments/assets/992d0278-f5e3-4830-af6b-52637812714e)
+__(yes, that's over 1-billion messages).__ 👀
+![image](https://github.com/user-attachments/assets/48ed2204-0efa-4ee0-8b8a-50f557f74d24)
 
 ### Queue view
-![image](https://github.com/user-attachments/assets/bf9387ec-8a7e-4847-9d96-ba18cfc66cf6)
+![image](https://github.com/user-attachments/assets/2e636a0c-1955-4940-9f0d-74c8c239e64c)
 
 ### Messages view
-![image](https://github.com/user-attachments/assets/2e3ebc0f-7b67-41b6-b398-2c7a5aad7f8f)
+![image](https://github.com/user-attachments/assets/5782e58e-66f7-4f7b-9d2e-8098cb02e616)
 
 ### Message view
-![image](https://github.com/user-attachments/assets/d43b89a6-398a-41d3-84dc-6a8b5e4b84de)
-
+![image](https://github.com/user-attachments/assets/4c61a930-4ecb-48cb-aa90-c7bd528c7ae8)
 
 ## License
 [MIT](https://choosealicense.com/licenses/mit/)
