@@ -96,6 +96,39 @@ private static bool Client_OnReceived(CMqClient client, string queueName, ICMqMe
 }
 ```
 
+
+## Web API
+When enabled, CatMQ also allows managing queues by the way of Web API, you'll first need to login to the web management UI, create a user and generate a API key. This API key will need to be passed in the "x-catmq-api-Key" header value.
+
+**Currently supported WebAPI calls**
+- Enqueue/{queueName}/{objectType} [json in body]
+- CreateQueue/{queueName}
+- CreateQueue [CMqQueueConfiguration json in body]
+- Purge/{queueName}
+- DeleteQueue/{queueName}
+
+**Example creating a queue using default settings with WebAPI via cURL**
+```
+curl --location --request POST 'http://127.0.0.1:45783/api/CreateQueue/MyDefault'
+```
+
+**Example creating a queue with WebAPI via cURL**
+```
+curl --location 'http://127.0.0.1:45783/api/CreateQueue' \
+--header 'x-catmq-api-Key: kk4IajpGUJHMR1dFlzXmvnt0VlvGhp' \
+--header 'Content-Type: application/json' \
+--data '{
+    "QueueName": "MyQueue",
+    "BatchDeliveryInterval": "00:00:00",
+    "DeliveryThrottle": "00:00:00",
+    "MaxDeliveryAttempts": 5,
+    "MaxMessageAge": "01:00:00",
+    "ConsumptionScheme": "SuccessfulDeliveryToAllSubscribers",
+    "DeliveryScheme": "Random",
+    "PersistenceScheme": "Persistent"
+}'
+```
+
 ## Technologies
 CatMQ is based heavily on internally built technologies that leverage the works by people
 much smarter than me. Eternally grateful to all those for making my development a walk in the park.
