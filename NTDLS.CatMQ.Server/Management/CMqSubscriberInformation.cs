@@ -5,15 +5,15 @@
     /// </summary>
     public class CMqSubscriberInformation
     {
-        internal CMqSubscriberInformation(Guid connectionId)
+        internal CMqSubscriberInformation(Guid subscriberId)
         {
-            ConnectionId = connectionId;
+            SubscriberId = subscriberId;
         }
 
         /// <summary>
-        /// The unique connection id of the subscriber.
+        /// The unique id of the subscriber, synonymous with ConnectionId.
         /// </summary>
-        public Guid ConnectionId { get; internal set; }
+        public Guid SubscriberId { get; internal set; }
 
         /// <summary>
         /// The number of messages that have been attempted to the subscriber.

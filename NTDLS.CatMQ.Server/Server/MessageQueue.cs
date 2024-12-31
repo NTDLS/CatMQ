@@ -142,11 +142,11 @@ namespace NTDLS.CatMQ.Server.Server
                                 {
                                     //Get list of subscribers that have yet to get a copy of the message.
 
-                                    var yetToBeDeliveredSubscriberIds = s.Keys.Except(topMessage.SatisfiedSubscribersConnectionIDs).ToList();
+                                    var yetToBeDeliveredSubscriberIds = s.Keys.Except(topMessage.SatisfiedSubscriberssubscriberIDs).ToList();
 
                                     yetToBeDeliveredSubscribers = s.Where(o => yetToBeDeliveredSubscriberIds.Contains(o.Key)).Select(o => o.Value).ToList();
 
-                                    if (messageQueue.QueueConfiguration.DeliveryScheme == CMqDeliveryScheme.Random)
+                                    if (messageQueue.QueueConfiguration.DeliveryScheme == CMqDeliveryScheme.Balanced)
                                     {
                                         yetToBeDeliveredSubscribers = yetToBeDeliveredSubscribers.OrderBy(_ => Guid.NewGuid()).ToList();
                                     }
@@ -172,21 +172,21 @@ namespace NTDLS.CatMQ.Server.Server
                             }
 
                             //Keep track of per-message-subscriber delivery metrics.
-                            if (topMessage.SubscriberMessageDeliveries.TryGetValue(subscriber.ConnectionId, out var subscriberMessageDelivery))
+                            if (topMessage.SubscriberMessageDeliveries.TryGetValue(subscriber.SubscriberId, out var subscriberMessageDelivery))
                             {
                                 subscriberMessageDelivery.DeliveryAttempts++;
                             }
                             else
                             {
                                 subscriberMessageDelivery = new SubscriberMessageDelivery() { DeliveryAttempts = 1 };
-                                topMessage.SubscriberMessageDeliveries.Add(subscriber.ConnectionId, subscriberMessageDelivery);
+                                topMessage.SubscriberMessageDeliveries.Add(subscriber.SubscriberId, subscriberMessageDelivery);
                             }
 
                             try
                             {
                                 subscriber.DeliveryAttempts++;
 
-                                if (messageQueue.QueueServer.DeliverMessage(subscriber.ConnectionId, messageQueue.QueueConfiguration.QueueName, topMessage))
+                                if (messageQueue.QueueServer.DeliverMessage(subscriber.SubscriberId, messageQueue.QueueConfiguration.QueueName, topMessage))
                                 {
                                     subscriber.ConsumedMessages++;
                                     successfulDeliveryAndConsume = true;
@@ -201,7 +201,7 @@ namespace NTDLS.CatMQ.Server.Server
                                 }
 
                                 //This thread is the only place we manage [SatisfiedSubscribersConnectionIDs], so we can use it without additional locking.
-                                topMessage.SatisfiedSubscribersConnectionIDs.Add(subscriber.ConnectionId);
+                                topMessage.SatisfiedSubscriberssubscriberIDs.Add(subscriber.SubscriberId);
                                 successfulDeliveries++;
 
                                 if (successfulDeliveryAndConsume
@@ -222,7 +222,7 @@ namespace NTDLS.CatMQ.Server.Server
                             if (messageQueue.QueueConfiguration.MaxDeliveryAttempts > 0
                                 && subscriberMessageDelivery.DeliveryAttempts >= messageQueue.QueueConfiguration.MaxDeliveryAttempts)
                             {
-                                topMessage.SatisfiedSubscribersConnectionIDs.Add(subscriber.ConnectionId);
+                                topMessage.SatisfiedSubscriberssubscriberIDs.Add(subscriber.SubscriberId);
                             }
                         }
 
@@ -260,7 +260,7 @@ namespace NTDLS.CatMQ.Server.Server
                                     messageQueue.QueueServer.RemovePersistenceMessage(messageQueue.QueueConfiguration.QueueName, topMessage.MessageId);
                                     m.Remove(topMessage);
                                 }
-                                else if (s.Keys.Except(topMessage.SatisfiedSubscribersConnectionIDs).Any() == false)
+                                else if (s.Keys.Except(topMessage.SatisfiedSubscriberssubscriberIDs).Any() == false)
                                 {
                                     //If all subscribers are satisfied (delivered or max attempts reached), then remove the message.
                                     messageQueue.QueueServer.RemovePersistenceMessage(messageQueue.QueueConfiguration.QueueName, topMessage.MessageId);

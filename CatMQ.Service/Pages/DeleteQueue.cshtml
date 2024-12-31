@@ -1,0 +1,43 @@
+﻿@page "/DeleteQueue/{QueueName}"
+@using NTDLS.Helpers
+@model DeleteQueueModel
+@{
+    ViewData["Title"] = "Delete Queue";
+    var redirectTimeout = 5;
+}
+
+@if (string.IsNullOrEmpty(Model.ErrorMessage))
+{
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            var countdownElement = document.getElementById('countdown');
+            var countdownTime = @redirectTimeout - 1;
+
+            var interval = setInterval(function () {
+                countdownElement.textContent = countdownTime;
+                countdownTime--;
+
+                if (countdownTime < 0) {
+                    clearInterval(interval);
+                    window.location.href = "@Model.RedirectURL";
+                }
+            }, 1000);
+        });
+    </script>
+
+    <div class="container mt-4">
+        <form method="post">
+            <div class="card">
+                <div class="card-header">
+                    <h4>@ViewData["Title"]</h4>
+                </div>
+                <div class="card-body">
+                    The message queue has been deleted.
+                    <p>
+                        <a href="@Model.RedirectURL">Continue now</a> or you will be redirected in <span id="countdown">@redirectTimeout</span> seconds.
+                    </p>
+                </div>
+            </div>
+        </form>
+    </div>
+}

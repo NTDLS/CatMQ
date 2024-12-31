@@ -29,3 +29,9 @@ body {
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
   text-align: start;
 }
+
+.btn-thin {
+    padding: 4px 8px; /* Adjust padding to make it thinner */
+    font-size: 12px; /* Optionally reduce the font size */
+    line-height: 1.2; /* Adjust line height for vertical alignment */
+}

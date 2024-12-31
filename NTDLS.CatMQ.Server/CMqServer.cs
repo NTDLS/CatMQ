@@ -229,7 +229,7 @@ namespace NTDLS.CatMQ.Server
                                         Timestamp = message.Timestamp,
                                         SubscriberCount = sKVP.Count,
                                         SubscriberMessageDeliveries = message.SubscriberMessageDeliveries.Keys.ToHashSet(),
-                                        SatisfiedSubscribersConnectionIDs = message.SatisfiedSubscribersConnectionIDs,
+                                        SatisfiedSubscribersSubscriberIDs = message.SatisfiedSubscriberssubscriberIDs,
                                         AssemblyQualifiedTypeName = message.AssemblyQualifiedTypeName,
                                         MessageJson = message.MessageJson,
                                         MessageId = message.MessageId
@@ -279,7 +279,7 @@ namespace NTDLS.CatMQ.Server
                                 {
                                     Timestamp = message.Timestamp,
                                     SubscriberMessageDeliveries = message.SubscriberMessageDeliveries.Keys.ToHashSet(),
-                                    SatisfiedSubscribersConnectionIDs = message.SatisfiedSubscribersConnectionIDs,
+                                    SatisfiedSubscribersSubscriberIDs = message.SatisfiedSubscriberssubscriberIDs,
                                     AssemblyQualifiedTypeName = message.AssemblyQualifiedTypeName,
                                     MessageJson = message.MessageJson,
                                     MessageId = message.MessageId
@@ -508,9 +508,9 @@ namespace NTDLS.CatMQ.Server
         /// <summary>
         /// Deliver a message from a server queue to a subscribed client.
         /// </summary>
-        internal bool DeliverMessage(Guid connectionId, string queueName, EnqueuedMessage enqueuedMessage)
+        internal bool DeliverMessage(Guid subscriberId, string queueName, EnqueuedMessage enqueuedMessage)
         {
-            var result = _rmServer.Query(connectionId, new CMqMessageDeliveryQuery(queueName, enqueuedMessage.AssemblyQualifiedTypeName, enqueuedMessage.MessageJson)).Result;
+            var result = _rmServer.Query(subscriberId, new CMqMessageDeliveryQuery(queueName, enqueuedMessage.AssemblyQualifiedTypeName, enqueuedMessage.MessageJson)).Result;
             if (string.IsNullOrEmpty(result.ErrorMessage) == false)
             {
                 throw new Exception(result.ErrorMessage);
@@ -625,9 +625,9 @@ namespace NTDLS.CatMQ.Server
         /// <summary>
         /// Creates a subscription to a queue for a given connection id.
         /// </summary>
-        internal void SubscribeToQueue(Guid connectionId, IPEndPoint? localEndpoint, IPEndPoint? remoteEndpoint, string queueName)
+        internal void SubscribeToQueue(Guid subscriberId, IPEndPoint? localEndpoint, IPEndPoint? remoteEndpoint, string queueName)
         {
-            OnLog?.Invoke(this, CMqErrorLevel.Verbose, $"Subscribing connection [{connectionId}] to queue: [{queueName}].");
+            OnLog?.Invoke(this, CMqErrorLevel.Verbose, $"Subscribing connection [{subscriberId}] to queue: [{queueName}].");
 
             string queueKey = queueName.ToLowerInvariant();
 
@@ -641,9 +641,9 @@ namespace NTDLS.CatMQ.Server
                     {
                         success = messageQueue.Subscribers.TryUse(s =>
                         {
-                            if (s.ContainsKey(connectionId) == false)
+                            if (s.ContainsKey(subscriberId) == false)
                             {
-                                s.Add(connectionId, new CMqSubscriberInformation(connectionId)
+                                s.Add(subscriberId, new CMqSubscriberInformation(subscriberId)
                                 {
                                     LocalAddress = localEndpoint?.Address?.ToString(),
                                     RemoteAddress = remoteEndpoint?.Address?.ToString(),
@@ -670,9 +670,9 @@ namespace NTDLS.CatMQ.Server
         /// <summary>
         /// Removes a subscription from a queue for a given connection id.
         /// </summary>
-        internal void UnsubscribeFromQueue(Guid connectionId, string queueName)
+        public void UnsubscribeFromQueue(Guid subscriberId, string queueName)
         {
-            OnLog?.Invoke(this, CMqErrorLevel.Verbose, $"Unsubscribing connection [{connectionId}] from queue: [{queueName}].");
+            OnLog?.Invoke(this, CMqErrorLevel.Verbose, $"Unsubscribing connection [{subscriberId}] from queue: [{queueName}].");
 
             string queueKey = queueName.ToLowerInvariant();
 
@@ -686,7 +686,7 @@ namespace NTDLS.CatMQ.Server
                     {
                         success = messageQueue.Subscribers.TryUse(s =>
                         {
-                            s.Remove(connectionId);
+                            s.Remove(subscriberId);
                         }) && success;
                     }
                 }) && success;

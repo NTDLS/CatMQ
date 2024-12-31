@@ -126,7 +126,7 @@ curl --location 'http://127.0.0.1:45783/api/CreateQueue' \
     "DeliveryThrottle": "00:00:00",
     "MaxDeliveryAttempts": 5,
     "MaxMessageAge": "01:00:00",
-    "ConsumptionScheme": "SuccessfulDeliveryToAllSubscribers",
+    "ConsumptionScheme": "Delivered",
     "DeliveryScheme": "Random",
     "PersistenceScheme": "Persistent"
 }'

@@ -42,6 +42,6 @@ namespace NTDLS.CatMQ.Server.Server
         /// List of subscribers which have been delivered to or for which the retry-attempts have been reached.
         /// </summary>
         [JsonIgnore] //Serialize using System.Text.Json as opposed to Newtonsoft for efficiency.
-        public HashSet<Guid> SatisfiedSubscribersConnectionIDs { get; set; } = new();
+        public HashSet<Guid> SatisfiedSubscriberssubscriberIDs { get; set; } = new();
     }
 }

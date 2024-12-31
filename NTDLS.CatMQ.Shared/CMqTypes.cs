@@ -8,7 +8,7 @@
         /// <summary>
         /// The messages are delivered to each subscriber, the message is removed once it is delivered to all subscribers even if they do not consume it.
         /// </summary>
-        SuccessfulDeliveryToAllSubscribers,
+        Delivered,
         /// <summary>
         /// The messages are delivered to each subscriber, but is removed when any one of the subscribers consumes the message.
         /// </summary>
@@ -27,7 +27,7 @@
         /// <summary>
         /// Messages are delivered to subscribers in a random order.
         /// </summary>
-        Random
+        Balanced
     }
 
     /// <summary>

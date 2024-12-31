@@ -38,6 +38,6 @@
         /// <summary>
         /// List of subscribers which have been delivered to or for which the retry-attempts have been reached.
         /// </summary>
-        public HashSet<Guid> SatisfiedSubscribersConnectionIDs { get; internal set; } = new();
+        public HashSet<Guid> SatisfiedSubscribersSubscriberIDs { get; internal set; } = new();
     }
 }
