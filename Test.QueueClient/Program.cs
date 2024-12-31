@@ -23,7 +23,8 @@ namespace Test.QueueClient
 
             Console.WriteLine("Connected...");
 
-            client.OnReceived += Client_OnReceived; //Wire up an event to listen for messages.
+            client.OnReceivedUnboxed += Client_OnReceivedUnboxed; //Wire up an event to listen for messages.
+            client.OnReceivedBoxed += Client_OnReceivedBoxed;
 
             //Create a queue. These are highly configurable.
             client.CreateQueue(new CMqQueueConfiguration("MyFirstQueue")
@@ -57,7 +58,13 @@ namespace Test.QueueClient
             client.Disconnect();
         }
 
-        private static bool Client_OnReceived(CMqClient client, string queueName, ICMqMessage message)
+        private static bool Client_OnReceivedBoxed(CMqClient client, string queueName, string objectType, string message)
+        {
+            Console.WriteLine($"Received: '{objectType}'->'{message}'");
+            return true;
+        }
+
+        private static bool Client_OnReceivedUnboxed(CMqClient client, string queueName, ICMqMessage message)
         {
             //Here we receive the messages for the queue(s) we are subscribed to
             //  and we can use pattern matching to determine what message was received.

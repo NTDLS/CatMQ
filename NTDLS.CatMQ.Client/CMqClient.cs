@@ -21,6 +21,16 @@ namespace NTDLS.CatMQ.Client
         private bool _explicitDisconnect = false;
         private readonly CMqClientConfiguration _configuration;
 
+        /// <summary>
+        /// Whether or not the client has the OnReceivedUnboxed event hooked.
+        /// </summary>
+        internal bool ProcessUnboxedMessages => OnReceivedUnboxed != null;
+
+        /// <summary>
+        /// Whether or not the client has the OnReceivedBoxed event hooked.
+        /// </summary>
+        internal bool ProcessBoxedMessages => OnReceivedBoxed != null;
+
         private string? _lastReconnectHost;
         private int _lastReconnectPort;
         private IPAddress? _lastReconnectIpAddress;
@@ -31,19 +41,35 @@ namespace NTDLS.CatMQ.Client
         public bool IsConnected => _rmClient.IsConnected;
 
         /// <summary>
-        /// Delegate used for server-to-client delivery notifications.
+        /// Delegate used for server-to-client deserialized delivery notifications.
+        /// These messages are automatically deserialized, but this requires that
+        /// the client assembly contain the references to any appropriate classes that are to be deserialized.
         /// </summary>
         /// <returns>Return true to mark the message as consumed by the client.</returns>
-        public delegate bool OnReceivedEvent(CMqClient client, string queueName, ICMqMessage message);
+        public delegate bool OnReceivedUnboxedEvent(CMqClient client, string queueName, ICMqMessage message);
+
+        /// <summary>
+        /// Event used for server-to-client deserialized delivery notifications.
+        /// These messages are automatically deserialized, but this requires that
+        /// the client assembly contain the references to any appropriate classes that are to be deserialized.
+        /// </summary>
+        /// <returns>Return true to mark the message as consumed by the client.</returns>
+        public event OnReceivedUnboxedEvent? OnReceivedUnboxed;
+
+        /// <summary>
+        /// Delegate used for server-to-client delivery notifications containing raw JSON.
+        /// </summary>
+        /// <returns>Return true to mark the message as consumed by the client.</returns>
+        public delegate bool OnReceivedBoxedEvent(CMqClient client, string queueName, string objectType, string message);
 
         /// <summary>
         /// Event used for server-to-client delivery notifications.
         /// </summary>
         /// <returns>Return true to mark the message as consumed by the client.</returns>
-        public event OnReceivedEvent? OnReceived;
+        public event OnReceivedBoxedEvent? OnReceivedBoxed;
 
         /// <summary>
-        /// Delegate used client connectivity notifications.
+        /// Event used for server-to-client delivery notifications containing raw JSON.
         /// </summary>
         public delegate void OnConnectedEvent(CMqClient client);
 
@@ -60,7 +86,7 @@ namespace NTDLS.CatMQ.Client
         /// <summary>
         /// Delegate used to notify of queue client exceptions.
         /// </summary>
-        public delegate void OnExceptionEvent(CMqClient client, CMqQueueConfiguration? queue, Exception ex);
+        public delegate void OnExceptionEvent(CMqClient client, string? queueName, Exception ex);
 
         /// <summary>
         /// Event used to notify of queue client exceptions.
@@ -143,12 +169,12 @@ namespace NTDLS.CatMQ.Client
             }
         }
 
-        internal bool InvokeOnReceived(CMqClient client, string queueName, ICMqMessage message)
+        internal bool InvokeOnReceivedUnboxed(CMqClient client, string queueName, ICMqMessage message)
         {
             bool wasConsumed = false;
-            if (OnReceived != null)
+            if (OnReceivedUnboxed != null)
             {
-                foreach (var handler in OnReceived.GetInvocationList().Cast<OnReceivedEvent>())
+                foreach (var handler in OnReceivedUnboxed.GetInvocationList().Cast<OnReceivedUnboxedEvent>())
                 {
                     bool isConsumed = handler(client, queueName, message);
                     if (isConsumed)
@@ -160,8 +186,25 @@ namespace NTDLS.CatMQ.Client
             return wasConsumed;
         }
 
-        internal void InvokeOnException(CMqClient client, CMqQueueConfiguration? queue, Exception ex)
-            => OnException?.Invoke(client, queue, ex);
+        internal bool InvokeOnReceivedBoxed(CMqClient client, string queueName, string objectType, string message)
+        {
+            bool wasConsumed = false;
+            if (OnReceivedBoxed != null)
+            {
+                foreach (var handler in OnReceivedBoxed.GetInvocationList().Cast<OnReceivedBoxedEvent>())
+                {
+                    bool isConsumed = handler(client, queueName, objectType, message);
+                    if (isConsumed)
+                    {
+                        wasConsumed = true;
+                    }
+                }
+            }
+            return wasConsumed;
+        }
+
+        internal void InvokeOnException(CMqClient client, string? queueName, Exception ex)
+            => OnException?.Invoke(client, queueName, ex);
 
         /// <summary>
         /// Connects the client to a queue server.

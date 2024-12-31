@@ -67,7 +67,8 @@ namespace Test.Stress
                 }
             }
 
-            client.OnReceived += Client_OnReceived;
+            client.OnReceivedUnboxed += Client_OnReceivedUnboxed;
+            client.OnReceivedBoxed += Client_OnReceivedBoxed;
 
             int clientId = Math.Abs(Guid.NewGuid().GetHashCode());
 
@@ -87,7 +88,13 @@ namespace Test.Stress
             client.Disconnect();
         }
 
-        private static bool Client_OnReceived(CMqClient client, string queueName, ICMqMessage message)
+        private static bool Client_OnReceivedBoxed(CMqClient client, string queueName, string objectType, string message)
+        {
+            Console.WriteLine($"Received: '{objectType}'->'{message}'");
+            return true;
+        }
+
+        private static bool Client_OnReceivedUnboxed(CMqClient client, string queueName, ICMqMessage message)
         {
             if (message is MyMessage myMessage)
             {

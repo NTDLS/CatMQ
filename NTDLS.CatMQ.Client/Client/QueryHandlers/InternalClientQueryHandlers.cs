@@ -23,51 +23,74 @@ namespace NTDLS.CatMQ.Client.Client.QueryHandlers
         public static T? MqDeserializeToObject<T>(string json)
             => JsonConvert.DeserializeObject<T>(json, _typeNameHandlingAll);
 
+        /// <summary>
+        /// The client has received a message from the server which needs to be consumed.
+        /// </summary>
+        /// <param name="context"></param>
+        /// <param name="param"></param>
+        /// <returns></returns>
         public CMqMessageDeliveryQueryReply MessageDeliveryQuery(RmContext context, CMqMessageDeliveryQuery param)
         {
             try
             {
-                string cacheKey = $"{param.ObjectType}";
+                bool unboxedMessageConsumed = false;
+                bool boxedMessageConsumed = false;
 
-                var genericToObjectMethod = _reflectionCache.Use((o) =>
+                if (mqClient.ProcessBoxedMessages)
                 {
-                    if (o.TryGetValue(cacheKey, out var method))
+                    boxedMessageConsumed = mqClient.InvokeOnReceivedBoxed(mqClient, param.QueueName, param.ObjectType, param.MessageJson);
+                }
+
+                if (mqClient.ProcessUnboxedMessages)
+                {
+                    #region Automatic Message Unboxing.
+
+                    string cacheKey = $"{param.ObjectType}";
+
+                    var genericToObjectMethod = _reflectionCache.Use((o) =>
                     {
-                        return method;
+                        if (o.TryGetValue(cacheKey, out var method))
+                        {
+                            return method;
+                        }
+                        return null;
+                    });
+
+                    ICMqMessage? deserializedMessage = null;
+
+                    if (genericToObjectMethod != null) //Reflection cache hit.
+                    {
+                        //Call the generic deserialization:
+                        deserializedMessage = genericToObjectMethod.Invoke(null, [param.MessageJson]) as ICMqMessage
+                            ?? throw new Exception($"Extraction message can not be null.");
                     }
-                    return null;
-                });
+                    else
+                    {
+                        var genericType = Type.GetType(param.ObjectType)
+                            ?? throw new Exception($"Unknown extraction message type {param.ObjectType}.");
 
-                ICMqMessage? deserializedMessage = null;
+                        var toObjectMethod = typeof(InternalClientQueryHandlers).GetMethod("MqDeserializeToObject")
+                                ?? throw new Exception($"Could not resolve MqDeserializeToObject().");
 
-                if (genericToObjectMethod != null) //Reflection cache hit.
-                {
-                    //Call the generic deserialization:
-                    deserializedMessage = genericToObjectMethod.Invoke(null, [param.MessageJson]) as ICMqMessage
-                        ?? throw new Exception($"Extraction message can not be null.");
-                }
-                else
-                {
-                    var genericType = Type.GetType(param.ObjectType)
-                        ?? throw new Exception($"Unknown extraction message type {param.ObjectType}.");
+                        genericToObjectMethod = toObjectMethod.MakeGenericMethod(genericType);
 
-                    var toObjectMethod = typeof(InternalClientQueryHandlers).GetMethod("MqDeserializeToObject")
-                            ?? throw new Exception($"Could not resolve MqDeserializeToObject().");
+                        _reflectionCache.Use((o) => o.TryAdd(cacheKey, genericToObjectMethod));
 
-                    genericToObjectMethod = toObjectMethod.MakeGenericMethod(genericType);
+                        //Call the generic deserialization:
+                        deserializedMessage = genericToObjectMethod.Invoke(null, [param.MessageJson]) as ICMqMessage
+                            ?? throw new Exception($"Extraction message can not be null.");
+                    }
 
-                    _reflectionCache.Use((o) => o.TryAdd(cacheKey, genericToObjectMethod));
+                    unboxedMessageConsumed = mqClient.InvokeOnReceivedUnboxed(mqClient, param.QueueName, deserializedMessage);
 
-                    //Call the generic deserialization:
-                    deserializedMessage = genericToObjectMethod.Invoke(null, [param.MessageJson]) as ICMqMessage
-                        ?? throw new Exception($"Extraction message can not be null.");
+                    #endregion
                 }
 
-                bool wasMessageConsumed = mqClient.InvokeOnReceived(mqClient, param.QueueName, deserializedMessage);
-                return new CMqMessageDeliveryQueryReply(wasMessageConsumed);
+                return new CMqMessageDeliveryQueryReply(boxedMessageConsumed || unboxedMessageConsumed);
             }
             catch (Exception ex)
             {
+                mqClient.InvokeOnException(mqClient, null, ex);
                 return new CMqMessageDeliveryQueryReply(ex.GetBaseException());
             }
         }
