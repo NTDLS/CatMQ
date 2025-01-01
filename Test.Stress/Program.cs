@@ -67,8 +67,7 @@ namespace Test.Stress
                 }
             }
 
-            client.OnReceivedUnboxed += Client_OnReceivedUnboxed;
-            client.OnReceivedBoxed += Client_OnReceivedBoxed;
+            client.OnReceived += Client_OnReceived;
 
             int clientId = Math.Abs(Guid.NewGuid().GetHashCode());
 
@@ -88,14 +87,9 @@ namespace Test.Stress
             client.Disconnect();
         }
 
-        private static CMqConsumptionResult Client_OnReceivedBoxed(CMqClient client, string queueName, string objectType, string message)
+        private static CMqConsumptionResult Client_OnReceived(CMqClient client, CMqReceivedMessage rawMessage)
         {
-            Console.WriteLine($"Received: '{objectType}'->'{message}'");
-            return CMqConsumptionResult.Consumed;
-        }
-
-        private static CMqConsumptionResult Client_OnReceivedUnboxed(CMqClient client, string queueName, ICMqMessage message)
-        {
+            var message = rawMessage.Deserialize();
             if (message is MyMessage myMessage)
             {
                 Console.WriteLine($"Received: '{myMessage.Text}'");
@@ -104,7 +98,7 @@ namespace Test.Stress
             {
                 Console.WriteLine($"Received unknown message type.");
             }
-            return  CMqConsumptionResult.Consumed;
+            return CMqConsumptionResult.Consumed;
         }
     }
 }

@@ -20,23 +20,11 @@ namespace NTDLS.CatMQ.Client
         private readonly RmClient _rmClient;
         private bool _explicitDisconnect = false;
         private readonly CMqClientConfiguration _configuration;
-        private readonly Dictionary<string, SubscriptionReference> _queueSubscriptionReferences = new(StringComparer.OrdinalIgnoreCase);
 
         class SubscriptionReference
         {
-            public int Count  { get; set; }
+            public int Count { get; set; }
         }
-
-
-        /// <summary>
-        /// Whether or not the client has the OnReceivedUnboxed event hooked.
-        /// </summary>
-        internal bool ProcessUnboxedMessages => OnReceivedUnboxed != null;
-
-        /// <summary>
-        /// Whether or not the client has the OnReceivedBoxed event hooked.
-        /// </summary>
-        internal bool ProcessBoxedMessages => OnReceivedBoxed != null;
 
         private string? _lastReconnectHost;
         private int _lastReconnectPort;
@@ -48,32 +36,16 @@ namespace NTDLS.CatMQ.Client
         public bool IsConnected => _rmClient.IsConnected;
 
         /// <summary>
-        /// Delegate used for server-to-client deserialized delivery notifications.
-        /// These messages are automatically deserialized, but this requires that
-        /// the client assembly contain the references to any appropriate classes that are to be deserialized.
-        /// </summary>
-        /// <returns>Return true to mark the message as consumed by the client.</returns>
-        public delegate CMqConsumptionResult OnReceivedUnboxedEvent(CMqClient client, string queueName, ICMqMessage message);
-
-        /// <summary>
-        /// Event used for server-to-client deserialized delivery notifications.
-        /// These messages are automatically deserialized, but this requires that
-        /// the client assembly contain the references to any appropriate classes that are to be deserialized.
-        /// </summary>
-        /// <returns>Return true to mark the message as consumed by the client.</returns>
-        public event OnReceivedUnboxedEvent? OnReceivedUnboxed;
-
-        /// <summary>
         /// Delegate used for server-to-client delivery notifications containing raw JSON.
         /// </summary>
         /// <returns>Return true to mark the message as consumed by the client.</returns>
-        public delegate CMqConsumptionResult OnReceivedBoxedEvent(CMqClient client, string queueName, string objectType, string message);
+        public delegate CMqConsumptionResult OnReceivedEvent(CMqClient client, CMqReceivedMessage rawMessage);
 
         /// <summary>
         /// Event used for server-to-client delivery notifications.
         /// </summary>
         /// <returns>Return true to mark the message as consumed by the client.</returns>
-        public event OnReceivedBoxedEvent? OnReceivedBoxed;
+        public event OnReceivedEvent? OnReceived;
 
         /// <summary>
         /// Event used for server-to-client delivery notifications containing raw JSON.
@@ -176,31 +148,14 @@ namespace NTDLS.CatMQ.Client
             }
         }
 
-        internal bool InvokeOnReceivedUnboxed(CMqClient client, string queueName, ICMqMessage message)
+        internal bool InvokeOnReceived(CMqClient client, CMqReceivedMessage message)
         {
             bool wasConsumed = false;
-            if (OnReceivedUnboxed != null)
+            if (OnReceived != null)
             {
-                foreach (var handler in OnReceivedUnboxed.GetInvocationList().Cast<OnReceivedUnboxedEvent>())
+                foreach (var handler in OnReceived.GetInvocationList().Cast<OnReceivedEvent>())
                 {
-                    var consume = handler(client, queueName, message);
-                    if (consume == CMqConsumptionResult.Consumed)
-                    {
-                        wasConsumed = true;
-                    }
-                }
-            }
-            return wasConsumed;
-        }
-
-        internal bool InvokeOnReceivedBoxed(CMqClient client, string queueName, string objectType, string message)
-        {
-            bool wasConsumed = false;
-            if (OnReceivedBoxed != null)
-            {
-                foreach (var handler in OnReceivedBoxed.GetInvocationList().Cast<OnReceivedBoxedEvent>())
-                {
-                    var consume = handler(client, queueName, objectType, message);
+                    var consume = handler(client, message);
                     if (consume == CMqConsumptionResult.Consumed)
                     {
                         wasConsumed = true;
@@ -355,18 +310,6 @@ namespace NTDLS.CatMQ.Client
         /// </summary>
         public void Subscribe(string queueName)
         {
-            lock (_queueSubscriptionReferences)
-            {
-                if (_queueSubscriptionReferences.TryGetValue(queueName, out var reference))
-                {
-                    reference.Count++;
-                }
-                else
-                {
-                    _queueSubscriptionReferences.Add(queueName, new SubscriptionReference() { Count = 1 });
-                }
-            }
-
             var result = _rmClient.Query(new CMqSubscribeToQueueQuery(queueName)).Result;
             if (result.IsSuccess == false)
             {
@@ -379,23 +322,10 @@ namespace NTDLS.CatMQ.Client
         /// </summary>
         public void Unsubscribe(string queueName)
         {
-            bool lastQueueSubscription = false;
-            lock (_queueSubscriptionReferences)
+            var result = _rmClient.Query(new CMqUnsubscribeFromQueueQuery(queueName)).Result;
+            if (result.IsSuccess == false)
             {
-                if (_queueSubscriptionReferences.TryGetValue(queueName, out var reference))
-                {
-                    reference.Count--;
-                    lastQueueSubscription = reference.Count == 0;
-                }
-            }
-
-            if (lastQueueSubscription)
-            {
-                var result = _rmClient.Query(new CMqUnsubscribeFromQueueQuery(queueName)).Result;
-                if (result.IsSuccess == false)
-                {
-                    throw new Exception(result.ErrorMessage);
-                }
+                throw new Exception(result.ErrorMessage);
             }
         }
 
