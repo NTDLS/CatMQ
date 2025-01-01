@@ -3,7 +3,7 @@
     /// <summary>
     /// Describes a subscription to a queue, this reference is needed to unsubscribe to a single queue subscription.
     /// </summary>
-    public class CMqSubscription(string queueName, OnReceivedEvent method)
+    public class CMqSubscription
     {
         /// <summary>
         /// The unique identifier for this subscription.
@@ -13,11 +13,34 @@
         /// <summary>
         /// The name of the queue that this subscription is for.
         /// </summary>
-        public string QueueName { get; internal set; } = queueName;
+        public string QueueName { get; internal set; }
 
         /// <summary>
         /// Function that is called when a message is received for this subscription.
         /// </summary>
-        public OnReceivedEvent Method { get; internal set; } = method;
+        public OnMessageReceived? MessageFunction { get; internal set; }
+
+        /// <summary>
+        /// For buffered subscriptions, this is the number of messages that the client will attempt to honor.
+        /// </summary>
+        public int? BufferSize { get; private set; }
+
+        /// <summary>
+        /// Function that is called when a buffered batch is received for this subscription.
+        /// </summary>
+        public OnBatchReceived? BufferedFunction { get; internal set; }
+
+        internal CMqSubscription(string queueName, OnMessageReceived messageFunction)
+        {
+            QueueName = queueName;
+            MessageFunction = messageFunction;
+        }
+
+        internal CMqSubscription(string queueName, int bufferSize, OnBatchReceived bufferedFunction)
+        {
+            QueueName = queueName;
+            BufferedFunction = bufferedFunction;
+            BufferSize = bufferSize;
+        }
     }
 }

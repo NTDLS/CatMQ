@@ -85,7 +85,7 @@ namespace Test.Stress
             client.Disconnect();
         }
 
-        private static CMqConsumptionResult OnMessageReceived(CMqClient client, CMqReceivedMessage rawMessage)
+        private static bool OnMessageReceived(CMqClient client, CMqReceivedMessage rawMessage)
         {
             var message = rawMessage.Deserialize();
             if (message is MyMessage myMessage)
@@ -96,7 +96,7 @@ namespace Test.Stress
             {
                 Console.WriteLine($"Received unknown message type.");
             }
-            return CMqConsumptionResult.Consumed;
+            return true;
         }
     }
 }

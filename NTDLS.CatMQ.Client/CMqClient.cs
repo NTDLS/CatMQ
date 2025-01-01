@@ -3,6 +3,7 @@ using NTDLS.CatMQ.Client.Client.QueryHandlers;
 using NTDLS.CatMQ.Shared;
 using NTDLS.CatMQ.Shared.Payload.ClientToServer;
 using NTDLS.ReliableMessaging;
+using NTDLS.Semaphore;
 using System.Net;
 
 namespace NTDLS.CatMQ.Client
@@ -20,7 +21,9 @@ namespace NTDLS.CatMQ.Client
         private readonly RmClient _rmClient;
         private bool _explicitDisconnect = false;
         private readonly CMqClientConfiguration _configuration;
-        private readonly Dictionary<string, List<CMqSubscription>> _subscriptions = new(StringComparer.OrdinalIgnoreCase);
+        private readonly OptimisticCriticalResource<Dictionary<string, List<CMqSubscription>>> _subscriptions;
+        private readonly OptimisticCriticalResource<Dictionary<Guid, List<CMqReceivedMessage>>> _messageBuffer = new();
+        private Thread? _bufferThread;
 
         class SubscriptionReference
         {
@@ -67,6 +70,7 @@ namespace NTDLS.CatMQ.Client
         public CMqClient(CMqClientConfiguration configuration)
         {
             _configuration = configuration;
+            _subscriptions = new(() => new Dictionary<string, List<CMqSubscription>>(StringComparer.OrdinalIgnoreCase));
 
             var rmConfiguration = new RmConfiguration()
             {
@@ -87,6 +91,7 @@ namespace NTDLS.CatMQ.Client
         public CMqClient()
         {
             _configuration = new CMqClientConfiguration();
+            _subscriptions = new(() => new Dictionary<string, List<CMqSubscription>>(StringComparer.OrdinalIgnoreCase));
             _rmClient = new RmClient();
 
             _rmClient.OnConnected += RmClient_OnConnected;
@@ -141,13 +146,13 @@ namespace NTDLS.CatMQ.Client
         {
             List<CMqSubscription>? filteredSubscriptions = null;
 
-            lock (_subscriptions)
+            _subscriptions.Read(s =>
             {
-                if (_subscriptions.TryGetValue(message.QueueName, out var subscriptions))
+                if (s.TryGetValue(message.QueueName, out var subscriptions))
                 {
                     filteredSubscriptions = subscriptions.ToList();
                 }
-            }
+            });
 
             bool wasConsumed = false;
 
@@ -155,10 +160,29 @@ namespace NTDLS.CatMQ.Client
             {
                 foreach (var subscription in filteredSubscriptions)
                 {
-                    var consume = subscription.Method.Invoke(client, message);
-                    if (consume == CMqConsumptionResult.Consumed)
+                    if (subscription.BufferSize != null && subscription.BufferedFunction != null)
                     {
+                        _messageBuffer.Write(mb =>
+                        {
+                            if (mb.TryGetValue(subscription.Id, out var buffer))
+                            {
+                                buffer.Add(message);
+                            }
+                            else
+                            {
+                                mb.Add(subscription.Id, new List<CMqReceivedMessage> { message });
+                            }
+                        });
+
                         wasConsumed = true;
+                    }
+                    else if (subscription.MessageFunction != null)
+                    {
+                        bool consumed = subscription.MessageFunction.Invoke(client, message);
+                        if (consumed)
+                        {
+                            wasConsumed = true;
+                        }
                     }
                 }
             }
@@ -168,6 +192,26 @@ namespace NTDLS.CatMQ.Client
 
         internal void InvokeOnException(CMqClient client, string? queueName, Exception ex)
             => OnException?.Invoke(client, queueName, ex);
+
+        private void BufferThreadProc(object? p)
+        {
+            while (!_explicitDisconnect)
+            {
+                _messageBuffer.Read(mb =>
+                {
+                    lock (_subscriptions)
+                    {
+                        foreach (var messageBuffer in mb)
+                        {
+                            //messageBuffer.Value
+                        }
+
+                    }
+                });
+
+                Thread.Sleep(1);
+            }
+        }
 
         /// <summary>
         /// Connects the client to a queue server.
@@ -179,6 +223,9 @@ namespace NTDLS.CatMQ.Client
             _lastReconnectPort = port;
 
             _explicitDisconnect = false;
+
+            _bufferThread = new Thread(BufferThreadProc);
+            _bufferThread.Start();
 
             _rmClient.Connect(hostName, port);
         }
@@ -193,6 +240,9 @@ namespace NTDLS.CatMQ.Client
             _lastReconnectPort = port;
 
             _explicitDisconnect = false;
+
+            _bufferThread = new Thread(BufferThreadProc);
+            _bufferThread.Start();
 
             _rmClient.Connect(ipAddress, port);
         }
@@ -256,6 +306,7 @@ namespace NTDLS.CatMQ.Client
         {
             _explicitDisconnect = true;
             _rmClient.Disconnect(wait);
+            _bufferThread?.Join();
         }
 
         /// <summary>
@@ -309,25 +360,60 @@ namespace NTDLS.CatMQ.Client
         /// <summary>
         /// Instructs the server to notify the client of messages sent to the given queue.
         /// </summary>
-        public CMqSubscription Subscribe(string queueName, OnReceivedEvent proc)
+        public CMqSubscription Subscribe(string queueName, OnMessageReceived messageFunction)
         {
             bool wasFirstSubscriptionToThisQueue = false;
 
-            var newSubscription = new CMqSubscription(queueName, proc);
+            var newSubscription = new CMqSubscription(queueName, messageFunction);
 
-            lock (_subscriptions)
+            _subscriptions.Write(s =>
             {
-                if (_subscriptions.TryGetValue(queueName, out var subscriptions))
+                if (s.TryGetValue(queueName, out var subscriptions))
                 {
                     wasFirstSubscriptionToThisQueue = subscriptions.Count == 0;
                     subscriptions.Add(newSubscription);
                 }
                 else
                 {
-                    _subscriptions.Add(queueName, new List<CMqSubscription>() { newSubscription });
+                    s.Add(queueName, new List<CMqSubscription>() { newSubscription });
                     wasFirstSubscriptionToThisQueue = true;
                 }
+            });
+
+            if (wasFirstSubscriptionToThisQueue)
+            {
+                var result = _rmClient.Query(new CMqSubscribeToQueueQuery(queueName)).Result;
+                if (result.IsSuccess == false)
+                {
+                    throw new Exception(result.ErrorMessage);
+                }
             }
+
+            return newSubscription;
+        }
+
+        /// <summary>
+        /// Instructs the server to notify the client of messages sent to the given queue.
+        /// </summary>
+        public CMqSubscription SubscribeBuffered(string queueName, int bufferSize, OnBatchReceived batchFunction)
+        {
+            bool wasFirstSubscriptionToThisQueue = false;
+
+            var newSubscription = new CMqSubscription(queueName, bufferSize, batchFunction);
+
+            _subscriptions.Write(s =>
+            {
+                if (s.TryGetValue(queueName, out var subscriptions))
+                {
+                    wasFirstSubscriptionToThisQueue = subscriptions.Count == 0;
+                    subscriptions.Add(newSubscription);
+                }
+                else
+                {
+                    s.Add(queueName, new List<CMqSubscription>() { newSubscription });
+                    wasFirstSubscriptionToThisQueue = true;
+                }
+            });
 
             if (wasFirstSubscriptionToThisQueue)
             {
@@ -348,9 +434,9 @@ namespace NTDLS.CatMQ.Client
         {
             bool wasLastSubscriptionToThisQueue = false;
 
-            lock (_subscriptions)
+            _subscriptions.Write(s =>
             {
-                if (_subscriptions.TryGetValue(subscription.QueueName, out var subscriptions))
+                if (s.TryGetValue(subscription.QueueName, out var subscriptions))
                 {
                     subscriptions.RemoveAll(o => o.Id == subscription.Id);
                     wasLastSubscriptionToThisQueue = subscriptions.Count == 0;
@@ -359,7 +445,7 @@ namespace NTDLS.CatMQ.Client
                 {
                     wasLastSubscriptionToThisQueue = true;
                 }
-            }
+            });
 
             if (wasLastSubscriptionToThisQueue)
             {
