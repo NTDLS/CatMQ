@@ -26,6 +26,13 @@
         public int? BufferSize { get; private set; }
 
         /// <summary>
+        /// The interval in which the message buffer will be flushed even if the buffer size is not met. 0 = never.
+        /// </summary>
+        public TimeSpan AutoFlushInterval { get; set; } = TimeSpan.Zero;
+
+        internal DateTime LastBufferFlushed { get; set; } = DateTime.UtcNow;
+
+        /// <summary>
         /// Function that is called when a buffered batch is received for this subscription.
         /// </summary>
         public OnBatchReceived? BufferedFunction { get; internal set; }
@@ -36,11 +43,12 @@
             MessageFunction = messageFunction;
         }
 
-        internal CMqSubscription(string queueName, int bufferSize, OnBatchReceived bufferedFunction)
+        internal CMqSubscription(string queueName, int bufferSize, TimeSpan autoFlushInterval, OnBatchReceived bufferedFunction)
         {
             QueueName = queueName;
             BufferedFunction = bufferedFunction;
             BufferSize = bufferSize;
+            AutoFlushInterval = autoFlushInterval;
         }
     }
 }

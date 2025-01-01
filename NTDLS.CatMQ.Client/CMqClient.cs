@@ -197,20 +197,51 @@ namespace NTDLS.CatMQ.Client
         {
             while (!_explicitDisconnect)
             {
-                _messageBuffer.Read(mb =>
-                {
-                    lock (_subscriptions)
-                    {
-                        foreach (var messageBuffer in mb)
-                        {
-                            //messageBuffer.Value
-                        }
-
-                    }
-                });
-
+                FlushBufferedMessages();
                 Thread.Sleep(1);
             }
+
+            FlushBufferedMessages();
+        }
+
+        private void FlushBufferedMessages()
+        {
+            _messageBuffer.TryWrite(mb =>
+            {
+                if (mb.Count == 0)
+                {
+                    return;
+                }
+
+                _subscriptions.TryRead(s =>
+                {
+                    foreach (var subscriptions in s.Values)
+                    {
+                        foreach (var subscription in subscriptions)
+                        {
+                            foreach (var messageBuffer in mb)
+                            {
+                                if (messageBuffer.Value.Count >= subscription.BufferSize
+                                    || (subscription.AutoFlushInterval != TimeSpan.Zero
+                                        && (DateTime.UtcNow - subscription.LastBufferFlushed) >= subscription.AutoFlushInterval))
+                                {
+                                    if (messageBuffer.Key == subscription.Id)
+                                    {
+                                        var bufferedValueClone = messageBuffer.Value.ToList();
+                                        Task.Run(() =>
+                                            {
+                                        subscription.BufferedFunction?.Invoke(this, bufferedValueClone);
+                                    });
+                                        messageBuffer.Value.Clear();
+                                    }
+
+                                    subscription.LastBufferFlushed = DateTime.UtcNow;
+                                }
+                            }
+                        }
+                    }
+                });
+            });
         }
 
         /// <summary>
@@ -395,11 +426,11 @@ namespace NTDLS.CatMQ.Client
         /// <summary>
         /// Instructs the server to notify the client of messages sent to the given queue.
         /// </summary>
-        public CMqSubscription SubscribeBuffered(string queueName, int bufferSize, OnBatchReceived batchFunction)
+        public CMqSubscription SubscribeBuffered(string queueName, int bufferSize, TimeSpan autoFlushInterval, OnBatchReceived batchFunction)
         {
             bool wasFirstSubscriptionToThisQueue = false;
 
-            var newSubscription = new CMqSubscription(queueName, bufferSize, batchFunction);
+            var newSubscription = new CMqSubscription(queueName, bufferSize, autoFlushInterval, batchFunction);
 
             _subscriptions.Write(s =>
             {

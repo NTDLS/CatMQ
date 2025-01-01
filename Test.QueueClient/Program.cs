@@ -1,5 +1,6 @@
 ﻿using NTDLS.CatMQ.Client;
 using NTDLS.CatMQ.Shared;
+using static Test.QueueClient.Program;
 
 namespace Test.QueueClient
 {
@@ -36,6 +37,7 @@ namespace Test.QueueClient
             {
                 //Wire up an event to listen for messages.
                 client.Subscribe("MyFirstQueue", OnMessageReceived);
+                //client.SubscribeBuffered("MyFirstQueue", 1000, TimeSpan.FromMilliseconds(500), OnBatchReceived);
                 Console.WriteLine("Subscribed...");
             }
             catch (Exception ex)
@@ -69,6 +71,25 @@ namespace Test.QueueClient
             }
 
             return true;
+        }
+
+        private static void OnBatchReceived(CMqClient client, List<CMqReceivedMessage> rawMessages)
+        {
+            Console.WriteLine($"Received: '{rawMessages.Count}'");
+
+            foreach (var rawMessage in rawMessages)
+            {
+                var message = rawMessage.Deserialize();
+                if (message is MyMessage myMessage)
+                {
+                    //Console.WriteLine($"Received: '{myMessage.Text}'");
+                }
+                else
+                {
+                    //Console.WriteLine($"Received: '{message.ObjectType}'->'{message.MessageJson}'");
+                }
+
+            }
         }
     }
 }
