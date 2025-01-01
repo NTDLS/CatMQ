@@ -24,7 +24,7 @@ namespace Test.QueueClient
             Console.WriteLine("Connected...");
 
             client.OnReceivedUnboxed += Client_OnReceivedUnboxed; //Wire up an event to listen for messages.
-            client.OnReceivedBoxed += Client_OnReceivedBoxed;
+            //client.OnReceivedBoxed += Client_OnReceivedBoxed;
 
             //Create a queue. These are highly configurable.
             client.CreateQueue(new CMqQueueConfiguration("MyFirstQueue")
@@ -46,7 +46,7 @@ namespace Test.QueueClient
             }
 
             //Enqueue a few messages, note that the message is just a class and it must inherit from ICMqMessage.
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10000000; i++)
             {
                 client.Enqueue("MyFirstQueue", new MyMessage($"Test message {i++:n0}"));
             }
@@ -58,13 +58,13 @@ namespace Test.QueueClient
             client.Disconnect();
         }
 
-        private static bool Client_OnReceivedBoxed(CMqClient client, string queueName, string objectType, string message)
+        private static CMqConsumptionResult Client_OnReceivedBoxed(CMqClient client, string queueName, string objectType, string message)
         {
             Console.WriteLine($"Received: '{objectType}'->'{message}'");
-            return true;
+            return CMqConsumptionResult.Consumed;
         }
 
-        private static bool Client_OnReceivedUnboxed(CMqClient client, string queueName, ICMqMessage message)
+        private static CMqConsumptionResult Client_OnReceivedUnboxed(CMqClient client, string queueName, ICMqMessage message)
         {
             //Here we receive the messages for the queue(s) we are subscribed to
             //  and we can use pattern matching to determine what message was received.
@@ -76,7 +76,7 @@ namespace Test.QueueClient
             {
                 Console.WriteLine($"Received unknown message type.");
             }
-            return true;
+            return CMqConsumptionResult.Consumed;
         }
     }
 }

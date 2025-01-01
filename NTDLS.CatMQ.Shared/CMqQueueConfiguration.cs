@@ -18,11 +18,6 @@ namespace NTDLS.CatMQ.Shared
         }
 
         /// <summary>
-        /// The interval in which the queue will deliver all of its contents to the subscribers. 0 = immediate.
-        /// </summary>
-        public TimeSpan BatchDeliveryInterval { get; set; } = TimeSpan.Zero;
-
-        /// <summary>
         /// The amount of time to wait between sending individual messages to subscribers.
         /// </summary>
         public TimeSpan DeliveryThrottle { get; set; } = TimeSpan.Zero;

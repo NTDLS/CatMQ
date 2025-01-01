@@ -13,11 +13,6 @@ namespace NTDLS.CatMQ.Server.Management
         public string QueueName { get; internal set; } = string.Empty;
 
         /// <summary>
-        /// The interval in which the queue will deliver all of its contents to the subscribers. 0 = immediate.
-        /// </summary>
-        public TimeSpan BatchDeliveryInterval { get; internal set; } = TimeSpan.Zero;
-
-        /// <summary>
         /// The amount of time to wait between sending individual messages to subscribers.
         /// </summary>
         public TimeSpan DeliveryThrottle { get; internal set; } = TimeSpan.Zero;

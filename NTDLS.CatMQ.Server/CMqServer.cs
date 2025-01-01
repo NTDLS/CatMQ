@@ -128,7 +128,6 @@ namespace NTDLS.CatMQ.Server
                             {
                                 result.Add(new CMqQueueInformation
                                 {
-                                    BatchDeliveryInterval = mqKVP.Value.QueueConfiguration.BatchDeliveryInterval,
                                     ConsumptionScheme = mqKVP.Value.QueueConfiguration.ConsumptionScheme,
                                     DeliveryScheme = mqKVP.Value.QueueConfiguration.DeliveryScheme,
                                     DeliveryThrottle = mqKVP.Value.QueueConfiguration.DeliveryThrottle,

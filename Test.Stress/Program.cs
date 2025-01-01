@@ -88,13 +88,13 @@ namespace Test.Stress
             client.Disconnect();
         }
 
-        private static bool Client_OnReceivedBoxed(CMqClient client, string queueName, string objectType, string message)
+        private static CMqConsumptionResult Client_OnReceivedBoxed(CMqClient client, string queueName, string objectType, string message)
         {
             Console.WriteLine($"Received: '{objectType}'->'{message}'");
-            return true;
+            return CMqConsumptionResult.Consumed;
         }
 
-        private static bool Client_OnReceivedUnboxed(CMqClient client, string queueName, ICMqMessage message)
+        private static CMqConsumptionResult Client_OnReceivedUnboxed(CMqClient client, string queueName, ICMqMessage message)
         {
             if (message is MyMessage myMessage)
             {
@@ -104,7 +104,7 @@ namespace Test.Stress
             {
                 Console.WriteLine($"Received unknown message type.");
             }
-            return true;
+            return  CMqConsumptionResult.Consumed;
         }
     }
 }

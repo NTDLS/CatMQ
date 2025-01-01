@@ -82,7 +82,6 @@ namespace NTDLS.CatMQ.Server.Server
             var messageQueue = pMessageQueue.EnsureNotNull<MessageQueue>();
 
             var lastStaleMessageScan = DateTime.UtcNow;
-            var lastBatchDelivery = DateTime.UtcNow;
 
             messageQueue.QueueServer.EnsureNotNull();
 
@@ -92,17 +91,6 @@ namespace NTDLS.CatMQ.Server.Server
 
                 try
                 {
-                    if (messageQueue.QueueConfiguration.BatchDeliveryInterval > TimeSpan.Zero)
-                    {
-                        if (DateTime.UtcNow - lastBatchDelivery < messageQueue.QueueConfiguration.BatchDeliveryInterval)
-                        {
-                            Thread.Sleep(1);
-                            continue;
-                        }
-                    }
-
-                    lastBatchDelivery = DateTime.UtcNow;
-
                     EnqueuedMessage? topMessage = null;
                     List<CMqSubscriberInformation>? yetToBeDeliveredSubscribers = null;
 
@@ -284,6 +272,7 @@ namespace NTDLS.CatMQ.Server.Server
 
                 if (successfulDeliveries == 0)
                 {
+                    //If nothing was successfully delivered, then delay for a period.
                     messageQueue.DeliveryThreadWaitEvent.WaitOne(10);
                 }
             }

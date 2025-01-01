@@ -46,7 +46,7 @@ namespace NTDLS.CatMQ.Client
         /// the client assembly contain the references to any appropriate classes that are to be deserialized.
         /// </summary>
         /// <returns>Return true to mark the message as consumed by the client.</returns>
-        public delegate bool OnReceivedUnboxedEvent(CMqClient client, string queueName, ICMqMessage message);
+        public delegate CMqConsumptionResult OnReceivedUnboxedEvent(CMqClient client, string queueName, ICMqMessage message);
 
         /// <summary>
         /// Event used for server-to-client deserialized delivery notifications.
@@ -60,7 +60,7 @@ namespace NTDLS.CatMQ.Client
         /// Delegate used for server-to-client delivery notifications containing raw JSON.
         /// </summary>
         /// <returns>Return true to mark the message as consumed by the client.</returns>
-        public delegate bool OnReceivedBoxedEvent(CMqClient client, string queueName, string objectType, string message);
+        public delegate CMqConsumptionResult OnReceivedBoxedEvent(CMqClient client, string queueName, string objectType, string message);
 
         /// <summary>
         /// Event used for server-to-client delivery notifications.
@@ -176,8 +176,8 @@ namespace NTDLS.CatMQ.Client
             {
                 foreach (var handler in OnReceivedUnboxed.GetInvocationList().Cast<OnReceivedUnboxedEvent>())
                 {
-                    bool isConsumed = handler(client, queueName, message);
-                    if (isConsumed)
+                    var consume = handler(client, queueName, message);
+                    if (consume == CMqConsumptionResult.Consumed)
                     {
                         wasConsumed = true;
                     }
@@ -193,8 +193,8 @@ namespace NTDLS.CatMQ.Client
             {
                 foreach (var handler in OnReceivedBoxed.GetInvocationList().Cast<OnReceivedBoxedEvent>())
                 {
-                    bool isConsumed = handler(client, queueName, objectType, message);
-                    if (isConsumed)
+                    var consume = handler(client, queueName, objectType, message);
+                    if (consume == CMqConsumptionResult.Consumed)
                     {
                         wasConsumed = true;
                     }

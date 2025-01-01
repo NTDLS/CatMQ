@@ -11,7 +11,7 @@
         <table class="table table-striped table-bordered">
             <thead class="table-light">
                 <tr>
-                    <th colspan="8">Configuration</th>
+                    <th colspan="7">Configuration</th>
                 </tr>
             </thead>
             <thead class="table-light">
@@ -19,7 +19,6 @@
                     <th>Persistence</th>
                     <th>Consumption</th>
                     <th>Delivery</th>
-                    <th>Interval</th>
                     <th>Throttle</th>
                     <th>Retries</th>
                     <th>Expiration</th>
@@ -31,12 +30,11 @@
                     <td>@Model.Queue.PersistenceScheme</td>
                     <td>@Model.Queue.ConsumptionScheme</td>
                     <td>@Model.Queue.DeliveryScheme</td>
-                    <td>@Model.Queue.BatchDeliveryInterval</td>
                     <td>@Model.Queue.DeliveryThrottle</td>
                     <td>@Model.Queue.MaxDeliveryAttempts</td>
                     <td>@Model.Queue.MaxMessageAge</td>
                     <td>@Html.Raw(ConfirmActionHelper.GenerateDangerLink(
-                        $"Deleting the queue '{@Model.Queue.QueueName}' will result in permanant message loss and any subscribers will fail. Continue?",
+                        $"Deleting the queue '{@Model.Queue.QueueName}' will result in permanent message loss and any subscribers will fail. Continue?",
                         "Delete", $"/DeleteQueue/{@Model.Queue.QueueName}"))
                     </td>
                 </tr>
@@ -69,7 +67,7 @@
                     <td>@Model.Queue.ExpiredMessageCount.ToString("n0")</td>
                     <td>@Model.Queue.DeliveryFailureCount.ToString("n0")</td>
                     <td>@Html.Raw(ConfirmActionHelper.GenerateDangerLink(
-                        $"Purging the queue '{@Model.Queue.QueueName}' will result in permanant message loss. Continue?",
+                        $"Purging the queue '{@Model.Queue.QueueName}' will result in permanent message loss. Continue?",
                         "Purge", $"/PurgeQueue/{@Model.Queue.QueueName}"))
                     </td>
                 </tr>
