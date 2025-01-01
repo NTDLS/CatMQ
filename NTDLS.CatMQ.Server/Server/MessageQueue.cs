@@ -254,7 +254,7 @@ namespace NTDLS.CatMQ.Server.Server
                                 }
                                 else if (s.Keys.Except(topMessage.SatisfiedSubscribersSubscriberIDs).Any() == false)
                                 {
-                                    if (topMessage.FailedSubscribersSubscriberIDs.Any())
+                                    if (topMessage.FailedSubscribersSubscriberIDs.Count != 0)
                                     {
                                         _queueServer.ShovelToDLQ(QueueConfiguration.QueueName,
                                             $"{QueueConfiguration.QueueName.ToLowerInvariant()}.dlq",
