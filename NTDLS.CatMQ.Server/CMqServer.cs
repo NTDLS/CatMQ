@@ -552,6 +552,26 @@ namespace NTDLS.CatMQ.Server
                     var messageQueue = new MessageQueue(this, queueConfiguration);
                     mqd.Add(queueKey, messageQueue);
 
+                    if (queueConfiguration.CreateDeadLetterQueue)
+                    {
+                        string dlqKey = $"{queueConfiguration.QueueName.ToLowerInvariant()}.dlq";
+                        if (mqd.ContainsKey(dlqKey) == false)
+                        {
+                            var dlq = new MessageQueue(this, new CMqQueueConfiguration($"{queueConfiguration.QueueName}.dlq")
+                            {
+                                ConsumptionScheme = CMqConsumptionScheme.Delivered,
+                                MaxMessageAge = TimeSpan.Zero,
+                                PersistenceScheme = CMqPersistenceScheme.Persistent,
+                                MaxDeliveryAttempts = 0,
+                                DeliveryScheme = CMqDeliveryScheme.RoundRobbin,
+                                DeliveryThrottle = TimeSpan.Zero,
+                            });
+                            mqd.Add(dlqKey, dlq);
+
+                            dlq.Start();
+                        }
+                    }
+
                     if (queueConfiguration.PersistenceScheme == CMqPersistenceScheme.Persistent)
                     {
                         if (string.IsNullOrEmpty(_configuration.PersistencePath) == false)
