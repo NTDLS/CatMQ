@@ -4,10 +4,8 @@ using System.Reflection;
 
 namespace NTDLS.CatMQ.Shared
 {
-    static class CMqUnboxing
+    internal static class CMqUnboxing
     {
-        #region Unboxing.
-
         private static readonly JsonSerializerSettings _typeNameHandlingAll = new()
         {
             TypeNameHandling = TypeNameHandling.All
@@ -65,7 +63,5 @@ namespace NTDLS.CatMQ.Shared
 
             return deserializedMessage;
         }
-
-        #endregion
     }
 }
