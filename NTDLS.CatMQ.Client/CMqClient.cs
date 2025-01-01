@@ -3,7 +3,6 @@ using NTDLS.CatMQ.Client.Client.QueryHandlers;
 using NTDLS.CatMQ.Shared;
 using NTDLS.CatMQ.Shared.Payload.ClientToServer;
 using NTDLS.ReliableMessaging;
-using System.Collections.Generic;
 using System.Net;
 
 namespace NTDLS.CatMQ.Client
