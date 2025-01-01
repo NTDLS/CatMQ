@@ -42,7 +42,7 @@ internal class Program
 
 With the client, we can interact with the server. Create/delete/purge queues, subscribe
 and of course send and receive messages. Messages are sent by simply passing a serializable
-class instanct that inherits ICMqMessage.
+class instance that inherits ICMqMessage.
 
 
 ```csharp
@@ -64,8 +64,7 @@ static void Main()
     });
 
     //Subscribe to the queue we just created.
-    //For a simplified sample, this will cause this process to receive the messages we send.
-    client.Subscribe("MyFirstQueue");
+    client.Subscribe("MyFirstQueue", OnMessageReceived);
 
     //Enqueue a few messages, note that the message is just a class and it must inherit from ICMqMessage.
     for (int i = 0; i < 10; i++)
@@ -80,8 +79,10 @@ static void Main()
     client.Disconnect();
 }
 
-private static bool Client_OnReceived(CMqClient client, string queueName, ICMqMessage message)
+private static bool OnMessageReceived(CMqClient client, CMqReceivedMessage rawMessage)
 {
+    var message = rawMessage.Deserialize();
+
     //Here we receive the messages for the queue(s) we are subscribed to
     //  and we can use pattern matching to determine what message was received.
     if (message is MyMessage myMessage)
