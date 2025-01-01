@@ -1,4 +1,4 @@
-﻿namespace NTDLS.CatMQ.Client
+﻿namespace NTDLS.CatMQ.Shared
 {
     /// <summary>
     /// A message received by the server.

@@ -1,4 +1,6 @@
-﻿namespace NTDLS.CatMQ.Client
+﻿using NTDLS.CatMQ.Shared;
+
+namespace NTDLS.CatMQ.Client
 {
     /// <summary>
     /// Delegate used for server-to-client delivery notifications containing raw JSON.

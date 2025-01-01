@@ -2,7 +2,7 @@
 using NTDLS.Semaphore;
 using System.Reflection;
 
-namespace NTDLS.CatMQ.Client
+namespace NTDLS.CatMQ.Shared
 {
     internal static class CMqUnboxing
     {

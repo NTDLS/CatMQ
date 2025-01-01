@@ -1,4 +1,5 @@
-﻿using NTDLS.CatMQ.Shared.Payload.ServerToClient;
+﻿using NTDLS.CatMQ.Shared;
+using NTDLS.CatMQ.Shared.Payload.ServerToClient;
 using NTDLS.ReliableMessaging;
 
 namespace NTDLS.CatMQ.Client.Client.QueryHandlers
