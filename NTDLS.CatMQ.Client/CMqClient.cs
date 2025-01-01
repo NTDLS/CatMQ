@@ -3,6 +3,7 @@ using NTDLS.CatMQ.Client.Client.QueryHandlers;
 using NTDLS.CatMQ.Shared;
 using NTDLS.CatMQ.Shared.Payload.ClientToServer;
 using NTDLS.ReliableMessaging;
+using System.Collections.Generic;
 using System.Net;
 
 namespace NTDLS.CatMQ.Client
@@ -20,6 +21,7 @@ namespace NTDLS.CatMQ.Client
         private readonly RmClient _rmClient;
         private bool _explicitDisconnect = false;
         private readonly CMqClientConfiguration _configuration;
+        private readonly Dictionary<string, List<CMqSubscription>> _subscriptions = new(StringComparer.OrdinalIgnoreCase);
 
         class SubscriptionReference
         {
@@ -34,18 +36,6 @@ namespace NTDLS.CatMQ.Client
         /// Returns true if the client is connected.
         /// </summary>
         public bool IsConnected => _rmClient.IsConnected;
-
-        /// <summary>
-        /// Delegate used for server-to-client delivery notifications containing raw JSON.
-        /// </summary>
-        /// <returns>Return true to mark the message as consumed by the client.</returns>
-        public delegate CMqConsumptionResult OnReceivedEvent(CMqClient client, CMqReceivedMessage rawMessage);
-
-        /// <summary>
-        /// Event used for server-to-client delivery notifications.
-        /// </summary>
-        /// <returns>Return true to mark the message as consumed by the client.</returns>
-        public event OnReceivedEvent? OnReceived;
 
         /// <summary>
         /// Event used for server-to-client delivery notifications containing raw JSON.
@@ -150,18 +140,30 @@ namespace NTDLS.CatMQ.Client
 
         internal bool InvokeOnReceived(CMqClient client, CMqReceivedMessage message)
         {
-            bool wasConsumed = false;
-            if (OnReceived != null)
+            List<CMqSubscription>? filteredSubscriptions = null;
+
+            lock (_subscriptions)
             {
-                foreach (var handler in OnReceived.GetInvocationList().Cast<OnReceivedEvent>())
+                if (_subscriptions.TryGetValue(message.QueueName, out var subscriptions))
                 {
-                    var consume = handler(client, message);
+                    filteredSubscriptions = subscriptions.ToList();
+                }
+            }
+
+            bool wasConsumed = false;
+
+            if (filteredSubscriptions != null)
+            {
+                foreach (var subscription in filteredSubscriptions)
+                {
+                    var consume = subscription.Method.Invoke(client, message);
                     if (consume == CMqConsumptionResult.Consumed)
                     {
                         wasConsumed = true;
                     }
                 }
             }
+
             return wasConsumed;
         }
 
@@ -308,19 +310,73 @@ namespace NTDLS.CatMQ.Client
         /// <summary>
         /// Instructs the server to notify the client of messages sent to the given queue.
         /// </summary>
-        public void Subscribe(string queueName)
+        public CMqSubscription Subscribe(string queueName, OnReceivedEvent proc)
         {
-            var result = _rmClient.Query(new CMqSubscribeToQueueQuery(queueName)).Result;
-            if (result.IsSuccess == false)
+            bool wasFirstSubscriptionToThisQueue = false;
+
+            var newSubscription = new CMqSubscription(queueName, proc);
+
+            lock (_subscriptions)
             {
-                throw new Exception(result.ErrorMessage);
+                if (_subscriptions.TryGetValue(queueName, out var subscriptions))
+                {
+                    wasFirstSubscriptionToThisQueue = subscriptions.Count == 0;
+                    subscriptions.Add(newSubscription);
+                }
+                else
+                {
+                    _subscriptions.Add(queueName, new List<CMqSubscription>() { newSubscription });
+                    wasFirstSubscriptionToThisQueue = true;
+                }
+            }
+
+            if (wasFirstSubscriptionToThisQueue)
+            {
+                var result = _rmClient.Query(new CMqSubscribeToQueueQuery(queueName)).Result;
+                if (result.IsSuccess == false)
+                {
+                    throw new Exception(result.ErrorMessage);
+                }
+            }
+
+            return newSubscription;
+        }
+
+        /// <summary>
+        /// Removes the subscription for the specified subscription descriptor.
+        /// </summary>
+        public void Unsubscribe(CMqSubscription subscription)
+        {
+            bool wasLastSubscriptionToThisQueue = false;
+
+            lock (_subscriptions)
+            {
+                if (_subscriptions.TryGetValue(subscription.QueueName, out var subscriptions))
+                {
+                    subscriptions.RemoveAll(o => o.Id == subscription.Id);
+                    wasLastSubscriptionToThisQueue = subscriptions.Count == 0;
+                }
+                else
+                {
+                    wasLastSubscriptionToThisQueue = true;
+                }
+            }
+
+            if (wasLastSubscriptionToThisQueue)
+            {
+                //We only actually unsubscribe from the server queue when we have removed all subscribed client events.
+                var result = _rmClient.Query(new CMqUnsubscribeFromQueueQuery(subscription.QueueName)).Result;
+                if (result.IsSuccess == false)
+                {
+                    throw new Exception(result.ErrorMessage);
+                }
             }
         }
 
         /// <summary>
         /// Instructs the server to stop notifying the client of messages sent to the given queue.
         /// </summary>
-        public void Unsubscribe(string queueName)
+        public void UnsubscribeAll(string queueName)
         {
             var result = _rmClient.Query(new CMqUnsubscribeFromQueueQuery(queueName)).Result;
             if (result.IsSuccess == false)

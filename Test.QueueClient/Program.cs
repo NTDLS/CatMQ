@@ -23,8 +23,6 @@ namespace Test.QueueClient
 
             Console.WriteLine("Connected...");
 
-            client.OnReceived += Client_OnReceived; //Wire up an event to listen for messages.
-
             //Create a queue. These are highly configurable.
             client.CreateQueue(new CMqQueueConfiguration("MyFirstQueue")
             {
@@ -36,7 +34,8 @@ namespace Test.QueueClient
 
             try
             {
-                client.Subscribe("MyFirstQueue");
+                //Wire up an event to listen for messages.
+                client.Subscribe("MyFirstQueue", OnMessageReceived);
                 Console.WriteLine("Subscribed...");
             }
             catch (Exception ex)
@@ -57,7 +56,7 @@ namespace Test.QueueClient
             client.Disconnect();
         }
 
-        private static CMqConsumptionResult Client_OnReceived(CMqClient client, CMqReceivedMessage rawMessage)
+        private static CMqConsumptionResult OnMessageReceived(CMqClient client, CMqReceivedMessage rawMessage)
         {
             var message = rawMessage.Deserialize();
             if (message is MyMessage myMessage)

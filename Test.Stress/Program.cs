@@ -61,13 +61,11 @@ namespace Test.Stress
                     if (alreadySubscribedQueueNames.Contains(queueName) == false)
                     {
                         Console.WriteLine($"Subscribing to queue: '{queueName}'.");
-                        client.Subscribe(queueName);
+                        client.Subscribe(queueName, OnMessageReceived);
                         alreadySubscribedQueueNames.Add(queueName);
                     }
                 }
             }
-
-            client.OnReceived += Client_OnReceived;
 
             int clientId = Math.Abs(Guid.NewGuid().GetHashCode());
 
@@ -87,7 +85,7 @@ namespace Test.Stress
             client.Disconnect();
         }
 
-        private static CMqConsumptionResult Client_OnReceived(CMqClient client, CMqReceivedMessage rawMessage)
+        private static CMqConsumptionResult OnMessageReceived(CMqClient client, CMqReceivedMessage rawMessage)
         {
             var message = rawMessage.Deserialize();
             if (message is MyMessage myMessage)
