@@ -20,6 +20,13 @@ namespace NTDLS.CatMQ.Client
         private readonly RmClient _rmClient;
         private bool _explicitDisconnect = false;
         private readonly CMqClientConfiguration _configuration;
+        private readonly Dictionary<string, SubscriptionReference> _queueSubscriptionReferences = new(StringComparer.OrdinalIgnoreCase);
+
+        class SubscriptionReference
+        {
+            public int Count  { get; set; }
+        }
+
 
         /// <summary>
         /// Whether or not the client has the OnReceivedUnboxed event hooked.
@@ -348,6 +355,18 @@ namespace NTDLS.CatMQ.Client
         /// </summary>
         public void Subscribe(string queueName)
         {
+            lock (_queueSubscriptionReferences)
+            {
+                if (_queueSubscriptionReferences.TryGetValue(queueName, out var reference))
+                {
+                    reference.Count++;
+                }
+                else
+                {
+                    _queueSubscriptionReferences.Add(queueName, new SubscriptionReference() { Count = 1 });
+                }
+            }
+
             var result = _rmClient.Query(new CMqSubscribeToQueueQuery(queueName)).Result;
             if (result.IsSuccess == false)
             {
@@ -360,10 +379,23 @@ namespace NTDLS.CatMQ.Client
         /// </summary>
         public void Unsubscribe(string queueName)
         {
-            var result = _rmClient.Query(new CMqUnsubscribeFromQueueQuery(queueName)).Result;
-            if (result.IsSuccess == false)
+            bool lastQueueSubscription = false;
+            lock (_queueSubscriptionReferences)
             {
-                throw new Exception(result.ErrorMessage);
+                if (_queueSubscriptionReferences.TryGetValue(queueName, out var reference))
+                {
+                    reference.Count--;
+                    lastQueueSubscription = reference.Count == 0;
+                }
+            }
+
+            if (lastQueueSubscription)
+            {
+                var result = _rmClient.Query(new CMqUnsubscribeFromQueueQuery(queueName)).Result;
+                if (result.IsSuccess == false)
+                {
+                    throw new Exception(result.ErrorMessage);
+                }
             }
         }
 
