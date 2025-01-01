@@ -25,11 +25,6 @@ namespace NTDLS.CatMQ.Client
         private readonly OptimisticCriticalResource<Dictionary<Guid, List<CMqReceivedMessage>>> _messageBuffer = new();
         private Thread? _bufferThread;
 
-        class SubscriptionReference
-        {
-            public int Count { get; set; }
-        }
-
         private string? _lastReconnectHost;
         private int _lastReconnectPort;
         private IPAddress? _lastReconnectIpAddress;
@@ -197,51 +192,59 @@ namespace NTDLS.CatMQ.Client
         {
             while (!_explicitDisconnect)
             {
-                FlushBufferedMessages();
+                FlushBufferedMessages(false);
                 Thread.Sleep(1);
             }
 
-            FlushBufferedMessages();
+            FlushBufferedMessages(true);
         }
 
-        private void FlushBufferedMessages()
+        private void FlushBufferedMessages(bool ensureEmpty)
         {
-            _messageBuffer.TryWrite(mb =>
+            bool success;
+
+            do
             {
-                if (mb.Count == 0)
-                {
-                    return;
-                }
+                success = true;
 
-                _subscriptions.TryRead(s =>
+                success = _messageBuffer.TryWrite(mb =>
                 {
-                    foreach (var subscriptions in s.Values)
+                    if (mb.Count == 0)
                     {
-                        foreach (var subscription in subscriptions)
-                        {
-                            foreach (var messageBuffer in mb)
-                            {
-                                if (messageBuffer.Value.Count >= subscription.BufferSize
-                                    || (subscription.AutoFlushInterval != TimeSpan.Zero
-                                        && (DateTime.UtcNow - subscription.LastBufferFlushed) >= subscription.AutoFlushInterval))
-                                {
-                                    if (messageBuffer.Key == subscription.Id)
-                                    {
-                                        var bufferedValueClone = messageBuffer.Value.ToList();
-                                        Task.Run(() =>
-                                            {
-                                                subscription.BufferedFunction?.Invoke(this, bufferedValueClone);
-                                            });
-                                        messageBuffer.Value.Clear();
-                                    }
+                        return;
+                    }
 
-                                    subscription.LastBufferFlushed = DateTime.UtcNow;
+                    success = _subscriptions.TryRead(s =>
+                    {
+                        foreach (var subscriptions in s.Values)
+                        {
+                            foreach (var subscription in subscriptions)
+                            {
+                                foreach (var messageBuffer in mb)
+                                {
+                                    if (messageBuffer.Value.Count == 0)
+                                    {
+                                        subscription.LastBufferFlushed = DateTime.UtcNow;
+                                    }
+                                    else if (messageBuffer.Value.Count >= subscription.BufferSize
+                                        || (subscription.AutoFlushInterval != TimeSpan.Zero
+                                            && (DateTime.UtcNow - subscription.LastBufferFlushed) >= subscription.AutoFlushInterval))
+                                    {
+                                        if (messageBuffer.Key == subscription.Id)
+                                        {
+                                            var bufferedValueClone = messageBuffer.Value.ToList();
+                                            Task.Run(() => subscription.BufferedFunction?.Invoke(this, bufferedValueClone));
+                                            messageBuffer.Value.Clear();
+                                        }
+
+                                        subscription.LastBufferFlushed = DateTime.UtcNow;
+                                    }
                                 }
                             }
                         }
-                    }
-                });
-            });
+                    }) && success;
+                }) && success;
+            } while (!success && ensureEmpty);
         }
 
         /// <summary>

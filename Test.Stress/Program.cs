@@ -58,11 +58,26 @@ namespace Test.Stress
 
                 if (_random.Next(1, 100) > 50) //We don't always subscribe to our own queue.
                 {
-                    if (alreadySubscribedQueueNames.Contains(queueName) == false)
+                    if (_random.Next(1, 100) > 75)
                     {
-                        Console.WriteLine($"Subscribing to queue: '{queueName}'.");
-                        client.Subscribe(queueName, OnMessageReceived);
-                        alreadySubscribedQueueNames.Add(queueName);
+                        if (alreadySubscribedQueueNames.Contains(queueName) == false)
+                        {
+                            Console.WriteLine($"Subscribing to queue: '{queueName}' (buffered).");
+                            client.SubscribeBuffered(queueName,
+                                _random.Next(100, 1000),
+                                TimeSpan.FromMilliseconds(_random.Next(500, 2500)),
+                                OnBatchReceived);
+                            alreadySubscribedQueueNames.Add(queueName);
+                        }
+                    }
+                    else
+                    {
+                        if (alreadySubscribedQueueNames.Contains(queueName) == false)
+                        {
+                            Console.WriteLine($"Subscribing to queue: '{queueName}'.");
+                            client.Subscribe(queueName, OnMessageReceived);
+                            alreadySubscribedQueueNames.Add(queueName);
+                        }
                     }
                 }
             }
@@ -88,6 +103,8 @@ namespace Test.Stress
         private static bool OnMessageReceived(CMqClient client, CMqReceivedMessage rawMessage)
         {
             var message = rawMessage.Deserialize();
+            //Console.WriteLine($"Received single message.");
+            /*
             if (message is MyMessage myMessage)
             {
                 Console.WriteLine($"Received: '{myMessage.Text}'");
@@ -96,7 +113,13 @@ namespace Test.Stress
             {
                 Console.WriteLine($"Received unknown message type.");
             }
+            */
             return true;
+        }
+
+        private static void OnBatchReceived(CMqClient client, List<CMqReceivedMessage> rawMessages)
+        {
+            Console.WriteLine($"Received message batch: {rawMessages.Count}.");
         }
     }
 }
