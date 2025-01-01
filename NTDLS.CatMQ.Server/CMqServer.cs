@@ -228,7 +228,7 @@ namespace NTDLS.CatMQ.Server
                                         Timestamp = message.Timestamp,
                                         SubscriberCount = sKVP.Count,
                                         SubscriberMessageDeliveries = message.SubscriberMessageDeliveries.Keys.ToHashSet(),
-                                        SatisfiedSubscribersSubscriberIDs = message.SatisfiedSubscriberssubscriberIDs,
+                                        SatisfiedSubscribersSubscriberIDs = message.SatisfiedSubscribersSubscriberIDs,
                                         AssemblyQualifiedTypeName = message.AssemblyQualifiedTypeName,
                                         MessageJson = message.MessageJson,
                                         MessageId = message.MessageId
@@ -278,7 +278,7 @@ namespace NTDLS.CatMQ.Server
                                 {
                                     Timestamp = message.Timestamp,
                                     SubscriberMessageDeliveries = message.SubscriberMessageDeliveries.Keys.ToHashSet(),
-                                    SatisfiedSubscribersSubscriberIDs = message.SatisfiedSubscriberssubscriberIDs,
+                                    SatisfiedSubscribersSubscriberIDs = message.SatisfiedSubscribersSubscriberIDs,
                                     AssemblyQualifiedTypeName = message.AssemblyQualifiedTypeName,
                                     MessageJson = message.MessageJson,
                                     MessageId = message.MessageId
@@ -469,7 +469,6 @@ namespace NTDLS.CatMQ.Server
             }
         }
 
-
         /// <summary>
         /// Stops the message queue server.
         /// </summary>
@@ -503,6 +502,57 @@ namespace NTDLS.CatMQ.Server
         #endregion
 
         #region Message queue interactions.
+
+        internal void ShovelToDLQ(string queueName, string dlqKey, IEnumerable<EnqueuedMessage> messages)
+        {
+            OnLog?.Invoke(this, CMqErrorLevel.Verbose, $"DLQ message: [{queueName}].");
+
+            while (true)
+            {
+                bool success = true;
+
+                success = _messageQueues.TryUse(mqd =>
+                {
+                    if (mqd.TryGetValue(dlqKey, out var messageQueue))
+                    {
+                        success = messageQueue.EnqueuedMessages.TryUse(m =>
+                        {
+                            foreach (var message in messages)
+                            {
+                                message.SubscriberMessageDeliveries.Clear();
+                                message.SatisfiedSubscribersSubscriberIDs.Clear();
+                                message.FailedSubscribersSubscriberIDs.Clear();
+
+                                messageQueue.ReceivedMessageCount++;
+                                if (messageQueue.QueueConfiguration.PersistenceScheme == CMqPersistenceScheme.Persistent && _persistenceDatabase != null)
+                                {
+                                    //Serialize using System.Text.Json as opposed to Newtonsoft for efficiency.
+                                    var persistedJson = JsonSerializer.Serialize(message);
+                                    lock (_persistenceDatabase)
+                                    {
+                                        _persistenceDatabase.Put($"{dlqKey}_{message.MessageId}", persistedJson);
+                                    }
+                                }
+
+                                m.Add(message);
+                            }
+                            messageQueue.DeliveryThreadWaitEvent.Set();
+                        }) && success;
+                    }
+                    else
+                    {
+                        //Its ok, the DLQ does not have to exist.
+                        //throw new Exception($"Queue not found: [{queueName}].");
+                    }
+                }) && success;
+
+                if (success)
+                {
+                    return;
+                }
+                Thread.Sleep(_deadlockAvoidanceWaitMs);
+            }
+        }
 
         /// <summary>
         /// Deliver a message from a server queue to a subscribed client.
@@ -611,7 +661,7 @@ namespace NTDLS.CatMQ.Server
                             messageQueue.Stop();
                             mqd.Remove(queueKey);
 
-                            if (_persistenceDatabase != null)
+                            if (messageQueue.QueueConfiguration.PersistenceScheme == CMqPersistenceScheme.Persistent && _persistenceDatabase != null)
                             {
                                 foreach (var message in m)
                                 {
@@ -739,7 +789,7 @@ namespace NTDLS.CatMQ.Server
                         {
                             messageQueue.ReceivedMessageCount++;
                             var message = new EnqueuedMessage(queueKey, assemblyQualifiedTypeName, messageJson);
-                            if (_persistenceDatabase != null)
+                            if (messageQueue.QueueConfiguration.PersistenceScheme == CMqPersistenceScheme.Persistent && _persistenceDatabase != null)
                             {
                                 //Serialize using System.Text.Json as opposed to Newtonsoft for efficiency.
                                 var persistedJson = JsonSerializer.Serialize(message);
@@ -785,7 +835,7 @@ namespace NTDLS.CatMQ.Server
                     {
                         success = messageQueue.EnqueuedMessages.TryUse(m =>
                         {
-                            if (_persistenceDatabase != null)
+                            if (messageQueue.QueueConfiguration.PersistenceScheme == CMqPersistenceScheme.Persistent && _persistenceDatabase != null)
                             {
                                 foreach (var message in m)
                                 {
