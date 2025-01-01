@@ -16,7 +16,7 @@ namespace Test.Stress
         {
             Thread.Sleep(5000);
 
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 32; i++)
             {
                 new Thread(() => InstanceThread()).Start();
             }
