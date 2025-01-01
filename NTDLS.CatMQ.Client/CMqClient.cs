@@ -3,6 +3,7 @@ using NTDLS.CatMQ.Client.Client.QueryHandlers;
 using NTDLS.CatMQ.Shared;
 using NTDLS.CatMQ.Shared.Payload.ClientToServer;
 using NTDLS.ReliableMessaging;
+using NTDLS.Semaphore;
 using System.Net;
 
 namespace NTDLS.CatMQ.Client
@@ -20,16 +21,14 @@ namespace NTDLS.CatMQ.Client
         private readonly RmClient _rmClient;
         private bool _explicitDisconnect = false;
         private readonly CMqClientConfiguration _configuration;
+        private readonly OptimisticCriticalResource<Dictionary<string, List<CMqSubscription>>> _subscriptions;
+        private readonly OptimisticCriticalResource<Dictionary<Guid, List<CMqReceivedMessage>>> _messageBuffer = new();
+        private Thread? _bufferThread;
 
-        /// <summary>
-        /// Whether or not the client has the OnReceivedUnboxed event hooked.
-        /// </summary>
-        internal bool ProcessUnboxedMessages => OnReceivedUnboxed != null;
-
-        /// <summary>
-        /// Whether or not the client has the OnReceivedBoxed event hooked.
-        /// </summary>
-        internal bool ProcessBoxedMessages => OnReceivedBoxed != null;
+        class SubscriptionReference
+        {
+            public int Count { get; set; }
+        }
 
         private string? _lastReconnectHost;
         private int _lastReconnectPort;
@@ -39,34 +38,6 @@ namespace NTDLS.CatMQ.Client
         /// Returns true if the client is connected.
         /// </summary>
         public bool IsConnected => _rmClient.IsConnected;
-
-        /// <summary>
-        /// Delegate used for server-to-client deserialized delivery notifications.
-        /// These messages are automatically deserialized, but this requires that
-        /// the client assembly contain the references to any appropriate classes that are to be deserialized.
-        /// </summary>
-        /// <returns>Return true to mark the message as consumed by the client.</returns>
-        public delegate CMqConsumptionResult OnReceivedUnboxedEvent(CMqClient client, string queueName, ICMqMessage message);
-
-        /// <summary>
-        /// Event used for server-to-client deserialized delivery notifications.
-        /// These messages are automatically deserialized, but this requires that
-        /// the client assembly contain the references to any appropriate classes that are to be deserialized.
-        /// </summary>
-        /// <returns>Return true to mark the message as consumed by the client.</returns>
-        public event OnReceivedUnboxedEvent? OnReceivedUnboxed;
-
-        /// <summary>
-        /// Delegate used for server-to-client delivery notifications containing raw JSON.
-        /// </summary>
-        /// <returns>Return true to mark the message as consumed by the client.</returns>
-        public delegate CMqConsumptionResult OnReceivedBoxedEvent(CMqClient client, string queueName, string objectType, string message);
-
-        /// <summary>
-        /// Event used for server-to-client delivery notifications.
-        /// </summary>
-        /// <returns>Return true to mark the message as consumed by the client.</returns>
-        public event OnReceivedBoxedEvent? OnReceivedBoxed;
 
         /// <summary>
         /// Event used for server-to-client delivery notifications containing raw JSON.
@@ -99,6 +70,7 @@ namespace NTDLS.CatMQ.Client
         public CMqClient(CMqClientConfiguration configuration)
         {
             _configuration = configuration;
+            _subscriptions = new(() => new Dictionary<string, List<CMqSubscription>>(StringComparer.OrdinalIgnoreCase));
 
             var rmConfiguration = new RmConfiguration()
             {
@@ -119,6 +91,7 @@ namespace NTDLS.CatMQ.Client
         public CMqClient()
         {
             _configuration = new CMqClientConfiguration();
+            _subscriptions = new(() => new Dictionary<string, List<CMqSubscription>>(StringComparer.OrdinalIgnoreCase));
             _rmClient = new RmClient();
 
             _rmClient.OnConnected += RmClient_OnConnected;
@@ -169,42 +142,107 @@ namespace NTDLS.CatMQ.Client
             }
         }
 
-        internal bool InvokeOnReceivedUnboxed(CMqClient client, string queueName, ICMqMessage message)
+        internal bool InvokeOnReceived(CMqClient client, CMqReceivedMessage message)
         {
-            bool wasConsumed = false;
-            if (OnReceivedUnboxed != null)
-            {
-                foreach (var handler in OnReceivedUnboxed.GetInvocationList().Cast<OnReceivedUnboxedEvent>())
-                {
-                    var consume = handler(client, queueName, message);
-                    if (consume == CMqConsumptionResult.Consumed)
-                    {
-                        wasConsumed = true;
-                    }
-                }
-            }
-            return wasConsumed;
-        }
+            List<CMqSubscription>? filteredSubscriptions = null;
 
-        internal bool InvokeOnReceivedBoxed(CMqClient client, string queueName, string objectType, string message)
-        {
-            bool wasConsumed = false;
-            if (OnReceivedBoxed != null)
+            _subscriptions.Read(s =>
             {
-                foreach (var handler in OnReceivedBoxed.GetInvocationList().Cast<OnReceivedBoxedEvent>())
+                if (s.TryGetValue(message.QueueName, out var subscriptions))
                 {
-                    var consume = handler(client, queueName, objectType, message);
-                    if (consume == CMqConsumptionResult.Consumed)
+                    filteredSubscriptions = subscriptions.ToList();
+                }
+            });
+
+            bool wasConsumed = false;
+
+            if (filteredSubscriptions != null)
+            {
+                foreach (var subscription in filteredSubscriptions)
+                {
+                    if (subscription.BufferSize != null && subscription.BufferedFunction != null)
                     {
+                        _messageBuffer.Write(mb =>
+                        {
+                            if (mb.TryGetValue(subscription.Id, out var buffer))
+                            {
+                                buffer.Add(message);
+                            }
+                            else
+                            {
+                                mb.Add(subscription.Id, new List<CMqReceivedMessage> { message });
+                            }
+                        });
+
                         wasConsumed = true;
+                    }
+                    else if (subscription.MessageFunction != null)
+                    {
+                        bool consumed = subscription.MessageFunction.Invoke(client, message);
+                        if (consumed)
+                        {
+                            wasConsumed = true;
+                        }
                     }
                 }
             }
+
             return wasConsumed;
         }
 
         internal void InvokeOnException(CMqClient client, string? queueName, Exception ex)
             => OnException?.Invoke(client, queueName, ex);
+
+        private void BufferThreadProc(object? p)
+        {
+            while (!_explicitDisconnect)
+            {
+                FlushBufferedMessages();
+                Thread.Sleep(1);
+            }
+
+            FlushBufferedMessages();
+        }
+
+        private void FlushBufferedMessages()
+        {
+            _messageBuffer.TryWrite(mb =>
+            {
+                if (mb.Count == 0)
+                {
+                    return;
+                }
+
+                _subscriptions.TryRead(s =>
+                {
+                    foreach (var subscriptions in s.Values)
+                    {
+                        foreach (var subscription in subscriptions)
+                        {
+                            foreach (var messageBuffer in mb)
+                            {
+                                if (messageBuffer.Value.Count >= subscription.BufferSize
+                                    || (subscription.AutoFlushInterval != TimeSpan.Zero
+                                        && (DateTime.UtcNow - subscription.LastBufferFlushed) >= subscription.AutoFlushInterval))
+                                {
+                                    if (messageBuffer.Key == subscription.Id)
+                                    {
+                                        var bufferedValueClone = messageBuffer.Value.ToList();
+                                        Task.Run(() =>
+                                            {
+                                                subscription.BufferedFunction?.Invoke(this, bufferedValueClone);
+                                            });
+                                        messageBuffer.Value.Clear();
+                                    }
+
+                                    subscription.LastBufferFlushed = DateTime.UtcNow;
+                                }
+                            }
+                        }
+                    }
+                });
+            });
+        }
 
         /// <summary>
         /// Connects the client to a queue server.
@@ -216,6 +254,9 @@ namespace NTDLS.CatMQ.Client
             _lastReconnectPort = port;
 
             _explicitDisconnect = false;
+
+            _bufferThread = new Thread(BufferThreadProc);
+            _bufferThread.Start();
 
             _rmClient.Connect(hostName, port);
         }
@@ -230,6 +271,9 @@ namespace NTDLS.CatMQ.Client
             _lastReconnectPort = port;
 
             _explicitDisconnect = false;
+
+            _bufferThread = new Thread(BufferThreadProc);
+            _bufferThread.Start();
 
             _rmClient.Connect(ipAddress, port);
         }
@@ -293,6 +337,7 @@ namespace NTDLS.CatMQ.Client
         {
             _explicitDisconnect = true;
             _rmClient.Disconnect(wait);
+            _bufferThread?.Join();
         }
 
         /// <summary>
@@ -346,19 +391,108 @@ namespace NTDLS.CatMQ.Client
         /// <summary>
         /// Instructs the server to notify the client of messages sent to the given queue.
         /// </summary>
-        public void Subscribe(string queueName)
+        public CMqSubscription Subscribe(string queueName, OnMessageReceived messageFunction)
         {
-            var result = _rmClient.Query(new CMqSubscribeToQueueQuery(queueName)).Result;
-            if (result.IsSuccess == false)
+            bool wasFirstSubscriptionToThisQueue = false;
+
+            var newSubscription = new CMqSubscription(queueName, messageFunction);
+
+            _subscriptions.Write(s =>
             {
-                throw new Exception(result.ErrorMessage);
+                if (s.TryGetValue(queueName, out var subscriptions))
+                {
+                    wasFirstSubscriptionToThisQueue = subscriptions.Count == 0;
+                    subscriptions.Add(newSubscription);
+                }
+                else
+                {
+                    s.Add(queueName, new List<CMqSubscription>() { newSubscription });
+                    wasFirstSubscriptionToThisQueue = true;
+                }
+            });
+
+            if (wasFirstSubscriptionToThisQueue)
+            {
+                var result = _rmClient.Query(new CMqSubscribeToQueueQuery(queueName)).Result;
+                if (result.IsSuccess == false)
+                {
+                    throw new Exception(result.ErrorMessage);
+                }
+            }
+
+            return newSubscription;
+        }
+
+        /// <summary>
+        /// Instructs the server to notify the client of messages sent to the given queue.
+        /// </summary>
+        public CMqSubscription SubscribeBuffered(string queueName, int bufferSize, TimeSpan autoFlushInterval, OnBatchReceived batchFunction)
+        {
+            bool wasFirstSubscriptionToThisQueue = false;
+
+            var newSubscription = new CMqSubscription(queueName, bufferSize, autoFlushInterval, batchFunction);
+
+            _subscriptions.Write(s =>
+            {
+                if (s.TryGetValue(queueName, out var subscriptions))
+                {
+                    wasFirstSubscriptionToThisQueue = subscriptions.Count == 0;
+                    subscriptions.Add(newSubscription);
+                }
+                else
+                {
+                    s.Add(queueName, new List<CMqSubscription>() { newSubscription });
+                    wasFirstSubscriptionToThisQueue = true;
+                }
+            });
+
+            if (wasFirstSubscriptionToThisQueue)
+            {
+                var result = _rmClient.Query(new CMqSubscribeToQueueQuery(queueName)).Result;
+                if (result.IsSuccess == false)
+                {
+                    throw new Exception(result.ErrorMessage);
+                }
+            }
+
+            return newSubscription;
+        }
+
+        /// <summary>
+        /// Removes the subscription for the specified subscription descriptor.
+        /// </summary>
+        public void Unsubscribe(CMqSubscription subscription)
+        {
+            bool wasLastSubscriptionToThisQueue = false;
+
+            _subscriptions.Write(s =>
+            {
+                if (s.TryGetValue(subscription.QueueName, out var subscriptions))
+                {
+                    subscriptions.RemoveAll(o => o.Id == subscription.Id);
+                    wasLastSubscriptionToThisQueue = subscriptions.Count == 0;
+                }
+                else
+                {
+                    wasLastSubscriptionToThisQueue = true;
+                }
+            });
+
+            if (wasLastSubscriptionToThisQueue)
+            {
+                //We only actually unsubscribe from the server queue when we have removed all subscribed client events.
+                var result = _rmClient.Query(new CMqUnsubscribeFromQueueQuery(subscription.QueueName)).Result;
+                if (result.IsSuccess == false)
+                {
+                    throw new Exception(result.ErrorMessage);
+                }
             }
         }
 
         /// <summary>
         /// Instructs the server to stop notifying the client of messages sent to the given queue.
         /// </summary>
-        public void Unsubscribe(string queueName)
+        public void UnsubscribeAll(string queueName)
         {
             var result = _rmClient.Query(new CMqUnsubscribeFromQueueQuery(queueName)).Result;
             if (result.IsSuccess == false)

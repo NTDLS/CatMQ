@@ -16,25 +16,6 @@
     }
 
     /// <summary>
-    /// Determines how messages are marked as processed by the server.
-    /// </summary>
-    public enum CMqConsumptionResult
-    {
-        /// <summary>
-        /// The subscriber did not consume the message.
-        /// </summary>
-        NotConsumed,
-        /// <summary>
-        /// The subscriber has consumed the message.
-        /// </summary>
-        Consumed,
-        /// <summary>
-        /// The subscriber has consumed the message, but place it on a buffer for additional batch processing.
-        /// </summary>
-        Buffer
-    }
-
-    /// <summary>
     /// Determines how messages are distributed to subscribers.
     /// </summary>
     public enum CMqDeliveryScheme

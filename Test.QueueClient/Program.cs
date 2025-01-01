@@ -23,9 +23,6 @@ namespace Test.QueueClient
 
             Console.WriteLine("Connected...");
 
-            client.OnReceivedUnboxed += Client_OnReceivedUnboxed; //Wire up an event to listen for messages.
-            //client.OnReceivedBoxed += Client_OnReceivedBoxed;
-
             //Create a queue. These are highly configurable.
             client.CreateQueue(new CMqQueueConfiguration("MyFirstQueue")
             {
@@ -37,7 +34,9 @@ namespace Test.QueueClient
 
             try
             {
-                client.Subscribe("MyFirstQueue");
+                //Wire up an event to listen for messages.
+                client.Subscribe("MyFirstQueue", OnMessageReceived);
+                //client.SubscribeBuffered("MyFirstQueue", 1000, TimeSpan.FromMilliseconds(500), OnBatchReceived);
                 Console.WriteLine("Subscribed...");
             }
             catch (Exception ex)
@@ -58,25 +57,38 @@ namespace Test.QueueClient
             client.Disconnect();
         }
 
-        private static CMqConsumptionResult Client_OnReceivedBoxed(CMqClient client, string queueName, string objectType, string message)
+        private static bool OnMessageReceived(CMqClient client, CMqReceivedMessage rawMessage)
         {
-            Console.WriteLine($"Received: '{objectType}'->'{message}'");
-            return CMqConsumptionResult.Consumed;
-        }
-
-        private static CMqConsumptionResult Client_OnReceivedUnboxed(CMqClient client, string queueName, ICMqMessage message)
-        {
-            //Here we receive the messages for the queue(s) we are subscribed to
-            //  and we can use pattern matching to determine what message was received.
+            var message = rawMessage.Deserialize();
             if (message is MyMessage myMessage)
             {
                 Console.WriteLine($"Received: '{myMessage.Text}'");
             }
             else
             {
-                Console.WriteLine($"Received unknown message type.");
+                //Console.WriteLine($"Received: '{message.ObjectType}'->'{message.MessageJson}'");
             }
-            return CMqConsumptionResult.Consumed;
+
+            return true;
+        }
+
+        private static void OnBatchReceived(CMqClient client, List<CMqReceivedMessage> rawMessages)
+        {
+            Console.WriteLine($"Received: '{rawMessages.Count}'");
+
+            foreach (var rawMessage in rawMessages)
+            {
+                var message = rawMessage.Deserialize();
+                if (message is MyMessage myMessage)
+                {
+                    //Console.WriteLine($"Received: '{myMessage.Text}'");
+                }
+                else
+                {
+                    //Console.WriteLine($"Received: '{message.ObjectType}'->'{message.MessageJson}'");
+                }
+
+            }
         }
     }
 }
