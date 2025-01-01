@@ -1,6 +1,5 @@
 ﻿using NTDLS.CatMQ.Client;
 using NTDLS.CatMQ.Shared;
-using static Test.QueueClient.Program;
 
 namespace Test.QueueClient
 {

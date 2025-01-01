@@ -230,8 +230,8 @@ namespace NTDLS.CatMQ.Client
                                         var bufferedValueClone = messageBuffer.Value.ToList();
                                         Task.Run(() =>
                                             {
-                                        subscription.BufferedFunction?.Invoke(this, bufferedValueClone);
-                                    });
+                                                subscription.BufferedFunction?.Invoke(this, bufferedValueClone);
+                                            });
                                         messageBuffer.Value.Clear();
                                     }
 

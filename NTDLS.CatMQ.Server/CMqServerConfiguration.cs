@@ -15,23 +15,23 @@ namespace NTDLS.CatMQ.Server
         /// <summary>
         /// The default amount of time to wait for a query to reply before throwing a timeout exception.
         /// </summary>
-        public int AcknowledgmentTimeoutSeconds { get; set; } = CMqDefaults.ACK_TIMEOUT_SECONDS;
+        public int AcknowledgmentTimeoutSeconds { get; set; } = CMqDefaults.DEFAULT_ACK_TIMEOUT_SECONDS;
         /// <summary>
         /// The initial size in bytes of the receive buffer.
         /// If the buffer ever gets full while receiving data it will be automatically resized up to MaxReceiveBufferSize.
         /// </summary>
-        public int InitialReceiveBufferSize { get; set; } = CMqDefaults.INITIAL_BUFFER_SIZE;
+        public int InitialReceiveBufferSize { get; set; } = CMqDefaults.DEFAULT_INITIAL_BUFFER_SIZE;
 
         /// <summary>
         ///The maximum size in bytes of the receive buffer.
         ///If the buffer ever gets full while receiving data it will be automatically resized up to MaxReceiveBufferSize.
         /// </summary>
-        public int MaxReceiveBufferSize { get; set; } = CMqDefaults.MAX_BUFFER_SIZE;
+        public int MaxReceiveBufferSize { get; set; } = CMqDefaults.DEFAULT_MAX_BUFFER_SIZE;
 
         /// <summary>
         ///The growth rate of the auto-resizing for the receive buffer.
         /// </summary>
-        public double ReceiveBufferGrowthRate { get; set; } = CMqDefaults.BUFFER_GROWTH_RATE;
+        public double ReceiveBufferGrowthRate { get; set; } = CMqDefaults.DEFAULT_BUFFER_GROWTH_RATE;
 
         /// <summary>
         /// For persistent queues, this is where the data will be stored.

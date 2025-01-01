@@ -1,4 +1,4 @@
-﻿namespace NTDLS.CatMQ.Shared
+﻿namespace NTDLS.CatMQ.Client
 {
     /// <summary>
     /// Any message that is dispatched should inherit from IMqMessage.
