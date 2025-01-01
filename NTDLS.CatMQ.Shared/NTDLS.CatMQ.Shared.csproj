@@ -15,13 +15,13 @@
     <RepositoryUrl>https://github.com/NTDLS/NTDLS.CatMQ</RepositoryUrl>
     <PackageTags>ipc;message-queue;inter-process-communication;tcp-ip;message-broker;mq;</PackageTags>
     <PackageReleaseNotes>
-      Initial release.
+      Dead letter configuration.
     </PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <Authors>NetworkDLS</Authors>
     <Company>NetworkDLS</Company>
-    <version>1.0.4</version>
+    <version>1.0.5</version>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>Logo.png</PackageIcon>
     <ApplicationIcon>Logo.ico</ApplicationIcon>

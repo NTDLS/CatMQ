@@ -10,8 +10,8 @@ namespace NTDLS.CatMQ.Server.Server
     /// </summary>
     internal class MessageQueue
     {
-        private readonly Thread _deliveryThread = new(DeliveryThreadProc);
-        private CMqServer? QueueServer { get; set; }
+        private readonly Thread _deliveryThread;
+        private CMqServer? _queueServer;
 
         internal AutoResetEvent DeliveryThreadWaitEvent = new(false);
         internal bool KeepRunning { get; set; } = false;
@@ -51,18 +51,19 @@ namespace NTDLS.CatMQ.Server.Server
         public MessageQueue()
         {
             QueueConfiguration = new();
+            _deliveryThread = new(DeliveryThreadProc);
         }
 
         public MessageQueue(CMqServer mqServer, CMqQueueConfiguration queueConfiguration)
         {
-            QueueServer = mqServer;
+            _queueServer = mqServer;
             QueueConfiguration = queueConfiguration;
-
+            _deliveryThread = new(DeliveryThreadProc);
         }
 
         internal void SetServer(CMqServer mqServer)
         {
-            QueueServer = mqServer;
+            _queueServer = mqServer;
         }
 
         /// <summary>
@@ -77,15 +78,13 @@ namespace NTDLS.CatMQ.Server.Server
             });
         }
 
-        private static void DeliveryThreadProc(object? pMessageQueue)
+        private void DeliveryThreadProc(object? p)
         {
-            var messageQueue = pMessageQueue.EnsureNotNull<MessageQueue>();
-
             var lastStaleMessageScan = DateTime.UtcNow;
 
-            messageQueue.QueueServer.EnsureNotNull();
+            _queueServer.EnsureNotNull();
 
-            while (messageQueue.KeepRunning)
+            while (KeepRunning)
             {
                 int successfulDeliveries = 0; //Just used to omit waiting. We want to spin fast when we are delivering messages.
 
@@ -96,24 +95,28 @@ namespace NTDLS.CatMQ.Server.Server
 
                     #region Get top message and its subscribers.
 
-                    messageQueue.EnqueuedMessages.TryUseAll([messageQueue.Subscribers], m =>
+                    EnqueuedMessages.TryUseAll([Subscribers], m =>
                     {
-                        messageQueue.Subscribers.Use(s => //This lock is already held.
+                        Subscribers.Use(s => //This lock is already held.
                         {
-                            if (messageQueue.QueueConfiguration.MaxMessageAge > TimeSpan.Zero
+                            if (QueueConfiguration.MaxMessageAge > TimeSpan.Zero
                             && (DateTime.UtcNow - lastStaleMessageScan).TotalSeconds >= 10)
                             {
                                 //If MaxMessageAge is defined, then remove stale messages.
 
-                                var expiredMessageIDs = m.Where(o => (DateTime.UtcNow - o.Timestamp) > messageQueue.QueueConfiguration.MaxMessageAge)
+                                var expiredMessageIDs = m.Where(o => (DateTime.UtcNow - o.Timestamp) > QueueConfiguration.MaxMessageAge)
                                     .Select(o => o.MessageId).ToHashSet();
 
                                 foreach (var messageId in expiredMessageIDs)
                                 {
-                                    messageQueue.QueueServer.RemovePersistenceMessage(messageQueue.QueueConfiguration.QueueName, messageId);
+                                    _queueServer.RemovePersistenceMessage(QueueConfiguration.QueueName, messageId);
                                 }
 
-                                messageQueue.ExpiredMessageCount += (ulong)m.RemoveAll(o => expiredMessageIDs.Contains(o.MessageId));
+                                _queueServer.ShovelToDLQ(QueueConfiguration.QueueName,
+                                    $"{QueueConfiguration.QueueName.ToLowerInvariant()}.dlq",
+                                    m.Where(o => expiredMessageIDs.Contains(o.MessageId)));
+
+                                ExpiredMessageCount += (ulong)m.RemoveAll(o => expiredMessageIDs.Contains(o.MessageId));
 
                                 //There could be a lot of messages in the queue, so lets use lastStaleMessageScan
                                 //  to not needlessly compare the timestamps each-and-every loop.
@@ -130,11 +133,11 @@ namespace NTDLS.CatMQ.Server.Server
                                 {
                                     //Get list of subscribers that have yet to get a copy of the message.
 
-                                    var yetToBeDeliveredSubscriberIds = s.Keys.Except(topMessage.SatisfiedSubscriberssubscriberIDs).ToList();
+                                    var yetToBeDeliveredSubscriberIds = s.Keys.Except(topMessage.SatisfiedSubscribersSubscriberIDs).ToList();
 
                                     yetToBeDeliveredSubscribers = s.Where(o => yetToBeDeliveredSubscriberIds.Contains(o.Key)).Select(o => o.Value).ToList();
 
-                                    if (messageQueue.QueueConfiguration.DeliveryScheme == CMqDeliveryScheme.Balanced)
+                                    if (QueueConfiguration.DeliveryScheme == CMqDeliveryScheme.Balanced)
                                     {
                                         yetToBeDeliveredSubscribers = yetToBeDeliveredSubscribers.OrderBy(_ => Guid.NewGuid()).ToList();
                                     }
@@ -154,7 +157,7 @@ namespace NTDLS.CatMQ.Server.Server
 
                         foreach (var subscriber in yetToBeDeliveredSubscribers)
                         {
-                            if (messageQueue.KeepRunning == false)
+                            if (KeepRunning == false)
                             {
                                 break;
                             }
@@ -174,26 +177,26 @@ namespace NTDLS.CatMQ.Server.Server
                             {
                                 subscriber.DeliveryAttempts++;
 
-                                if (messageQueue.QueueServer.DeliverMessage(subscriber.SubscriberId, messageQueue.QueueConfiguration.QueueName, topMessage))
+                                if (_queueServer.DeliverMessage(subscriber.SubscriberId, QueueConfiguration.QueueName, topMessage))
                                 {
                                     subscriber.ConsumedMessages++;
                                     successfulDeliveryAndConsume = true;
                                 }
 
-                                messageQueue.DeliveredMessageCount++;
+                                DeliveredMessageCount++;
                                 subscriber.SuccessfulMessagesDeliveries++;
 
-                                if (messageQueue.KeepRunning == false)
+                                if (KeepRunning == false)
                                 {
                                     break;
                                 }
 
                                 //This thread is the only place we manage [SatisfiedSubscribersConnectionIDs], so we can use it without additional locking.
-                                topMessage.SatisfiedSubscriberssubscriberIDs.Add(subscriber.SubscriberId);
+                                topMessage.SatisfiedSubscribersSubscriberIDs.Add(subscriber.SubscriberId);
                                 successfulDeliveries++;
 
                                 if (successfulDeliveryAndConsume
-                                    && messageQueue.QueueConfiguration.ConsumptionScheme == CMqConsumptionScheme.FirstConsumedSubscriber)
+                                    && QueueConfiguration.ConsumptionScheme == CMqConsumptionScheme.FirstConsumedSubscriber)
                                 {
                                     //Message was delivered and consumed, break the delivery loop so the message can be removed from the queue.
                                     break;
@@ -201,16 +204,17 @@ namespace NTDLS.CatMQ.Server.Server
                             }
                             catch (Exception ex) //Delivery failure.
                             {
-                                messageQueue.DeliveryFailureCount++;
+                                DeliveryFailureCount++;
                                 subscriber.FailedMessagesDeliveries++;
-                                messageQueue.QueueServer.InvokeOnLog(messageQueue.QueueServer, ex.GetBaseException());
+                                _queueServer.InvokeOnLog(_queueServer, ex.GetBaseException());
                             }
 
                             //If we have tried to deliver this message to this subscriber too many times, then mark this subscriber-message as satisfied.
-                            if (messageQueue.QueueConfiguration.MaxDeliveryAttempts > 0
-                                && subscriberMessageDelivery.DeliveryAttempts >= messageQueue.QueueConfiguration.MaxDeliveryAttempts)
+                            if (QueueConfiguration.MaxDeliveryAttempts > 0
+                                && subscriberMessageDelivery.DeliveryAttempts >= QueueConfiguration.MaxDeliveryAttempts)
                             {
-                                topMessage.SatisfiedSubscriberssubscriberIDs.Add(subscriber.SubscriberId);
+                                topMessage.FailedSubscribersSubscriberIDs.Add(subscriber.SubscriberId);
+                                topMessage.SatisfiedSubscribersSubscriberIDs.Add(subscriber.SubscriberId);
                             }
                         }
 
@@ -218,19 +222,19 @@ namespace NTDLS.CatMQ.Server.Server
 
                         #region Delivery Throttle.
 
-                        if (messageQueue.QueueConfiguration.DeliveryThrottle > TimeSpan.Zero)
+                        if (QueueConfiguration.DeliveryThrottle > TimeSpan.Zero)
                         {
-                            if (messageQueue.QueueConfiguration.DeliveryThrottle.TotalSeconds >= 1)
+                            if (QueueConfiguration.DeliveryThrottle.TotalSeconds >= 1)
                             {
-                                int sleepSeconds = (int)messageQueue.QueueConfiguration.DeliveryThrottle.TotalSeconds;
-                                for (int sleep = 0; sleep < sleepSeconds && messageQueue.KeepRunning; sleep++)
+                                int sleepSeconds = (int)QueueConfiguration.DeliveryThrottle.TotalSeconds;
+                                for (int sleep = 0; sleep < sleepSeconds && KeepRunning; sleep++)
                                 {
                                     Thread.Sleep(1000);
                                 }
                             }
                             else
                             {
-                                Thread.Sleep((int)messageQueue.QueueConfiguration.DeliveryThrottle.TotalMilliseconds);
+                                Thread.Sleep((int)QueueConfiguration.DeliveryThrottle.TotalMilliseconds);
                             }
                         }
 
@@ -238,20 +242,27 @@ namespace NTDLS.CatMQ.Server.Server
 
                         #region Remove message from queue.
 
-                        messageQueue.EnqueuedMessages.UseAll([messageQueue.Subscribers], m =>
+                        EnqueuedMessages.UseAll([Subscribers], m =>
                         {
-                            messageQueue.Subscribers.Use(s => //This lock is already held.
+                            Subscribers.Use(s => //This lock is already held.
                             {
-                                if (successfulDeliveryAndConsume && messageQueue.QueueConfiguration.ConsumptionScheme == CMqConsumptionScheme.FirstConsumedSubscriber)
+                                if (successfulDeliveryAndConsume && QueueConfiguration.ConsumptionScheme == CMqConsumptionScheme.FirstConsumedSubscriber)
                                 {
                                     //The message was consumed by a subscriber, remove it from the message list.
-                                    messageQueue.QueueServer.RemovePersistenceMessage(messageQueue.QueueConfiguration.QueueName, topMessage.MessageId);
+                                    _queueServer.RemovePersistenceMessage(QueueConfiguration.QueueName, topMessage.MessageId);
                                     m.Remove(topMessage);
                                 }
-                                else if (s.Keys.Except(topMessage.SatisfiedSubscriberssubscriberIDs).Any() == false)
+                                else if (s.Keys.Except(topMessage.SatisfiedSubscribersSubscriberIDs).Any() == false)
                                 {
+                                    if (topMessage.FailedSubscribersSubscriberIDs.Count != 0)
+                                    {
+                                        _queueServer.ShovelToDLQ(QueueConfiguration.QueueName,
+                                            $"{QueueConfiguration.QueueName.ToLowerInvariant()}.dlq",
+                                            new List<EnqueuedMessage> { topMessage });
+                                    }
+
                                     //If all subscribers are satisfied (delivered or max attempts reached), then remove the message.
-                                    messageQueue.QueueServer.RemovePersistenceMessage(messageQueue.QueueConfiguration.QueueName, topMessage.MessageId);
+                                    _queueServer.RemovePersistenceMessage(QueueConfiguration.QueueName, topMessage.MessageId);
                                     m.Remove(topMessage);
                                 }
                             });
@@ -259,7 +270,7 @@ namespace NTDLS.CatMQ.Server.Server
 
                         #endregion
 
-                        if (messageQueue.KeepRunning == false)
+                        if (KeepRunning == false)
                         {
                             break;
                         }
@@ -267,13 +278,13 @@ namespace NTDLS.CatMQ.Server.Server
                 }
                 catch (Exception ex)
                 {
-                    messageQueue.QueueServer.InvokeOnLog(messageQueue.QueueServer, ex.GetBaseException());
+                    _queueServer.InvokeOnLog(_queueServer, ex.GetBaseException());
                 }
 
                 if (successfulDeliveries == 0)
                 {
                     //If nothing was successfully delivered, then delay for a period.
-                    messageQueue.DeliveryThreadWaitEvent.WaitOne(10);
+                    DeliveryThreadWaitEvent.WaitOne(10);
                 }
             }
         }
@@ -284,9 +295,14 @@ namespace NTDLS.CatMQ.Server.Server
             _deliveryThread.Start(this);
         }
 
-        public void Stop()
+        public void StopAsync()
         {
             KeepRunning = false;
+            _deliveryThread.Join();
+        }
+
+        public void WaitOnStop()
+        {
             _deliveryThread.Join();
         }
     }
