@@ -273,7 +273,7 @@ namespace NTDLS.CatMQ.Server.Server
                                             {
                                                 if ((DateTime.UtcNow - topMessage.Timestamp) > QueueConfiguration.DeadLetterConfiguration.MaxMessageAge)
                                                 {
-                                                    //Even too old for the dead-letter queue, discard expired message.
+                                                    //Message is even too old for the dead-letter queue, discard expired message.
                                                 }
                                                 else
                                                 {

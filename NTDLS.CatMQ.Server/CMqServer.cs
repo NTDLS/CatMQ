@@ -397,9 +397,6 @@ namespace NTDLS.CatMQ.Server
 
                 #region Load persisted messages.
 
-                //The keys in RocksDB are not stored in the order they were added, so we
-                // need to load all messages into the messages queues then sort them in place.
-
                 RocksDb? persistenceDatabase = null;
 
                 var databaseFilePath = Path.Join(_configuration.PersistencePath, "messages");
@@ -416,6 +413,8 @@ namespace NTDLS.CatMQ.Server
                     using var iterator = persistenceDatabase.NewIterator();
                     _messageQueues.Write(mqd =>
                     {
+                        //The keys in RocksDB are not stored in the order they were added, so we
+                        // need to load all messages into the messages queues then sort them in place.
                         for (iterator.SeekToFirst(); iterator.Valid(); iterator.Next())
                         {
                             //Deserialize using System.Text.Json as opposed to Newtonsoft for efficiency.
@@ -424,6 +423,8 @@ namespace NTDLS.CatMQ.Server
                             {
                                 if (mqd.TryGetValue(persistedMessage.QueueName, out var messageQueue))
                                 {
+                                    //If we have a MaxMessageAge, check it and if the message is expired, either
+                                    //  dead-letter or discard it instead of adding it to its original queue.
                                     if (messageQueue.QueueConfiguration.MaxMessageAge > TimeSpan.Zero)
                                     {
                                         if ((DateTime.UtcNow - persistedMessage.Timestamp) > messageQueue.QueueConfiguration.MaxMessageAge)
@@ -432,7 +433,7 @@ namespace NTDLS.CatMQ.Server
                                             {
                                                 if ((DateTime.UtcNow - persistedMessage.Timestamp) > messageQueue.QueueConfiguration.DeadLetterConfiguration.MaxMessageAge)
                                                 {
-                                                    //Even too old for the dead-letter queue, discard expired message.
+                                                    //Message is even too old for the dead-letter queue, discard expired message.
                                                 }
                                                 else if (deadLetterQueueMessages.TryGetValue(persistedMessage.QueueName, out var deadLetterMessages))
                                                 {
@@ -452,11 +453,13 @@ namespace NTDLS.CatMQ.Server
                                         }
                                         else
                                         {
+                                            //Add the message back to its original queue.
                                             messageQueue.EnqueuedMessages.Write(m => m.Add(persistedMessage));
                                         }
                                     }
                                     else
                                     {
+                                        //Add the message back to its original queue.
                                         messageQueue.EnqueuedMessages.Write(m => m.Add(persistedMessage));
                                     }
                                 }
@@ -576,7 +579,7 @@ namespace NTDLS.CatMQ.Server
 
         internal void ShovelToDeadLetter(string sourceQueueName, List<EnqueuedMessage> messages)
         {
-            OnLog?.Invoke(this, CMqErrorLevel.Verbose, $"DLQ {messages.Count} messages for [{sourceQueueName}].");
+            OnLog?.Invoke(this, CMqErrorLevel.Verbose, $"Dead-lettering {messages.Count:n0} messages for [{sourceQueueName}].");
 
             var dlqName = $"{sourceQueueName}.dlq";
             var dlqKey = dlqName.ToLowerInvariant();
@@ -593,7 +596,7 @@ namespace NTDLS.CatMQ.Server
                         {
                             foreach (var message in messages)
                             {
-                                message.QueueName = dlqName;
+                                message.QueueName = dlqName; //Ne sure to change the queue name to the DLQ name.
                                 message.SubscriberMessageDeliveries.Clear();
                                 message.SatisfiedSubscribersSubscriberIDs.Clear();
                                 message.FailedSubscribersSubscriberIDs.Clear();
@@ -617,8 +620,7 @@ namespace NTDLS.CatMQ.Server
                     }
                     else
                     {
-                        //Its ok, the DLQ does not have to exist.
-                        //throw new Exception($"Queue not found: [{queueName}].");
+                        OnLog?.Invoke(this, CMqErrorLevel.Warning, $"Dead-letter queue does not exist, discarding {messages.Count:n0} messages for [{sourceQueueName}].");
                     }
                 }) && success;
 
