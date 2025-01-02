@@ -19,7 +19,7 @@ namespace NTDLS.CatMQ.Server
     {
         private const int _deadlockAvoidanceWaitMs = 10;
         private readonly RmServer _rmServer;
-        private readonly PessimisticCriticalResource<CaseInsensitiveMessageQueueDictionary> _messageQueues = new();
+        private readonly OptimisticCriticalResource<CaseInsensitiveMessageQueueDictionary> _messageQueues = new();
         private readonly CMqServerConfiguration _configuration;
         private RocksDb? _persistenceDatabase;
         private readonly object _persistenceDatabaseLock = new();
@@ -74,7 +74,7 @@ namespace NTDLS.CatMQ.Server
         /// </summary>
         public void CheckpointPersistentMessageQueues()
         {
-            _messageQueues.Use(mqd => CheckpointPersistentMessageQueues(mqd));
+            _messageQueues.Read(mqd => CheckpointPersistentMessageQueues(mqd));
         }
 
         private void CheckpointPersistentMessageQueues(CaseInsensitiveMessageQueueDictionary mqd)
@@ -120,13 +120,13 @@ namespace NTDLS.CatMQ.Server
                 bool success = true;
                 List<CMqQueueInformation>? result = new();
 
-                success = _messageQueues.TryUse(mqd =>
+                success = _messageQueues.TryRead(mqd =>
                 {
                     foreach (var mqKVP in mqd)
                     {
-                        success = mqKVP.Value.EnqueuedMessages.TryUse(m =>
+                        success = mqKVP.Value.EnqueuedMessages.TryRead(m =>
                         {
-                            success = mqKVP.Value.Subscribers.TryUse(sKVP =>
+                            success = mqKVP.Value.Subscribers.TryRead(sKVP =>
                             {
                                 result.Add(new CMqQueueInformation
                                 {
@@ -177,11 +177,11 @@ namespace NTDLS.CatMQ.Server
                 bool success = true;
                 var result = new List<CMqSubscriberInformation>();
 
-                success = _messageQueues.TryUse(mqd =>
+                success = _messageQueues.TryRead(mqd =>
                 {
                     if (mqd.TryGetValue(queueName, out var messageQueue))
                     {
-                        success = messageQueue.Subscribers.TryUse(sKVP =>
+                        success = messageQueue.Subscribers.TryRead(sKVP =>
                         {
                             foreach (var subscriber in sKVP)
                             {
@@ -214,14 +214,14 @@ namespace NTDLS.CatMQ.Server
                 bool success = true;
                 List<CMqEnqueuedMessageInformation>? result = new();
 
-                success = _messageQueues.TryUse(mqd =>
+                success = _messageQueues.TryRead(mqd =>
                 {
                     var filteredQueues = mqd.Where(o => o.Value.QueueConfiguration.QueueName.Equals(queueName, StringComparison.OrdinalIgnoreCase));
                     foreach (var qKVP in filteredQueues)
                     {
-                        success = qKVP.Value.EnqueuedMessages.TryUse(m =>
+                        success = qKVP.Value.EnqueuedMessages.TryRead(m =>
                         {
-                            success = qKVP.Value.Subscribers.TryUse(sKVP =>
+                            success = qKVP.Value.Subscribers.TryRead(sKVP =>
                             {
                                 foreach (var message in m.Skip(offset).Take(take))
                                 {
@@ -267,11 +267,11 @@ namespace NTDLS.CatMQ.Server
                 bool success = true;
                 CMqEnqueuedMessageInformation? result = null;
 
-                success = _messageQueues.TryUse(mqd =>
+                success = _messageQueues.TryRead(mqd =>
                 {
                     if (mqd.TryGetValue(queueName, out var messageQueue))
                     {
-                        success = messageQueue.EnqueuedMessages.TryUse(m =>
+                        success = messageQueue.EnqueuedMessages.TryRead(m =>
                         {
                             var message = m.Where(o => o.MessageId == messageId).FirstOrDefault();
                             if (message != null)
@@ -322,11 +322,11 @@ namespace NTDLS.CatMQ.Server
                 bool success = true;
 
                 //When a client disconnects, remove their subscriptions.
-                success = _messageQueues.TryUse(mqd =>
+                success = _messageQueues.TryRead(mqd =>
                 {
                     foreach (var mqKVP in mqd)
                     {
-                        success = mqKVP.Value.Subscribers.TryUse(s =>
+                        success = mqKVP.Value.Subscribers.TryWrite(s =>
                         {
                             s.Remove(context.ConnectionId);
                         }) && success;
@@ -359,11 +359,11 @@ namespace NTDLS.CatMQ.Server
 
             _keepRunning = true;
 
+            var persistedQueues = new List<MessageQueue>();
+
             if (_configuration.PersistencePath != null)
             {
                 #region Load and create persisted queues.
-
-                List<MessageQueue>? persistedQueues = null;
 
                 var persistedQueuesFile = Path.Join(_configuration.PersistencePath, "queues.json");
                 if (File.Exists(persistedQueuesFile))
@@ -376,11 +376,13 @@ namespace NTDLS.CatMQ.Server
 
                     if (loadedPersistedQueues != null)
                     {
-                        _messageQueues.Use(mqd =>
+                        _messageQueues.Write(mqd =>
                         {
                             foreach (var persistedQueue in loadedPersistedQueues)
                             {
                                 persistedQueue.SetServer(this);
+                                persistedQueues.Add(persistedQueue);
+
                                 var queueKey = persistedQueue.QueueConfiguration.QueueName.ToLower();
                                 if (mqd.ContainsKey(queueKey) == false)
                                 {
@@ -388,8 +390,6 @@ namespace NTDLS.CatMQ.Server
                                 }
                             }
                         });
-
-                        persistedQueues = loadedPersistedQueues;
                     }
                 }
 
@@ -409,12 +409,12 @@ namespace NTDLS.CatMQ.Server
                     .SetCreateIfMissing(true);
                 persistenceDatabase = RocksDb.Open(options, databaseFilePath);
 
-                if (persistedQueues != null)
+                if (persistedQueues.Count > 0)
                 {
                     OnLog?.Invoke(this, CMqErrorLevel.Information, "Loading persistent messages.");
 
                     using var iterator = persistenceDatabase.NewIterator();
-                    _messageQueues.Use(mqd =>
+                    _messageQueues.Write(mqd =>
                     {
                         for (iterator.SeekToFirst(); iterator.Valid(); iterator.Next())
                         {
@@ -424,7 +424,7 @@ namespace NTDLS.CatMQ.Server
                             {
                                 if (mqd.TryGetValue(persistedMessage.QueueName, out var messageQueue))
                                 {
-                                    messageQueue.EnqueuedMessages.Use(m =>
+                                    messageQueue.EnqueuedMessages.Write(m =>
                                     {
                                         m.Add(persistedMessage);
                                     });
@@ -447,13 +447,10 @@ namespace NTDLS.CatMQ.Server
             }
 
             OnLog?.Invoke(this, CMqErrorLevel.Information, "Starting queues.");
-            _messageQueues.Use(mqd =>
+            foreach (var mq in persistedQueues)
             {
-                foreach (var mq in mqd.Values)
-                {
-                    mq.Start();
-                }
-            });
+                mq.StartAsync();
+            }
 
             _rmServer.Start(listenPort);
 
@@ -502,7 +499,7 @@ namespace NTDLS.CatMQ.Server
 
             var messageQueues = new List<MessageQueue>();
 
-            _messageQueues.Use(mqd =>
+            _messageQueues.Read(mqd =>
             {
                 //Stop all message queues.
                 foreach (var mqKVP in mqd)
@@ -528,7 +525,7 @@ namespace NTDLS.CatMQ.Server
 
         #region Message queue interactions.
 
-        internal void ShovelToDLQ(string queueName, string dlqKey, IEnumerable<EnqueuedMessage> messages)
+        internal void ShovelToDLQ(string queueName, string dlqKey, EnqueuedMessage message)
         {
             OnLog?.Invoke(this, CMqErrorLevel.Verbose, $"DLQ message: [{queueName}].");
 
@@ -536,31 +533,29 @@ namespace NTDLS.CatMQ.Server
             {
                 bool success = true;
 
-                success = _messageQueues.TryUse(mqd =>
+                success = _messageQueues.TryRead(mqd =>
                 {
                     if (mqd.TryGetValue(dlqKey, out var messageQueue))
                     {
-                        success = messageQueue.EnqueuedMessages.TryUse(m =>
+                        success = messageQueue.EnqueuedMessages.TryWrite(m =>
                         {
-                            foreach (var message in messages)
+                            message.SubscriberMessageDeliveries.Clear();
+                            message.SatisfiedSubscribersSubscriberIDs.Clear();
+                            message.FailedSubscribersSubscriberIDs.Clear();
+
+                            messageQueue.ReceivedMessageCount++;
+                            if (messageQueue.QueueConfiguration.PersistenceScheme == CMqPersistenceScheme.Persistent && _persistenceDatabase != null)
                             {
-                                message.SubscriberMessageDeliveries.Clear();
-                                message.SatisfiedSubscribersSubscriberIDs.Clear();
-                                message.FailedSubscribersSubscriberIDs.Clear();
-
-                                messageQueue.ReceivedMessageCount++;
-                                if (messageQueue.QueueConfiguration.PersistenceScheme == CMqPersistenceScheme.Persistent && _persistenceDatabase != null)
+                                //Serialize using System.Text.Json as opposed to Newtonsoft for efficiency.
+                                var persistedJson = JsonSerializer.Serialize(message);
+                                lock (_persistenceDatabaseLock)
                                 {
-                                    //Serialize using System.Text.Json as opposed to Newtonsoft for efficiency.
-                                    var persistedJson = JsonSerializer.Serialize(message);
-                                    lock (_persistenceDatabaseLock)
-                                    {
-                                        _persistenceDatabase?.Put($"{dlqKey}_{message.MessageId}", persistedJson);
-                                    }
+                                    _persistenceDatabase?.Put($"{dlqKey}_{message.MessageId}", persistedJson);
                                 }
-
-                                m.Add(message);
                             }
+
+                            m.Add(message);
+
                             messageQueue.DeliveryThreadWaitEvent.Set();
                         }) && success;
                     }
@@ -619,7 +614,7 @@ namespace NTDLS.CatMQ.Server
         {
             OnLog?.Invoke(this, CMqErrorLevel.Verbose, $"Creating queue: [{queueConfiguration.QueueName}].");
 
-            _messageQueues.Use(mqd =>
+            _messageQueues.Write(mqd =>
             {
                 string queueKey = queueConfiguration.QueueName.ToLowerInvariant();
                 if (mqd.ContainsKey(queueKey) == false)
@@ -643,7 +638,7 @@ namespace NTDLS.CatMQ.Server
                             });
                             mqd.Add(dlqKey, dlq);
 
-                            dlq.Start();
+                            dlq.StartAsync();
                         }
                     }
 
@@ -659,7 +654,7 @@ namespace NTDLS.CatMQ.Server
                         }
                     }
 
-                    messageQueue.Start();
+                    messageQueue.StartAsync();
                 }
             });
         }
@@ -679,11 +674,11 @@ namespace NTDLS.CatMQ.Server
 
                 MessageQueue? waitOnStopMessageQueue = null;
 
-                success = _messageQueues.TryUse(mqd =>
+                success = _messageQueues.TryWrite(mqd =>
                 {
                     if (mqd.TryGetValue(queueKey, out var messageQueue))
                     {
-                        success = messageQueue.EnqueuedMessages.TryUse(m =>
+                        success = messageQueue.EnqueuedMessages.TryWrite(m =>
                         {
                             waitOnStopMessageQueue = messageQueue;
                             messageQueue.StopAsync();
@@ -733,11 +728,11 @@ namespace NTDLS.CatMQ.Server
             {
                 bool success = true;
 
-                success = _messageQueues.TryUse(mqd =>
+                success = _messageQueues.TryRead(mqd =>
                 {
                     if (mqd.TryGetValue(queueKey, out var messageQueue))
                     {
-                        success = messageQueue.Subscribers.TryUse(s =>
+                        success = messageQueue.Subscribers.TryWrite(s =>
                         {
                             if (s.ContainsKey(subscriberId) == false)
                             {
@@ -778,11 +773,11 @@ namespace NTDLS.CatMQ.Server
             {
                 bool success = true;
 
-                success = _messageQueues.TryUse(mqd =>
+                success = _messageQueues.TryRead(mqd =>
                 {
                     if (mqd.TryGetValue(queueKey, out var messageQueue))
                     {
-                        success = messageQueue.Subscribers.TryUse(s =>
+                        success = messageQueue.Subscribers.TryWrite(s =>
                         {
                             s.Remove(subscriberId);
                         }) && success;
@@ -810,11 +805,11 @@ namespace NTDLS.CatMQ.Server
             {
                 bool success = true;
 
-                success = _messageQueues.TryUse(mqd =>
+                success = _messageQueues.TryRead(mqd =>
                 {
                     if (mqd.TryGetValue(queueKey, out var messageQueue))
                     {
-                        success = messageQueue.EnqueuedMessages.TryUse(m =>
+                        success = messageQueue.EnqueuedMessages.TryWrite(m =>
                         {
                             messageQueue.ReceivedMessageCount++;
                             var message = new EnqueuedMessage(queueKey, assemblyQualifiedTypeName, messageJson);
@@ -857,12 +852,12 @@ namespace NTDLS.CatMQ.Server
             {
                 bool success = true;
 
-                success = _messageQueues.TryUse(mqd =>
+                success = _messageQueues.TryRead(mqd =>
                 {
                     string queueKey = queueName.ToLowerInvariant();
                     if (mqd.TryGetValue(queueKey, out var messageQueue))
                     {
-                        success = messageQueue.EnqueuedMessages.TryUse(m =>
+                        success = messageQueue.EnqueuedMessages.TryWrite(m =>
                         {
                             if (messageQueue.QueueConfiguration.PersistenceScheme == CMqPersistenceScheme.Persistent && _persistenceDatabase != null)
                             {
