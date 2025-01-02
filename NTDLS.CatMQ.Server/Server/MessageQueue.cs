@@ -292,7 +292,7 @@ namespace NTDLS.CatMQ.Server.Server
         public void Start()
         {
             KeepRunning = true;
-            _deliveryThread.Start(this);
+            _deliveryThread.Start();
         }
 
         public void StopAsync()

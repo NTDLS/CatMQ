@@ -54,7 +54,7 @@ namespace Test.Stress
                 client.CreateQueue(new CMqQueueConfiguration(queueName)
                 {
                     PersistenceScheme = CMqPersistenceScheme.Persistent,
-                    MaxMessageAge = TimeSpan.FromSeconds(2)
+                    MaxMessageAge = TimeSpan.FromSeconds(60)
                 });
 
                 if (_random.Next(1, 100) > 50) //We don't always subscribe to our own queue.

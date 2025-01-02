@@ -381,11 +381,10 @@ namespace NTDLS.CatMQ.Server
                             foreach (var persistedQueue in loadedPersistedQueues)
                             {
                                 persistedQueue.SetServer(this);
-                                string queueKey = persistedQueue.QueueConfiguration.QueueName.ToLower();
+                                var queueKey = persistedQueue.QueueConfiguration.QueueName.ToLower();
                                 if (mqd.ContainsKey(queueKey) == false)
                                 {
                                     mqd.Add(queueKey, persistedQueue);
-                                    persistedQueue.Start();
                                 }
                             }
                         });
@@ -403,13 +402,12 @@ namespace NTDLS.CatMQ.Server
 
                 RocksDb? persistenceDatabase = null;
 
-                string databaseFile = Path.Join(_configuration.PersistencePath, "messages");
-
+                var databaseFilePath = Path.Join(_configuration.PersistencePath, "messages");
                 OnLog?.Invoke(this, CMqErrorLevel.Information, "Instantiating persistent database.");
 
                 var options = new DbOptions()
                     .SetCreateIfMissing(true);
-                persistenceDatabase = RocksDb.Open(options, databaseFile);
+                persistenceDatabase = RocksDb.Open(options, databaseFilePath);
 
                 if (persistedQueues != null)
                 {
@@ -434,6 +432,8 @@ namespace NTDLS.CatMQ.Server
                             }
                         }
 
+                        OnLog?.Invoke(this, CMqErrorLevel.Information, "Sorting loaded queues.");
+
                         //Sort the message in the queues by their timestamps.
                         OnLog?.Invoke(this, CMqErrorLevel.Information, "Sorting persistent messages.");
                         var tasks = mqd.Values.Select(mq => Task.Run(() => mq.SortMessages()));
@@ -445,6 +445,15 @@ namespace NTDLS.CatMQ.Server
 
                 _persistenceDatabase = persistenceDatabase;
             }
+
+            OnLog?.Invoke(this, CMqErrorLevel.Information, "Starting queues.");
+            _messageQueues.Use(mqd =>
+            {
+                foreach (var mq in mqd.Values)
+                {
+                    mq.Start();
+                }
+            });
 
             _rmServer.Start(listenPort);
 
