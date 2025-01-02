@@ -131,8 +131,12 @@ namespace NTDLS.CatMQ.Server.Server
                                 {
                                     //If MaxMessageAge is defined, then remove the stale messages.
 
+                                    if (QueueConfiguration.DeadLetterConfiguration != null)
+                                    {
+                                        _queueServer.ShovelToDeadLetter(QueueConfiguration.QueueName, testExpired);
+                                    }
+
                                     _queueServer.RemovePersistenceMessage(QueueConfiguration.QueueName, testExpired.MessageId);
-                                    _queueServer.ShovelToDeadLetter(QueueConfiguration.QueueName, testExpired);
 
                                     m.Remove(testExpired);
                                     ExpiredMessageCount++;
@@ -258,7 +262,10 @@ namespace NTDLS.CatMQ.Server.Server
                                     {
                                         if (topMessage.FailedSubscribersSubscriberIDs.Count != 0)
                                         {
-                                            _queueServer.ShovelToDeadLetter(QueueConfiguration.QueueName, topMessage);
+                                            if (QueueConfiguration.DeadLetterConfiguration != null)
+                                            {
+                                                _queueServer.ShovelToDeadLetter(QueueConfiguration.QueueName, topMessage);
+                                            }
                                         }
 
                                         //If all subscribers are satisfied (delivered or max attempts reached), then remove the message.
