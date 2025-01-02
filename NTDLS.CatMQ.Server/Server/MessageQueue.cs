@@ -242,7 +242,7 @@ namespace NTDLS.CatMQ.Server.Server
 
                         do
                         {
-                            removeSuccess = EnqueuedMessages.TryWrite(m =>
+                            EnqueuedMessages.Write(m =>
                             {
                                 removeSuccess = Subscribers.TryRead(s => //This lock is already held.
                                 {
@@ -259,7 +259,7 @@ namespace NTDLS.CatMQ.Server.Server
                                         m.Remove(topMessage);
                                     }
                                 }) && removeSuccess;
-                            }) && removeSuccess;
+                            });
 
                             if (!removeSuccess)
                             {
