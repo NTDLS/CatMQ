@@ -21,7 +21,7 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <Authors>NetworkDLS</Authors>
     <Company>NetworkDLS</Company>
-    <version>1.0.11</version>
+    <version>1.0.12</version>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>Logo.png</PackageIcon>
     <ApplicationIcon>Logo.ico</ApplicationIcon>
@@ -45,7 +45,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\NTDLS.CatMQ.Shared\NTDLS.CatMQ.Shared.csproj" />
+    <PackageReference Include="NTDLS.CatMQ.Shared" Version="1.0.7" />
   </ItemGroup>
 
 </Project>
