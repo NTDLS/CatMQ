@@ -244,10 +244,12 @@ namespace NTDLS.CatMQ.Server.Server
 
                         #region Remove message from queue.
 
-                        bool removeSuccess = true;
+                        bool removeSuccess;
 
                         do
                         {
+                            removeSuccess = true;
+
                             EnqueuedMessages.Write(m =>
                             {
                                 removeSuccess = Subscribers.TryRead(s =>
@@ -282,6 +284,10 @@ namespace NTDLS.CatMQ.Server.Server
                                 }) && removeSuccess;
                             });
 
+                            if (!removeSuccess)
+                            {
+                                Thread.Sleep(CMqDefaults.DEFAULT_DEADLOCK_AVOIDANCE_WAIT_MS);
+                            }
                         } while (KeepRunning && removeSuccess == false);
 
                         #endregion

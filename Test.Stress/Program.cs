@@ -64,7 +64,7 @@ namespace Test.Stress
                 client.CreateQueue(new CMqQueueConfiguration(queueName)
                 {
                     PersistenceScheme = CMqPersistenceScheme.Persistent,
-                    //MaxMessageAge = TimeSpan.FromMinutes(_random.Next(4, 6)),
+                    MaxMessageAge = TimeSpan.FromMinutes(_random.Next(4, 6)),
                     DeadLetterConfiguration = deadLetterConfig
                 });
 
