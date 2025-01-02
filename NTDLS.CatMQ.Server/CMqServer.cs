@@ -697,24 +697,24 @@ namespace NTDLS.CatMQ.Server
                         }
                     }
 
+                    if (queueConfiguration.DeadLetterConfiguration != null)
+                    {
+                        var dlqConfiguration = new CMqQueueConfiguration($"{queueConfiguration.QueueName}.dlq")
+                        {
+                            DeadLetterConfiguration = null,
+                            ConsumptionScheme = queueConfiguration.DeadLetterConfiguration.ConsumptionScheme,
+                            MaxMessageAge = queueConfiguration.DeadLetterConfiguration.MaxMessageAge,
+                            PersistenceScheme = queueConfiguration.DeadLetterConfiguration.PersistenceScheme,
+                            MaxDeliveryAttempts = queueConfiguration.DeadLetterConfiguration.MaxDeliveryAttempts,
+                            DeliveryScheme = queueConfiguration.DeadLetterConfiguration.DeliveryScheme,
+                            DeliveryThrottle = queueConfiguration.DeadLetterConfiguration.DeliveryThrottle,
+                        };
+                        CreateQueue(dlqConfiguration);
+                    }
+
                     messageQueue.StartAsync();
                 }
             });
-
-            if (queueConfiguration.DeadLetterConfiguration != null)
-            {
-                var dlqConfiguration = new CMqQueueConfiguration($"{queueConfiguration.QueueName}.dlq")
-                {
-                    DeadLetterConfiguration = null,
-                    ConsumptionScheme = queueConfiguration.DeadLetterConfiguration.ConsumptionScheme,
-                    MaxMessageAge = queueConfiguration.DeadLetterConfiguration.MaxMessageAge,
-                    PersistenceScheme = queueConfiguration.DeadLetterConfiguration.PersistenceScheme,
-                    MaxDeliveryAttempts = queueConfiguration.DeadLetterConfiguration.MaxDeliveryAttempts,
-                    DeliveryScheme = queueConfiguration.DeadLetterConfiguration.DeliveryScheme,
-                    DeliveryThrottle = queueConfiguration.DeadLetterConfiguration.DeliveryThrottle,
-                };
-                CreateQueue(dlqConfiguration);
-            }
         }
 
         /// <summary>
