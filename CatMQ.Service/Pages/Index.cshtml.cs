@@ -11,11 +11,15 @@ namespace CatMQ.Service.Pages
     public class IndexModel(ILogger<IndexModel> logger, CMqServer mqServer) : BasePageModel
     {
         private readonly ILogger<IndexModel> _logger = logger;
-        public List<CMqQueueInformation> Queues { get; private set; } = new();
-        public CMqServerInformation ServerConfig = new();
+        public List<CMqQueueDescriptor> Queues { get; private set; } = new();
+        public CMqServerDescriptor ServerConfig = new();
+        public string ApplicationVersion { get; private set; } = string.Empty;
 
         public void OnGet()
         {
+            ApplicationVersion = string.Join('.', (Assembly.GetExecutingAssembly()
+                .GetName().Version?.ToString() ?? "0.0.0.0").Split('.').Take(3)); //Major.Minor.Patch
+
             try
             {
                 ServerConfig = mqServer.GetConfiguration();

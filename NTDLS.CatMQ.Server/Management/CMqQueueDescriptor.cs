@@ -5,7 +5,7 @@ namespace NTDLS.CatMQ.Server.Management
     /// <summary>
     /// Defines a queue configuration.
     /// </summary>
-    public class CMqQueueInformation()
+    public class CMqQueueDescriptor()
     {
         /// <summary>
         /// The name of the queue.

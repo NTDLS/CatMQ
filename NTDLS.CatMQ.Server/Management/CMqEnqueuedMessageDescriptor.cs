@@ -3,7 +3,7 @@
     /// <summary>
     /// Contains readonly information about messages.
     /// </summary>
-    public class CMqEnqueuedMessageInformation
+    public class CMqEnqueuedMessageDescriptor
     {
         /// <summary>
         /// The unique ID of the message.

@@ -14,7 +14,7 @@ namespace CatMQ.Service.Pages
         public Guid MessageId { get; set; }
 
         private readonly ILogger<MessageModel> _logger = logger;
-        public CMqEnqueuedMessageInformation Message { get; set; } = new();
+        public CMqEnqueuedMessageDescriptor Message { get; set; } = new();
 
         public void OnGet()
         {

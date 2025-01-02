@@ -11,7 +11,7 @@ namespace CatMQ.Service.Pages
     public class QueuesModel(ILogger<QueuesModel> logger, CMqServer mqServer) : BasePageModel
     {
         private readonly ILogger<QueuesModel> _logger = logger;
-        public List<CMqQueueInformation> Queues { get; private set; } = new();
+        public List<CMqQueueDescriptor> Queues { get; private set; } = new();
 
         public void OnGet()
         {

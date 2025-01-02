@@ -52,14 +52,14 @@ namespace Test.Stress
 
                 var deadLetterConfig = new CMqDeadLetterQueueConfiguration()
                 {
-                    MaxMessageAge = TimeSpan.FromMinutes(10)
+                    MaxMessageAge = TimeSpan.FromMinutes(2)
                 };
 
                 Console.WriteLine($"Creating queue: '{queueName}'.");
                 client.CreateQueue(new CMqQueueConfiguration(queueName)
                 {
                     PersistenceScheme = CMqPersistenceScheme.Persistent,
-                    MaxMessageAge = TimeSpan.FromSeconds(60),
+                    MaxMessageAge = TimeSpan.FromMinutes(1),
                     DeadLetterConfiguration = deadLetterConfig
                 });
 

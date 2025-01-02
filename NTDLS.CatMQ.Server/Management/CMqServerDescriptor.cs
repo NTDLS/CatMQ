@@ -5,7 +5,7 @@ namespace NTDLS.CatMQ.Server.Management
     /// <summary>
     /// Queue client configuration parameters.
     /// </summary>
-    public class CMqServerInformation
+    public class CMqServerDescriptor
     {
         /// <summary>
         /// When true, query replies are queued in a thread pool. Otherwise, queries block other activities.

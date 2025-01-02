@@ -102,11 +102,11 @@ private static bool OnMessageReceived(CMqClient client, CMqReceivedMessage rawMe
 When enabled, CatMQ also allows managing queues by the way of Web API, you'll first need to login to the web management UI, create a user and generate a API key. This API key will need to be passed in the "x-catmq-api-Key" header value.
 
 **Currently supported WebAPI calls**
-- Enqueue/{queueName}/{objectType} [json in body]
-- CreateQueue/{queueName}
-- CreateQueue [CMqQueueConfiguration json in body]
-- Purge/{queueName}
-- DeleteQueue/{queueName}
+- `Enqueue/{queueName}/{objectType}` [json in body]
+- `CreateQueue/{queueName}`
+- `CreateQueue` [CMqQueueConfiguration json in body]
+- `Purge/{queueName}`
+- `DeleteQueue/{queueName}`
 
 ### Example creating a queue using default settings with WebAPI via cURL
 **URL:** */api/CreateQueue/{queueName}*
@@ -175,6 +175,7 @@ much smarter than me. Eternally grateful to all those for making my development 
 
 ### Home view
 __(yes, that's over 1-billion messages).__ 👀
+
 ![image](https://github.com/user-attachments/assets/48ed2204-0efa-4ee0-8b8a-50f557f74d24)
 
 ### Queue view

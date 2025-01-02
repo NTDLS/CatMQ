@@ -14,8 +14,8 @@ namespace CatMQ.Service.Pages
         public string QueueName { get; set; } = string.Empty;
 
         private readonly ILogger<QueueModel> _logger = logger;
-        public CMqQueueInformation Queue { get; private set; } = new();
-        public List<CMqSubscriberInformation> Subscribers { get; set; } = new();
+        public CMqQueueDescriptor Queue { get; private set; } = new();
+        public List<CMqSubscriberDescriptor> Subscribers { get; set; } = new();
 
         public void OnGet()
         {

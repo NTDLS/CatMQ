@@ -19,7 +19,7 @@ namespace NTDLS.CatMQ.Server.Server
         /// <summary>
         /// List of subscriber connection IDs.
         /// </summary>
-        internal OptimisticCriticalResource<Dictionary<Guid, CMqSubscriberInformation>> Subscribers { get; set; } = new();
+        internal OptimisticCriticalResource<Dictionary<Guid, CMqSubscriberDescriptor>> Subscribers { get; set; } = new();
 
         /// <summary>
         /// Messages that are enqueued in this list.
@@ -89,13 +89,13 @@ namespace NTDLS.CatMQ.Server.Server
                 try
                 {
                     EnqueuedMessage? topMessage = null;
-                    List<CMqSubscriberInformation>? yetToBeDeliveredSubscribers = null;
+                    List<CMqSubscriberDescriptor>? yetToBeDeliveredSubscribers = null;
 
                     #region Get top message and its subscribers.
 
                     EnqueuedMessages.TryReadAll([Subscribers], m =>
                     {
-                        Subscribers.Read(s => //This lock is already held.
+                        Subscribers.Read(s =>
                         {
                             //We only process a queue if it has subscribers.
                             //This is so we do not discard messages as delivered for queues with no subscribers.
@@ -133,7 +133,14 @@ namespace NTDLS.CatMQ.Server.Server
 
                                     if (QueueConfiguration.DeadLetterConfiguration != null)
                                     {
-                                        _queueServer.ShovelToDeadLetter(QueueConfiguration.QueueName, testExpired);
+                                        if ((DateTime.UtcNow - testExpired.Timestamp) > QueueConfiguration.DeadLetterConfiguration.MaxMessageAge)
+                                        {
+                                            //Even too old for the dead-letter queue, discard expired message.
+                                        }
+                                        else
+                                        {
+                                            _queueServer.ShovelToDeadLetter(QueueConfiguration.QueueName, testExpired);
+                                        }
                                     }
 
                                     _queueServer.RemovePersistenceMessage(QueueConfiguration.QueueName, testExpired.MessageId);
@@ -250,7 +257,7 @@ namespace NTDLS.CatMQ.Server.Server
                         {
                             EnqueuedMessages.Write(m =>
                             {
-                                removeSuccess = Subscribers.TryRead(s => //This lock is already held.
+                                removeSuccess = Subscribers.TryRead(s =>
                                 {
                                     if (successfulDeliveryAndConsume && QueueConfiguration.ConsumptionScheme == CMqConsumptionScheme.FirstConsumedSubscriber)
                                     {
@@ -264,7 +271,14 @@ namespace NTDLS.CatMQ.Server.Server
                                         {
                                             if (QueueConfiguration.DeadLetterConfiguration != null)
                                             {
-                                                _queueServer.ShovelToDeadLetter(QueueConfiguration.QueueName, topMessage);
+                                                if ((DateTime.UtcNow - topMessage.Timestamp) > QueueConfiguration.DeadLetterConfiguration.MaxMessageAge)
+                                                {
+                                                    //Even too old for the dead-letter queue, discard expired message.
+                                                }
+                                                else
+                                                {
+                                                    _queueServer.ShovelToDeadLetter(QueueConfiguration.QueueName, topMessage);
+                                                }
                                             }
                                         }
 

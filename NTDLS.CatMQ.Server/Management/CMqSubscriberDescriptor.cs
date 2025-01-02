@@ -3,9 +3,9 @@
     /// <summary>
     /// Contains information about queue subscribers.
     /// </summary>
-    public class CMqSubscriberInformation
+    public class CMqSubscriberDescriptor
     {
-        internal CMqSubscriberInformation(Guid subscriberId)
+        internal CMqSubscriberDescriptor(Guid subscriberId)
         {
             SubscriberId = subscriberId;
         }

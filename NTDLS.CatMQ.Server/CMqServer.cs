@@ -95,9 +95,9 @@ namespace NTDLS.CatMQ.Server
         /// Returns a read-only copy of the running configuration.
         /// </summary>
         /// <returns></returns>
-        public CMqServerInformation GetConfiguration()
+        public CMqServerDescriptor GetConfiguration()
         {
-            return new CMqServerInformation
+            return new CMqServerDescriptor
             {
                 AsynchronousAcknowledgment = _configuration.AsynchronousAcknowledgment,
                 AcknowledgmentTimeoutSeconds = _configuration.AcknowledgmentTimeoutSeconds,
@@ -112,12 +112,12 @@ namespace NTDLS.CatMQ.Server
         /// <summary>
         /// Returns a read-only copy of the queues.
         /// </summary>
-        public ReadOnlyCollection<CMqQueueInformation> GetQueues()
+        public ReadOnlyCollection<CMqQueueDescriptor> GetQueues()
         {
             while (true)
             {
                 bool success = true;
-                List<CMqQueueInformation>? result = new();
+                List<CMqQueueDescriptor>? result = new();
 
                 success = _messageQueues.TryRead(mqd =>
                 {
@@ -127,7 +127,7 @@ namespace NTDLS.CatMQ.Server
                         {
                             success = mqKVP.Value.Subscribers.TryRead(sKVP =>
                             {
-                                result.Add(new CMqQueueInformation
+                                result.Add(new CMqQueueDescriptor
                                 {
                                     ConsumptionScheme = mqKVP.Value.QueueConfiguration.ConsumptionScheme,
                                     DeliveryScheme = mqKVP.Value.QueueConfiguration.DeliveryScheme,
@@ -159,7 +159,7 @@ namespace NTDLS.CatMQ.Server
 
                 if (success && result != null)
                 {
-                    return new ReadOnlyCollection<CMqQueueInformation>(result);
+                    return new ReadOnlyCollection<CMqQueueDescriptor>(result);
                 }
 
                 Thread.Sleep(CMqDefaults.DEFAULT_DEADLOCK_AVOIDANCE_WAIT_MS); //Failed to lock, sleep then try again.
@@ -169,12 +169,12 @@ namespace NTDLS.CatMQ.Server
         /// <summary>
         /// Returns a read-only copy of the queue subscribers.
         /// </summary>
-        public ReadOnlyCollection<CMqSubscriberInformation> GetSubscribers(string queueName)
+        public ReadOnlyCollection<CMqSubscriberDescriptor> GetSubscribers(string queueName)
         {
             while (true)
             {
                 bool success = true;
-                var result = new List<CMqSubscriberInformation>();
+                var result = new List<CMqSubscriberDescriptor>();
 
                 success = _messageQueues.TryRead(mqd =>
                 {
@@ -196,7 +196,7 @@ namespace NTDLS.CatMQ.Server
 
                 if (success)
                 {
-                    return new ReadOnlyCollection<CMqSubscriberInformation>(result);
+                    return new ReadOnlyCollection<CMqSubscriberDescriptor>(result);
                 }
 
                 Thread.Sleep(CMqDefaults.DEFAULT_DEADLOCK_AVOIDANCE_WAIT_MS); //Failed to lock, sleep then try again.
@@ -206,12 +206,12 @@ namespace NTDLS.CatMQ.Server
         /// <summary>
         /// Returns a read-only copy messages in the queue.
         /// </summary>
-        public ReadOnlyCollection<CMqEnqueuedMessageInformation> GetQueueMessages(string queueName, int offset, int take)
+        public ReadOnlyCollection<CMqEnqueuedMessageDescriptor> GetQueueMessages(string queueName, int offset, int take)
         {
             while (true)
             {
                 bool success = true;
-                List<CMqEnqueuedMessageInformation>? result = new();
+                List<CMqEnqueuedMessageDescriptor>? result = new();
 
                 success = _messageQueues.TryRead(mqd =>
                 {
@@ -224,7 +224,7 @@ namespace NTDLS.CatMQ.Server
                             {
                                 foreach (var message in m.Skip(offset).Take(take))
                                 {
-                                    result.Add(new CMqEnqueuedMessageInformation
+                                    result.Add(new CMqEnqueuedMessageDescriptor
                                     {
                                         Timestamp = message.Timestamp,
                                         SubscriberCount = sKVP.Count,
@@ -249,7 +249,7 @@ namespace NTDLS.CatMQ.Server
 
                 if (success && result != null)
                 {
-                    return new ReadOnlyCollection<CMqEnqueuedMessageInformation>(result);
+                    return new ReadOnlyCollection<CMqEnqueuedMessageDescriptor>(result);
                 }
 
                 Thread.Sleep(CMqDefaults.DEFAULT_DEADLOCK_AVOIDANCE_WAIT_MS); //Failed to lock, sleep then try again.
@@ -259,12 +259,12 @@ namespace NTDLS.CatMQ.Server
         /// <summary>
         /// Returns a read-only copy messages in the queue.
         /// </summary>
-        public CMqEnqueuedMessageInformation GetQueueMessage(string queueName, Guid messageId)
+        public CMqEnqueuedMessageDescriptor GetQueueMessage(string queueName, Guid messageId)
         {
             while (true)
             {
                 bool success = true;
-                CMqEnqueuedMessageInformation? result = null;
+                CMqEnqueuedMessageDescriptor? result = null;
 
                 success = _messageQueues.TryRead(mqd =>
                 {
@@ -275,7 +275,7 @@ namespace NTDLS.CatMQ.Server
                             var message = m.Where(o => o.MessageId == messageId).FirstOrDefault();
                             if (message != null)
                             {
-                                result = new CMqEnqueuedMessageInformation
+                                result = new CMqEnqueuedMessageDescriptor
                                 {
                                     Timestamp = message.Timestamp,
                                     SubscriberMessageDeliveries = message.SubscriberMessageDeliveries.Keys.ToHashSet(),
@@ -792,7 +792,7 @@ namespace NTDLS.CatMQ.Server
                         {
                             if (s.ContainsKey(subscriberId) == false)
                             {
-                                s.Add(subscriberId, new CMqSubscriberInformation(subscriberId)
+                                s.Add(subscriberId, new CMqSubscriberDescriptor(subscriberId)
                                 {
                                     LocalAddress = localEndpoint?.Address?.ToString(),
                                     RemoteAddress = remoteEndpoint?.Address?.ToString(),
