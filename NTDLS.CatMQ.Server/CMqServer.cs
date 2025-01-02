@@ -5,7 +5,6 @@ using NTDLS.CatMQ.Shared;
 using NTDLS.CatMQ.Shared.Payload.ServerToClient;
 using NTDLS.ReliableMessaging;
 using NTDLS.Semaphore;
-using RocksDbSharp;
 using System.Collections.ObjectModel;
 using System.Net;
 using System.Text.Json;
@@ -20,9 +19,9 @@ namespace NTDLS.CatMQ.Server
         private readonly RmServer _rmServer;
         private readonly OptimisticCriticalResource<CaseInsensitiveMessageQueueDictionary> _messageQueues = new();
         private readonly CMqServerConfiguration _configuration;
-        private RocksDb? _persistenceDatabase;
-        private readonly object _persistenceDatabaseLock = new();
         private bool _keepRunning = false;
+
+        internal CMqServerConfiguration Configuration => _configuration;
 
         /// <summary>
         /// Delegate used to notify of queue server exceptions.
@@ -82,7 +81,7 @@ namespace NTDLS.CatMQ.Server
             {
                 OnLog?.Invoke(this, CMqErrorLevel.Verbose, "Checkpoint persistent queues.");
 
-                var persistedQueues = mqd.Where(q => q.Value.QueueConfiguration.PersistenceScheme
+                var persistedQueues = mqd.Where(q => q.Value.Configuration.PersistenceScheme
                         == CMqPersistenceScheme.Persistent).Select(q => q.Value).ToList();
 
                 //Serialize using System.Text.Json as opposed to Newtonsoft for efficiency.
@@ -129,21 +128,21 @@ namespace NTDLS.CatMQ.Server
                             {
                                 result.Add(new CMqQueueDescriptor
                                 {
-                                    ConsumptionScheme = mqKVP.Value.QueueConfiguration.ConsumptionScheme,
-                                    DeliveryScheme = mqKVP.Value.QueueConfiguration.DeliveryScheme,
-                                    DeliveryThrottle = mqKVP.Value.QueueConfiguration.DeliveryThrottle,
-                                    MaxDeliveryAttempts = mqKVP.Value.QueueConfiguration.MaxDeliveryAttempts,
-                                    MaxMessageAge = mqKVP.Value.QueueConfiguration.MaxMessageAge,
-                                    PersistenceScheme = mqKVP.Value.QueueConfiguration.PersistenceScheme,
-                                    QueueName = mqKVP.Value.QueueConfiguration.QueueName,
+                                    ConsumptionScheme = mqKVP.Value.Configuration.ConsumptionScheme,
+                                    DeliveryScheme = mqKVP.Value.Configuration.DeliveryScheme,
+                                    DeliveryThrottle = mqKVP.Value.Configuration.DeliveryThrottle,
+                                    MaxDeliveryAttempts = mqKVP.Value.Configuration.MaxDeliveryAttempts,
+                                    MaxMessageAge = mqKVP.Value.Configuration.MaxMessageAge,
+                                    PersistenceScheme = mqKVP.Value.Configuration.PersistenceScheme,
+                                    QueueName = mqKVP.Value.Configuration.QueueName,
 
                                     CurrentSubscriberCount = sKVP.Count,
-                                    CurrentMessageCount = m.Count,
+                                    CurrentMessageCount = m.Messages.Count,
 
-                                    ReceivedMessageCount = mqKVP.Value.ReceivedMessageCount,
-                                    DeliveredMessageCount = mqKVP.Value.DeliveredMessageCount,
-                                    DeliveryFailureCount = mqKVP.Value.DeliveryFailureCount,
-                                    ExpiredMessageCount = mqKVP.Value.ExpiredMessageCount
+                                    ReceivedMessageCount = mqKVP.Value.Statistics.ReceivedMessageCount,
+                                    DeliveredMessageCount = mqKVP.Value.Statistics.DeliveredMessageCount,
+                                    DeliveryFailureCount = mqKVP.Value.Statistics.DeliveryFailureCount,
+                                    ExpiredMessageCount = mqKVP.Value.Statistics.ExpiredMessageCount
                                 });
                             }) && success;
                         }) && success;
@@ -215,14 +214,14 @@ namespace NTDLS.CatMQ.Server
 
                 success = _messageQueues.TryRead(mqd =>
                 {
-                    var filteredQueues = mqd.Where(o => o.Value.QueueConfiguration.QueueName.Equals(queueName, StringComparison.OrdinalIgnoreCase));
+                    var filteredQueues = mqd.Where(o => o.Value.Configuration.QueueName.Equals(queueName, StringComparison.OrdinalIgnoreCase));
                     foreach (var qKVP in filteredQueues)
                     {
                         success = qKVP.Value.EnqueuedMessages.TryRead(m =>
                         {
                             success = qKVP.Value.Subscribers.TryRead(sKVP =>
                             {
-                                foreach (var message in m.Skip(offset).Take(take))
+                                foreach (var message in m.Messages.Skip(offset).Take(take))
                                 {
                                     result.Add(new CMqEnqueuedMessageDescriptor
                                     {
@@ -272,7 +271,7 @@ namespace NTDLS.CatMQ.Server
                     {
                         success = messageQueue.EnqueuedMessages.TryRead(m =>
                         {
-                            var message = m.Where(o => o.MessageId == messageId).FirstOrDefault();
+                            var message = m.Messages.Where(o => o.MessageId == messageId).FirstOrDefault();
                             if (message != null)
                             {
                                 result = new CMqEnqueuedMessageDescriptor
@@ -308,11 +307,11 @@ namespace NTDLS.CatMQ.Server
 
         #endregion
 
-        internal void InvokeOnLog(CMqServer server, Exception ex)
-            => OnLog?.Invoke(server, CMqErrorLevel.Error, ex.Message, ex);
+        internal void InvokeOnLog(Exception ex)
+            => OnLog?.Invoke(this, CMqErrorLevel.Error, ex.Message, ex);
 
-        internal void InvokeOnLog(CMqServer server, CMqErrorLevel errorLevel, string message)
-            => OnLog?.Invoke(server, errorLevel, message);
+        internal void InvokeOnLog(CMqErrorLevel errorLevel, string message)
+            => OnLog?.Invoke(this, errorLevel, message);
 
         private void RmServer_OnDisconnected(RmContext context)
         {
@@ -359,12 +358,9 @@ namespace NTDLS.CatMQ.Server
             _keepRunning = true;
 
             var persistedQueues = new List<MessageQueue>();
-            var deadLetterQueueMessages = new Dictionary<string, List<EnqueuedMessage>>(StringComparer.OrdinalIgnoreCase);
 
             if (_configuration.PersistencePath != null)
             {
-                #region Load and create persisted queues.
-
                 var persistedQueuesFile = Path.Join(_configuration.PersistencePath, "queues.json");
                 if (File.Exists(persistedQueuesFile))
                 {
@@ -383,114 +379,13 @@ namespace NTDLS.CatMQ.Server
                                 persistedQueue.SetServer(this);
                                 persistedQueues.Add(persistedQueue);
 
-                                var queueKey = persistedQueue.QueueConfiguration.QueueName.ToLower();
+                                var queueKey = persistedQueue.Configuration.QueueName.ToLower();
                                 if (mqd.ContainsKey(queueKey) == false)
                                 {
                                     mqd.Add(queueKey, persistedQueue);
                                 }
                             }
                         });
-                    }
-                }
-
-                #endregion
-
-                #region Load persisted messages.
-
-                RocksDb? persistenceDatabase = null;
-
-                var databaseFilePath = Path.Join(_configuration.PersistencePath, "messages");
-                OnLog?.Invoke(this, CMqErrorLevel.Information, "Instantiating persistent database.");
-
-                var options = new DbOptions()
-                    .SetCreateIfMissing(true);
-                persistenceDatabase = RocksDb.Open(options, databaseFilePath);
-
-                if (persistedQueues.Count > 0)
-                {
-                    OnLog?.Invoke(this, CMqErrorLevel.Information, "Loading persistent messages.");
-
-                    using var iterator = persistenceDatabase.NewIterator();
-                    _messageQueues.Write(mqd =>
-                    {
-                        //The keys in RocksDB are not stored in the order they were added, so we
-                        // need to load all messages into the messages queues then sort them in place.
-                        for (iterator.SeekToFirst(); iterator.Valid(); iterator.Next())
-                        {
-                            //Deserialize using System.Text.Json as opposed to Newtonsoft for efficiency.
-                            var persistedMessage = JsonSerializer.Deserialize<EnqueuedMessage>(iterator.StringValue());
-                            if (persistedMessage != null)
-                            {
-                                if (mqd.TryGetValue(persistedMessage.QueueName, out var messageQueue))
-                                {
-                                    //If we have a MaxMessageAge, check it and if the message is expired, either
-                                    //  dead-letter or discard it instead of adding it to its original queue.
-                                    if (messageQueue.QueueConfiguration.MaxMessageAge > TimeSpan.Zero)
-                                    {
-                                        if ((DateTime.UtcNow - persistedMessage.Timestamp) > messageQueue.QueueConfiguration.MaxMessageAge)
-                                        {
-                                            if (messageQueue.QueueConfiguration.DeadLetterConfiguration != null)
-                                            {
-                                                if ((DateTime.UtcNow - persistedMessage.Timestamp) > messageQueue.QueueConfiguration.DeadLetterConfiguration.MaxMessageAge)
-                                                {
-                                                    //Message is even too old for the dead-letter queue, discard expired message.
-                                                }
-                                                else if (deadLetterQueueMessages.TryGetValue(persistedMessage.QueueName, out var deadLetterMessages))
-                                                {
-                                                    //Add to dead-letter queue.
-                                                    deadLetterMessages.Add(persistedMessage);
-                                                }
-                                                else
-                                                {
-                                                    //Add to dead-letter queue.
-                                                    deadLetterQueueMessages.Add(persistedMessage.QueueName, new List<EnqueuedMessage> { persistedMessage });
-                                                }
-                                            }
-                                            else
-                                            {
-                                                //No dead-letter queue, discard expired message.
-                                            }
-                                        }
-                                        else
-                                        {
-                                            //Add the message back to its original queue.
-                                            messageQueue.EnqueuedMessages.Write(m => m.Add(persistedMessage));
-                                        }
-                                    }
-                                    else
-                                    {
-                                        //Add the message back to its original queue.
-                                        messageQueue.EnqueuedMessages.Write(m => m.Add(persistedMessage));
-                                    }
-                                }
-                            }
-                        }
-
-                        OnLog?.Invoke(this, CMqErrorLevel.Information, "Sorting loaded queues.");
-
-                        //Sort the message in the queues by their timestamps.
-                        OnLog?.Invoke(this, CMqErrorLevel.Information, "Sorting persistent messages.");
-                        var tasks = mqd.Values.Select(mq => Task.Run(() => mq.SortMessages()));
-                        Task.WhenAll(tasks).Wait();
-                    });
-                }
-
-                #endregion
-
-                _persistenceDatabase = persistenceDatabase;
-            }
-
-            foreach (var mq in persistedQueues)
-            {
-                if (deadLetterQueueMessages.TryGetValue(mq.QueueConfiguration.QueueName, out var deadLetterMessages))
-                {
-                    OnLog?.Invoke(this, CMqErrorLevel.Information, $"Dead-lettering {deadLetterMessages.Count:n0} expired messages in [{mq.QueueConfiguration.QueueName}].");
-
-                    foreach (var deadLetterMessage in deadLetterMessages)
-                    {
-                        mq.ExpiredMessageCount++;
-                        ShovelToDeadLetter(mq.QueueConfiguration.QueueName, deadLetterMessage);
-                        RemovePersistenceMessage(mq.QueueConfiguration.QueueName, deadLetterMessage.MessageId);
                     }
                 }
             }
@@ -514,10 +409,6 @@ namespace NTDLS.CatMQ.Server
             {
                 if (DateTime.UtcNow - lastCheckpoint > TimeSpan.FromSeconds(30))
                 {
-                    //While the RockDB WAL logs data, it’s a good idea to flush the MemTable to disk periodically for additional safety.
-                    OnLog?.Invoke(this, CMqErrorLevel.Verbose, "Checkpoint persistent database.");
-                    _persistenceDatabase?.Flush(new FlushOptions());
-
                     CheckpointPersistentMessageQueues();
                     lastCheckpoint = DateTime.UtcNow;
                 }
@@ -534,15 +425,6 @@ namespace NTDLS.CatMQ.Server
             OnLog?.Invoke(this, CMqErrorLevel.Information, "Stopping service.");
 
             _keepRunning = false;
-            OnLog?.Invoke(this, CMqErrorLevel.Information, "Disposing database instance.");
-            if (_persistenceDatabase != null)
-            {
-                lock (_persistenceDatabaseLock)
-                {
-                    _persistenceDatabase?.Dispose();
-                    _persistenceDatabase = null;
-                }
-            }
             OnLog?.Invoke(this, CMqErrorLevel.Information, "Stopping reliable messaging.");
             _rmServer.Stop();
 
@@ -553,7 +435,7 @@ namespace NTDLS.CatMQ.Server
                 //Stop all message queues.
                 foreach (var mqKVP in mqd)
                 {
-                    OnLog?.Invoke(this, CMqErrorLevel.Information, $"Stopping queue [{mqKVP.Value.QueueConfiguration.QueueName}].");
+                    OnLog?.Invoke(this, CMqErrorLevel.Information, $"Stopping queue [{mqKVP.Value.Configuration.QueueName}].");
                     mqKVP.Value.StopAsync();
                     messageQueues.Add(mqKVP.Value);
                 }
@@ -596,18 +478,15 @@ namespace NTDLS.CatMQ.Server
                             message.SatisfiedSubscribersSubscriberIDs.Clear();
                             message.FailedSubscribersSubscriberIDs.Clear();
 
-                            messageQueue.ReceivedMessageCount++;
-                            if (messageQueue.QueueConfiguration.PersistenceScheme == CMqPersistenceScheme.Persistent && _persistenceDatabase != null)
+                            messageQueue.Statistics.ReceivedMessageCount++;
+                            if (messageQueue.Configuration.PersistenceScheme == CMqPersistenceScheme.Persistent && m.Database != null)
                             {
                                 //Serialize using System.Text.Json as opposed to Newtonsoft for efficiency.
                                 var persistedJson = JsonSerializer.Serialize(message);
-                                lock (_persistenceDatabaseLock)
-                                {
-                                    _persistenceDatabase?.Put($"{dlqKey}_{message.MessageId}", persistedJson);
-                                }
+                                m.Database?.Put(message.MessageId.ToString(), persistedJson);
                             }
 
-                            m.Add(message);
+                            m.Messages.Add(message);
 
                             messageQueue.DeliveryThreadWaitEvent.Set();
                         }) && success;
@@ -637,22 +516,6 @@ namespace NTDLS.CatMQ.Server
                 throw new Exception(result.ErrorMessage);
             }
             return result.WasMessageConsumed;
-        }
-
-        /// <summary>
-        /// Removes a message from the persistent store.
-        /// </summary>
-        internal void RemovePersistenceMessage(string queueName, Guid messageId)
-        {
-            if (_persistenceDatabase != null)
-            {
-                OnLog?.Invoke(this, CMqErrorLevel.Verbose, $"Removing persistent message from [{queueName}]: [{messageId}].");
-                string queueKey = queueName.ToLowerInvariant();
-                lock (_persistenceDatabaseLock)
-                {
-                    _persistenceDatabase?.Remove($"{queueKey}_{messageId}");
-                }
-            }
         }
 
         #endregion
@@ -736,14 +599,11 @@ namespace NTDLS.CatMQ.Server
                             messageQueue.StopAsync();
                             mqd.Remove(queueKey);
 
-                            if (messageQueue.QueueConfiguration.PersistenceScheme == CMqPersistenceScheme.Persistent && _persistenceDatabase != null)
+                            if (messageQueue.Configuration.PersistenceScheme == CMqPersistenceScheme.Persistent && m.Database != null)
                             {
-                                foreach (var message in m)
+                                foreach (var message in m.Messages)
                                 {
-                                    lock (_persistenceDatabaseLock)
-                                    {
-                                        _persistenceDatabase?.Remove($"{queueKey}_{message.MessageId}");
-                                    }
+                                    m.Database?.Remove(message.MessageId.ToString());
                                 }
                             }
                         }) && success;
@@ -760,7 +620,22 @@ namespace NTDLS.CatMQ.Server
 
                 if (success)
                 {
-                    waitOnStopMessageQueue?.WaitOnStop(); //We cant wait on the stop from within a lock. That'll deadlock.
+                    if (waitOnStopMessageQueue != null)
+                    {
+                        waitOnStopMessageQueue.WaitOnStop(); //We cant wait on the stop from within a lock. That'll deadlock.
+                        var databasePath = Path.Join(Configuration.PersistencePath, "messages", waitOnStopMessageQueue.Configuration.QueueName);
+
+                        try
+                        {
+                            Directory.Delete(databasePath, true);
+                        }
+                        catch (Exception ex)
+                        {
+                            OnLog?.Invoke(this, CMqErrorLevel.Verbose, $"Failed to delete persisted queue messages for [{queueName}].", ex);
+                        }
+                    }
+
+
                     return;
                 }
                 Thread.Sleep(CMqDefaults.DEFAULT_DEADLOCK_AVOIDANCE_WAIT_MS);
@@ -863,19 +738,16 @@ namespace NTDLS.CatMQ.Server
                     {
                         success = messageQueue.EnqueuedMessages.TryWrite(m =>
                         {
-                            messageQueue.ReceivedMessageCount++;
+                            messageQueue.Statistics.ReceivedMessageCount++;
                             var message = new EnqueuedMessage(queueKey, assemblyQualifiedTypeName, messageJson);
-                            if (messageQueue.QueueConfiguration.PersistenceScheme == CMqPersistenceScheme.Persistent && _persistenceDatabase != null)
+                            if (messageQueue.Configuration.PersistenceScheme == CMqPersistenceScheme.Persistent && m.Database != null)
                             {
                                 //Serialize using System.Text.Json as opposed to Newtonsoft for efficiency.
                                 var persistedJson = JsonSerializer.Serialize(message);
-                                lock (_persistenceDatabaseLock)
-                                {
-                                    _persistenceDatabase?.Put($"{queueKey}_{message.MessageId}", persistedJson);
-                                }
+                                m.Database?.Put(message.MessageId.ToString(), persistedJson);
                             }
 
-                            m.Add(message);
+                            m.Messages.Add(message);
                             messageQueue.DeliveryThreadWaitEvent.Set();
                         }) && success;
                     }
@@ -911,17 +783,14 @@ namespace NTDLS.CatMQ.Server
                     {
                         success = messageQueue.EnqueuedMessages.TryWrite(m =>
                         {
-                            if (messageQueue.QueueConfiguration.PersistenceScheme == CMqPersistenceScheme.Persistent && _persistenceDatabase != null)
+                            if (messageQueue.Configuration.PersistenceScheme == CMqPersistenceScheme.Persistent && m.Database != null)
                             {
-                                foreach (var message in m)
+                                foreach (var message in m.Messages)
                                 {
-                                    lock (_persistenceDatabaseLock)
-                                    {
-                                        _persistenceDatabase?.Remove($"{queueKey}_{message.MessageId}");
-                                    }
+                                    m.Database?.Remove(message.MessageId.ToString());
                                 }
                             }
-                            m.Clear();
+                            m.Messages.Clear();
                         }) && success;
                     }
                     else
