@@ -48,11 +48,6 @@ namespace NTDLS.CatMQ.Shared
         public CMqPersistenceScheme PersistenceScheme { get; set; } = CMqPersistenceScheme.Ephemeral;
 
         /// <summary>
-        /// Whether or not the queue will have a companion queue to contain expired messages or failed deliveries.
-        /// </summary>
-        public bool CreateDeadLetterQueue { get; set; } = true;
-
-        /// <summary>
         /// Instantiates a new instance of CMqQueueConfiguration.
         /// </summary>
         public CMqQueueConfiguration()

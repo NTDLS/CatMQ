@@ -244,6 +244,12 @@ namespace NTDLS.CatMQ.Client
                         }
                     }) && success;
                 }) && success;
+
+                if (!success)
+                {
+                    Thread.Sleep(CMqDefaults.DEFAULT_DEADLOCK_AVOIDANCE_WAIT_MS); //Failed to lock, sleep then try again.
+                }
+
             } while (!success && ensureEmpty);
         }
 

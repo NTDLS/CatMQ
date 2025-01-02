@@ -45,7 +45,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="NTDLS.CatMQ.Shared" Version="1.0.5" />
+    <PackageReference Include="NTDLS.CatMQ.Shared" Version="1.0.6" />
     <PackageReference Include="RocksDB" Version="9.7.3.54622" />
   </ItemGroup>
 

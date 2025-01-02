@@ -21,7 +21,7 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <Authors>NetworkDLS</Authors>
     <Company>NetworkDLS</Company>
-    <version>1.0.5</version>
+    <version>1.0.6</version>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>Logo.png</PackageIcon>
     <ApplicationIcon>Logo.ico</ApplicationIcon>

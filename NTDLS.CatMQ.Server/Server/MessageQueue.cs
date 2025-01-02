@@ -2,7 +2,6 @@
 using NTDLS.CatMQ.Shared;
 using NTDLS.Helpers;
 using NTDLS.Semaphore;
-using System.Reflection.Metadata.Ecma335;
 
 namespace NTDLS.CatMQ.Server.Server
 {
@@ -94,7 +93,7 @@ namespace NTDLS.CatMQ.Server.Server
 
                     #region Get top message and its subscribers.
 
-                    EnqueuedMessages.TryReadAll([Subscribers], m =>
+                    var lockAcquired = EnqueuedMessages.TryReadAll([Subscribers], m =>
                     {
                         Subscribers.Read(s => //This lock is already held.
                         {
@@ -131,10 +130,7 @@ namespace NTDLS.CatMQ.Server.Server
                                 if ((DateTime.UtcNow - testExpired.Timestamp) > QueueConfiguration.MaxMessageAge)
                                 {
                                     //If MaxMessageAge is defined, then remove the stale messages.
-
                                     _queueServer.RemovePersistenceMessage(QueueConfiguration.QueueName, testExpired.MessageId);
-                                    _queueServer.ShovelToDLQ(QueueConfiguration.QueueName,
-                                        $"{QueueConfiguration.QueueName.ToLowerInvariant()}.dlq", testExpired);
 
                                     m.Remove(testExpired);
                                     ExpiredMessageCount++;
@@ -258,18 +254,17 @@ namespace NTDLS.CatMQ.Server.Server
                                     }
                                     else if (s.Keys.Except(topMessage.SatisfiedSubscribersSubscriberIDs).Any() == false)
                                     {
-                                        if (topMessage.FailedSubscribersSubscriberIDs.Count != 0)
-                                        {
-                                            _queueServer.ShovelToDLQ(QueueConfiguration.QueueName,
-                                                $"{QueueConfiguration.QueueName.ToLowerInvariant()}.dlq", topMessage);
-                                        }
-
                                         //If all subscribers are satisfied (delivered or max attempts reached), then remove the message.
                                         _queueServer.RemovePersistenceMessage(QueueConfiguration.QueueName, topMessage.MessageId);
                                         m.Remove(topMessage);
                                     }
                                 }) && removeSuccess;
                             }) && removeSuccess;
+
+                            if (!removeSuccess)
+                            {
+                                Thread.Sleep(CMqDefaults.DEFAULT_DEADLOCK_AVOIDANCE_WAIT_MS);
+                            }
 
                         } while (KeepRunning && removeSuccess == false);
 
@@ -279,6 +274,11 @@ namespace NTDLS.CatMQ.Server.Server
                         {
                             break;
                         }
+                    }
+
+                    if (lockAcquired == false)
+                    {
+                        Thread.Sleep(1);
                     }
                 }
                 catch (Exception ex)
