@@ -575,11 +575,8 @@ namespace NTDLS.CatMQ.Server
         #region Message queue interactions.
 
         internal void ShovelToDeadLetter(string sourceQueueName, EnqueuedMessage message)
-            => ShovelToDeadLetter(sourceQueueName, new List<EnqueuedMessage> { message });
-
-        internal void ShovelToDeadLetter(string sourceQueueName, List<EnqueuedMessage> messages)
         {
-            OnLog?.Invoke(this, CMqErrorLevel.Verbose, $"Dead-lettering {messages.Count:n0} messages for [{sourceQueueName}].");
+            OnLog?.Invoke(this, CMqErrorLevel.Verbose, $"Dead-lettering message for [{sourceQueueName}].");
 
             var dlqName = $"{sourceQueueName}.dlq";
             var dlqKey = dlqName.ToLowerInvariant();
@@ -594,33 +591,30 @@ namespace NTDLS.CatMQ.Server
                     {
                         success = messageQueue.EnqueuedMessages.TryWrite(m =>
                         {
-                            foreach (var message in messages)
+                            message.QueueName = dlqName; //Ne sure to change the queue name to the DLQ name.
+                            message.SubscriberMessageDeliveries.Clear();
+                            message.SatisfiedSubscribersSubscriberIDs.Clear();
+                            message.FailedSubscribersSubscriberIDs.Clear();
+
+                            messageQueue.ReceivedMessageCount++;
+                            if (messageQueue.QueueConfiguration.PersistenceScheme == CMqPersistenceScheme.Persistent && _persistenceDatabase != null)
                             {
-                                message.QueueName = dlqName; //Ne sure to change the queue name to the DLQ name.
-                                message.SubscriberMessageDeliveries.Clear();
-                                message.SatisfiedSubscribersSubscriberIDs.Clear();
-                                message.FailedSubscribersSubscriberIDs.Clear();
-
-                                messageQueue.ReceivedMessageCount++;
-                                if (messageQueue.QueueConfiguration.PersistenceScheme == CMqPersistenceScheme.Persistent && _persistenceDatabase != null)
+                                //Serialize using System.Text.Json as opposed to Newtonsoft for efficiency.
+                                var persistedJson = JsonSerializer.Serialize(message);
+                                lock (_persistenceDatabaseLock)
                                 {
-                                    //Serialize using System.Text.Json as opposed to Newtonsoft for efficiency.
-                                    var persistedJson = JsonSerializer.Serialize(message);
-                                    lock (_persistenceDatabaseLock)
-                                    {
-                                        _persistenceDatabase?.Put($"{dlqKey}_{message.MessageId}", persistedJson);
-                                    }
+                                    _persistenceDatabase?.Put($"{dlqKey}_{message.MessageId}", persistedJson);
                                 }
-
-                                m.Add(message);
                             }
+
+                            m.Add(message);
 
                             messageQueue.DeliveryThreadWaitEvent.Set();
                         }) && success;
                     }
                     else
                     {
-                        OnLog?.Invoke(this, CMqErrorLevel.Warning, $"Dead-letter queue does not exist, discarding {messages.Count:n0} messages for [{sourceQueueName}].");
+                        OnLog?.Invoke(this, CMqErrorLevel.Warning, $"Dead-letter queue does not exist, discarding message for [{sourceQueueName}].");
                     }
                 }) && success;
 

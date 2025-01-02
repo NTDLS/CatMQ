@@ -51,6 +51,7 @@ namespace Test.Stress
                 myQueueNames.Add(queueName);
 
                 CMqDeadLetterQueueConfiguration? deadLetterConfig = null;
+                /*
                 if (_random.Next(1, 100) > 60) //We don't always create a dead-letter queue.
                 {
                     deadLetterConfig = new CMqDeadLetterQueueConfiguration()
@@ -58,7 +59,7 @@ namespace Test.Stress
                         MaxMessageAge = TimeSpan.FromMinutes(_random.Next(10, 16))
                     };
                 }
-
+                */
                 Console.WriteLine($"Creating queue: '{queueName}'.");
                 client.CreateQueue(new CMqQueueConfiguration(queueName)
                 {
