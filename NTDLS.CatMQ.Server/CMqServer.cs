@@ -526,6 +526,9 @@ namespace NTDLS.CatMQ.Server
         #region Message queue interactions.
 
         internal void ShovelToDLQ(string queueName, string dlqKey, EnqueuedMessage message)
+            => ShovelToDLQ(queueName, dlqKey, new List<EnqueuedMessage> { message });
+
+        internal void ShovelToDLQ(string queueName, string dlqKey, List<EnqueuedMessage> messages)
         {
             OnLog?.Invoke(this, CMqErrorLevel.Verbose, $"DLQ message: [{queueName}].");
 
@@ -539,22 +542,25 @@ namespace NTDLS.CatMQ.Server
                     {
                         success = messageQueue.EnqueuedMessages.TryWrite(m =>
                         {
-                            message.SubscriberMessageDeliveries.Clear();
-                            message.SatisfiedSubscribersSubscriberIDs.Clear();
-                            message.FailedSubscribersSubscriberIDs.Clear();
-
-                            messageQueue.ReceivedMessageCount++;
-                            if (messageQueue.QueueConfiguration.PersistenceScheme == CMqPersistenceScheme.Persistent && _persistenceDatabase != null)
+                            foreach (var message in messages)
                             {
-                                //Serialize using System.Text.Json as opposed to Newtonsoft for efficiency.
-                                var persistedJson = JsonSerializer.Serialize(message);
-                                lock (_persistenceDatabaseLock)
-                                {
-                                    _persistenceDatabase?.Put($"{dlqKey}_{message.MessageId}", persistedJson);
-                                }
-                            }
+                                message.SubscriberMessageDeliveries.Clear();
+                                message.SatisfiedSubscribersSubscriberIDs.Clear();
+                                message.FailedSubscribersSubscriberIDs.Clear();
 
-                            m.Add(message);
+                                messageQueue.ReceivedMessageCount++;
+                                if (messageQueue.QueueConfiguration.PersistenceScheme == CMqPersistenceScheme.Persistent && _persistenceDatabase != null)
+                                {
+                                    //Serialize using System.Text.Json as opposed to Newtonsoft for efficiency.
+                                    var persistedJson = JsonSerializer.Serialize(message);
+                                    lock (_persistenceDatabaseLock)
+                                    {
+                                        _persistenceDatabase?.Put($"{dlqKey}_{message.MessageId}", persistedJson);
+                                    }
+                                }
+
+                                m.Add(message);
+                            }
 
                             messageQueue.DeliveryThreadWaitEvent.Set();
                         }) && success;
