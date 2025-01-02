@@ -50,11 +50,17 @@ namespace Test.Stress
                 var queueName = "MQ_" + _random.Next(0, 10);
                 myQueueNames.Add(queueName);
 
+                var deadLetterConfig = new CMqDeadLetterQueueConfiguration()
+                {
+                    MaxMessageAge = TimeSpan.FromMinutes(10)
+                };
+
                 Console.WriteLine($"Creating queue: '{queueName}'.");
                 client.CreateQueue(new CMqQueueConfiguration(queueName)
                 {
                     PersistenceScheme = CMqPersistenceScheme.Persistent,
-                    MaxMessageAge = TimeSpan.FromSeconds(60)
+                    MaxMessageAge = TimeSpan.FromSeconds(60),
+                    DeadLetterConfiguration = deadLetterConfig
                 });
 
                 if (_random.Next(1, 100) > 50) //We don't always subscribe to our own queue.

@@ -1,22 +1,10 @@
-﻿using NTDLS.Helpers;
-
-namespace NTDLS.CatMQ.Shared
+﻿namespace NTDLS.CatMQ.Shared
 {
     /// <summary>
-    /// Defines a queue configuration.
+    /// Defines a dead-letter queue configuration.
     /// </summary>
-    public class CMqQueueConfiguration
+    public class CMqDeadLetterQueueConfiguration
     {
-        private string? _queueName;
-        /// <summary>
-        /// The name of the queue.
-        /// </summary>
-        public string QueueName
-        {
-            get => _queueName.EnsureNotNull();
-            set => _queueName = value;
-        }
-
         /// <summary>
         /// The amount of time to wait between sending individual messages to subscribers.
         /// </summary>
@@ -48,24 +36,10 @@ namespace NTDLS.CatMQ.Shared
         public CMqPersistenceScheme PersistenceScheme { get; set; } = CMqPersistenceScheme.Ephemeral;
 
         /// <summary>
-        /// Optional configuration for companion queue which contains expired messages or failed deliveries.
-        /// </summary>
-        public CMqDeadLetterQueueConfiguration? DeadLetterConfiguration { get; set; } = null;
-
-        /// <summary>
         /// Instantiates a new instance of CMqQueueConfiguration.
         /// </summary>
-        public CMqQueueConfiguration()
+        public CMqDeadLetterQueueConfiguration()
         {
-        }
-
-        /// <summary>
-        /// Instantiates a new instance of CMqQueueConfiguration.
-        /// </summary>
-        /// <param name="queueName"></param>
-        public CMqQueueConfiguration(string queueName)
-        {
-            QueueName = queueName;
         }
     }
 }

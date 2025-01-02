@@ -93,7 +93,7 @@ namespace NTDLS.CatMQ.Server.Server
 
                     #region Get top message and its subscribers.
 
-                    var lockAcquired = EnqueuedMessages.TryReadAll([Subscribers], m =>
+                    EnqueuedMessages.TryReadAll([Subscribers], m =>
                     {
                         Subscribers.Read(s => //This lock is already held.
                         {
@@ -130,7 +130,9 @@ namespace NTDLS.CatMQ.Server.Server
                                 if ((DateTime.UtcNow - testExpired.Timestamp) > QueueConfiguration.MaxMessageAge)
                                 {
                                     //If MaxMessageAge is defined, then remove the stale messages.
+
                                     _queueServer.RemovePersistenceMessage(QueueConfiguration.QueueName, testExpired.MessageId);
+                                    _queueServer.ShovelToDeadLetter(QueueConfiguration.QueueName, testExpired);
 
                                     m.Remove(testExpired);
                                     ExpiredMessageCount++;
@@ -254,17 +256,17 @@ namespace NTDLS.CatMQ.Server.Server
                                     }
                                     else if (s.Keys.Except(topMessage.SatisfiedSubscribersSubscriberIDs).Any() == false)
                                     {
+                                        if (topMessage.FailedSubscribersSubscriberIDs.Count != 0)
+                                        {
+                                            _queueServer.ShovelToDeadLetter(QueueConfiguration.QueueName, topMessage);
+                                        }
+
                                         //If all subscribers are satisfied (delivered or max attempts reached), then remove the message.
                                         _queueServer.RemovePersistenceMessage(QueueConfiguration.QueueName, topMessage.MessageId);
                                         m.Remove(topMessage);
                                     }
                                 }) && removeSuccess;
                             });
-
-                            if (!removeSuccess)
-                            {
-                                Thread.Sleep(CMqDefaults.DEFAULT_DEADLOCK_AVOIDANCE_WAIT_MS);
-                            }
 
                         } while (KeepRunning && removeSuccess == false);
 
@@ -274,11 +276,6 @@ namespace NTDLS.CatMQ.Server.Server
                         {
                             break;
                         }
-                    }
-
-                    if (lockAcquired == false)
-                    {
-                        Thread.Sleep(1);
                     }
                 }
                 catch (Exception ex)
