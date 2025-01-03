@@ -16,10 +16,11 @@ namespace NTDLS.CatMQ.Server
     /// </summary>
     public class CMqServer
     {
-        private readonly RmServer _rmServer;
-        private readonly OptimisticCriticalResource<CaseInsensitiveMessageQueueDictionary> _messageQueues = new();
-        private readonly CMqServerConfiguration _configuration;
         private bool _keepRunning = false;
+        private readonly CMqServerConfiguration _configuration;
+        private readonly JsonSerializerOptions _indentedJsonOptions = new() { WriteIndented = true };
+        private readonly OptimisticCriticalResource<CaseInsensitiveMessageQueueDictionary> _messageQueues = new();
+        private readonly RmServer _rmServer;
 
         internal CMqServerConfiguration Configuration => _configuration;
 
@@ -81,11 +82,11 @@ namespace NTDLS.CatMQ.Server
             {
                 OnLog?.Invoke(this, CMqErrorLevel.Verbose, "Checkpoint persistent queues.");
 
-                var persistedQueues = mqd.Where(q => q.Value.Configuration.PersistenceScheme
-                        == CMqPersistenceScheme.Persistent).Select(q => q.Value).ToList();
+                var queueMetas = mqd.Where(q => q.Value.Configuration.PersistenceScheme == CMqPersistenceScheme.Persistent)
+                    .Select(q => new MessageQueueMetadata(q.Value.Configuration, q.Value.Statistics)).ToList();
 
                 //Serialize using System.Text.Json as opposed to Newtonsoft for efficiency.
-                var persistedQueuesJson = JsonSerializer.Serialize(persistedQueues);
+                var persistedQueuesJson = JsonSerializer.Serialize(queueMetas, _indentedJsonOptions);
                 File.WriteAllText(Path.Join(_configuration.PersistencePath, "queues.json"), persistedQueuesJson);
             }
         }
@@ -357,7 +358,7 @@ namespace NTDLS.CatMQ.Server
 
             _keepRunning = true;
 
-            var persistedQueues = new List<MessageQueue>();
+            var messageQueuesToStart = new List<MessageQueue>();
 
             if (_configuration.PersistencePath != null)
             {
@@ -368,30 +369,31 @@ namespace NTDLS.CatMQ.Server
 
                     var persistedQueuesJson = File.ReadAllText(persistedQueuesFile);
                     //Deserialize using System.Text.Json as opposed to Newtonsoft for efficiency.
-                    var loadedPersistedQueues = JsonSerializer.Deserialize<List<MessageQueue>>(persistedQueuesJson);
+                    var queueMetas = JsonSerializer.Deserialize<List<MessageQueueMetadata>>(persistedQueuesJson);
 
-                    if (loadedPersistedQueues != null)
+                    if (queueMetas != null)
                     {
                         _messageQueues.Write(mqd =>
                         {
-                            foreach (var persistedQueue in loadedPersistedQueues)
+                            foreach (var queueMeta in queueMetas)
                             {
-                                persistedQueue.SetServer(this);
-                                persistedQueues.Add(persistedQueue);
-
-                                var queueKey = persistedQueue.Configuration.QueueName.ToLower();
-                                if (mqd.ContainsKey(queueKey) == false)
+                                var messageQueue = new MessageQueue(this, queueMeta.Configuration)
                                 {
-                                    mqd.Add(queueKey, persistedQueue);
-                                }
+                                    Statistics = queueMeta.Statistics
+                                };
+                                messageQueuesToStart.Add(messageQueue);
+                                mqd.Add(queueMeta.Configuration.QueueName.ToLowerInvariant(), messageQueue);
                             }
                         });
                     }
                 }
             }
 
+            var loadTasks = messageQueuesToStart.Select(m => Task.Run(() => m.InitializePersistentDatabase())).ToArray();
+            Task.WaitAll(loadTasks);
+
             OnLog?.Invoke(this, CMqErrorLevel.Information, "Starting queues.");
-            foreach (var mq in persistedQueues)
+            foreach (var mq in messageQueuesToStart)
             {
                 mq.StartAsync();
             }
@@ -473,7 +475,7 @@ namespace NTDLS.CatMQ.Server
                     {
                         success = messageQueue.EnqueuedMessages.TryWrite(m =>
                         {
-                            message.QueueName = dlqName; //Ne sure to change the queue name to the DLQ name.
+                            message.QueueName = dlqName; //Be sure to change the queue name to the DLQ name.
                             message.SubscriberMessageDeliveries.Clear();
                             message.SatisfiedSubscribersSubscriberIDs.Clear();
                             message.FailedSubscribersSubscriberIDs.Clear();
@@ -569,6 +571,7 @@ namespace NTDLS.CatMQ.Server
                         CreateQueue(dlqConfiguration);
                     }
 
+                    messageQueue.InitializePersistentDatabase();
                     messageQueue.StartAsync();
                 }
             });

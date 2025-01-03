@@ -1,4 +1,5 @@
 ﻿using NTDLS.Helpers;
+using System.Text.Json.Serialization;
 
 namespace NTDLS.CatMQ.Shared
 {
@@ -35,16 +36,19 @@ namespace NTDLS.CatMQ.Shared
         /// <summary>
         /// Determines when to remove messages from the queue as they are distributed to subscribers.
         /// </summary>
+        [JsonConverter(typeof(JsonStringEnumConverter))]
         public CMqConsumptionScheme ConsumptionScheme { get; set; } = CMqConsumptionScheme.Delivered;
 
         /// <summary>
         /// Determines how messages are distributed to subscribers.
         /// </summary>
+        [JsonConverter(typeof(JsonStringEnumConverter))]
         public CMqDeliveryScheme DeliveryScheme { get; set; } = CMqDeliveryScheme.Balanced;
 
         /// <summary>
         /// Whether the queue is persisted or ephemeral.
         /// </summary>
+        [JsonConverter(typeof(JsonStringEnumConverter))]
         public CMqPersistenceScheme PersistenceScheme { get; set; } = CMqPersistenceScheme.Ephemeral;
 
         /// <summary>

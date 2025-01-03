@@ -1,6 +1,5 @@
 ﻿using NTDLS.CatMQ.Server.Management;
 using NTDLS.CatMQ.Shared;
-using NTDLS.Helpers;
 using NTDLS.Semaphore;
 using RocksDbSharp;
 using System.Text.Json;
@@ -13,7 +12,7 @@ namespace NTDLS.CatMQ.Server.Server
     internal class MessageQueue
     {
         private readonly Thread _deliveryThread;
-        private CMqServer? _queueServer;
+        private readonly CMqServer _queueServer;
 
         internal AutoResetEvent DeliveryThreadWaitEvent = new(false);
         internal bool KeepRunning { get; set; } = false;
@@ -28,15 +27,9 @@ namespace NTDLS.CatMQ.Server.Server
         /// </summary>
         internal OptimisticCriticalResource<EnqueuedMessageContainer> EnqueuedMessages { get; set; } = new();
 
-        public CMqQueueConfiguration Configuration { get; set; }
+        internal CMqQueueConfiguration Configuration { get; set; }
 
-        public MessageQueueStatistics Statistics { get; set; } = new();
-
-        public MessageQueue()
-        {
-            Configuration = new();
-            _deliveryThread = new(DeliveryThreadProc);
-        }
+        internal MessageQueueStatistics Statistics { get; set; } = new();
 
         public MessageQueue(CMqServer mqServer, CMqQueueConfiguration queueConfiguration)
         {
@@ -45,17 +38,8 @@ namespace NTDLS.CatMQ.Server.Server
             _deliveryThread = new(DeliveryThreadProc);
         }
 
-        internal void SetServer(CMqServer mqServer)
-        {
-            _queueServer = mqServer;
-        }
-
         private void DeliveryThreadProc(object? p)
         {
-            _queueServer.EnsureNotNull();
-
-            LoadPersistentMessages();
-
             var lastCheckpoint = DateTime.UtcNow;
 
             while (KeepRunning)
@@ -311,13 +295,18 @@ namespace NTDLS.CatMQ.Server.Server
             }
         }
 
-        private void LoadPersistentMessages()
+        public void InitializePersistentDatabase()
         {
-            _queueServer.EnsureNotNull();
+            if (Configuration.PersistenceScheme != CMqPersistenceScheme.Persistent)
+            {
+                return;
+            }
 
             var deadLetterQueueMessages = new Dictionary<string, List<EnqueuedMessage>>(StringComparer.OrdinalIgnoreCase);
 
             #region Load persisted messages.
+
+            _queueServer.InvokeOnLog(CMqErrorLevel.Verbose, $"Creating persistent path for [{Configuration.QueueName}].");
 
             var databasePath = Path.Join(_queueServer.Configuration.PersistencePath, "messages", Configuration.QueueName);
             Directory.CreateDirectory(databasePath);
@@ -405,23 +394,23 @@ namespace NTDLS.CatMQ.Server.Server
 
         public void StartAsync()
         {
-            _queueServer?.InvokeOnLog(CMqErrorLevel.Information, $"Starting delivery thread for [{Configuration.QueueName}].");
+            _queueServer.InvokeOnLog(CMqErrorLevel.Information, $"Starting delivery thread for [{Configuration.QueueName}].");
             KeepRunning = true;
             _deliveryThread.Start();
         }
 
         public void StopAsync()
         {
-            _queueServer?.InvokeOnLog(CMqErrorLevel.Information, $"Signaling shutdown for [{Configuration.QueueName}].");
+            _queueServer.InvokeOnLog(CMqErrorLevel.Information, $"Signaling shutdown for [{Configuration.QueueName}].");
             KeepRunning = false;
         }
 
         public void WaitOnStop()
         {
-            _queueServer?.InvokeOnLog(CMqErrorLevel.Information, $"Waiting on delivery thread to quit for [{Configuration.QueueName}].");
+            _queueServer.InvokeOnLog(CMqErrorLevel.Information, $"Waiting on delivery thread to quit for [{Configuration.QueueName}].");
             _deliveryThread.Join();
 
-            _queueServer?.InvokeOnLog(CMqErrorLevel.Information, $"Shutting down database connection for [{Configuration.QueueName}].");
+            _queueServer.InvokeOnLog(CMqErrorLevel.Information, $"Shutting down database connection for [{Configuration.QueueName}].");
             EnqueuedMessages.Write(m =>
             {
                 if (m.Database != null)

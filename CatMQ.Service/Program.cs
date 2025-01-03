@@ -5,7 +5,7 @@ namespace CatMQ.Service
 {
     internal class Program
     {
-        static void Main(string[] args)
+        static void Main()
         {
             // Load appsettings.json
             var configuration = new ConfigurationBuilder()
