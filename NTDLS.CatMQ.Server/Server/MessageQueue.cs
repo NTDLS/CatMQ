@@ -40,6 +40,10 @@ namespace NTDLS.CatMQ.Server.Server
 
         private void DeliveryThreadProc(object? p)
         {
+#if DEBUG
+            Thread.CurrentThread.Name = $"DeliveryThreadProc_{Environment.CurrentManagedThreadId}";
+#endif
+
             var lastCheckpoint = DateTime.UtcNow;
 
             while (KeepRunning)
@@ -48,7 +52,7 @@ namespace NTDLS.CatMQ.Server.Server
                 {
                     if (Configuration.PersistenceScheme == CMqPersistenceScheme.Persistent)
                     {
-                        EnqueuedMessages.TryWrite(o =>
+                        EnqueuedMessages.TryWrite(1, o =>
                         {
                             if (o.Database != null)
                             {
@@ -71,7 +75,7 @@ namespace NTDLS.CatMQ.Server.Server
 
                     #region Get top message and its subscribers.
 
-                    EnqueuedMessages.TryReadAll([Subscribers], m =>
+                    EnqueuedMessages.TryReadAll([Subscribers], CMqDefaults.DEFAULT_TRY_WAIT_MS, m =>
                     {
                         Subscribers.Read(s =>
                         {
@@ -236,7 +240,7 @@ namespace NTDLS.CatMQ.Server.Server
 
                             EnqueuedMessages.Write(m =>
                             {
-                                removeSuccess = Subscribers.TryRead(s =>
+                                removeSuccess = Subscribers.TryRead(CMqDefaults.DEFAULT_TRY_WAIT_MS, s =>
                                 {
                                     if (successfulDeliveryAndConsume && Configuration.ConsumptionScheme == CMqConsumptionScheme.FirstConsumedSubscriber)
                                     {

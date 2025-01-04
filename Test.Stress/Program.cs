@@ -12,6 +12,7 @@ namespace Test.Stress
             public string Text { get; set; } = text;
         }
 
+
         static void Main()
         {
             Thread.Sleep(5000);
@@ -51,20 +52,20 @@ namespace Test.Stress
                 myQueueNames.Add(queueName);
 
                 CMqDeadLetterQueueConfiguration? deadLetterConfig = null;
-                /*
-                if (_random.Next(1, 100) > 60) //We don't always create a dead-letter queue.
-                {
+                //if (_random.Next(1, 100) > 60) //We don't always create a dead-letter queue.
+                //{
                     deadLetterConfig = new CMqDeadLetterQueueConfiguration()
                     {
-                        MaxMessageAge = TimeSpan.FromMinutes(_random.Next(10, 16))
+                        PersistenceScheme = CMqPersistenceScheme.Persistent,
+                        MaxMessageAge = TimeSpan.FromMinutes(2)
                     };
-                }
-                */
+                //}
+
                 Console.WriteLine($"Creating queue: '{queueName}'.");
                 client.CreateQueue(new CMqQueueConfiguration(queueName)
                 {
                     PersistenceScheme = CMqPersistenceScheme.Persistent,
-                    MaxMessageAge = TimeSpan.FromMinutes(_random.Next(4, 6)),
+                    MaxMessageAge = TimeSpan.FromMinutes(1),
                     DeadLetterConfiguration = deadLetterConfig
                 });
 

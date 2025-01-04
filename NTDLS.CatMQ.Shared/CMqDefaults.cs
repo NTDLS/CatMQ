@@ -5,7 +5,12 @@
         /// <summary>
         /// The amount of time to wait when performing deadlock avoidance locks.
         /// </summary>
-        public const int DEFAULT_DEADLOCK_AVOIDANCE_WAIT_MS = 10;
+        public const int DEFAULT_DEADLOCK_AVOIDANCE_WAIT_MS = 1;
+
+        /// <summary>
+        /// The amount of time to wait when attempting to acquire a lock.
+        /// </summary>
+        public const int DEFAULT_TRY_WAIT_MS = 10;
 
         /// <summary>
         /// The initial size in bytes of the buffer. If the buffer ever gets full while receiving

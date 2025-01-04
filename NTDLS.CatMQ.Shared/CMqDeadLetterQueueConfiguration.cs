@@ -46,5 +46,19 @@ namespace NTDLS.CatMQ.Shared
         public CMqDeadLetterQueueConfiguration()
         {
         }
+
+        public CMqQueueConfiguration ToConfiguration(string parentQueueName)
+        {
+            return new CMqQueueConfiguration($"{parentQueueName}.dlq")
+            {
+                DeadLetterConfiguration = null,
+                ConsumptionScheme = ConsumptionScheme,
+                MaxMessageAge = MaxMessageAge,
+                PersistenceScheme = PersistenceScheme,
+                MaxDeliveryAttempts = MaxDeliveryAttempts,
+                DeliveryScheme = DeliveryScheme,
+                DeliveryThrottle = DeliveryThrottle,
+            };
+        }
     }
 }

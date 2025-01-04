@@ -17,7 +17,7 @@ namespace CatMQ.Service.Pages
         {
             try
             {
-                Queues = mqServer.GetQueues().OrderBy(o => o.QueueName).ToList();
+                Queues = mqServer.GetQueues()?.OrderBy(o => o.QueueName)?.ToList() ?? new();
             }
             catch (Exception ex)
             {

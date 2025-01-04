@@ -39,6 +39,8 @@ namespace NTDLS.CatMQ.Server
         /// </summary>
         public CMqServer(CMqServerConfiguration configuration)
         {
+            //ThreadLockOwnershipTracking.Enable();
+
             _configuration = configuration;
 
             var rmConfiguration = new RmConfiguration()
@@ -112,20 +114,20 @@ namespace NTDLS.CatMQ.Server
         /// <summary>
         /// Returns a read-only copy of the queues.
         /// </summary>
-        public ReadOnlyCollection<CMqQueueDescriptor> GetQueues()
+        public ReadOnlyCollection<CMqQueueDescriptor>? GetQueues()
         {
-            while (true)
+            while (_keepRunning)
             {
                 bool success = true;
                 List<CMqQueueDescriptor>? result = new();
 
-                success = _messageQueues.TryRead(mqd =>
+                _messageQueues.Read(mqd =>
                 {
                     foreach (var mqKVP in mqd)
                     {
-                        success = mqKVP.Value.EnqueuedMessages.TryRead(m =>
+                        success = mqKVP.Value.EnqueuedMessages.TryReadAll([mqKVP.Value.Subscribers], CMqDefaults.DEFAULT_TRY_WAIT_MS, m =>
                         {
-                            success = mqKVP.Value.Subscribers.TryRead(sKVP =>
+                            mqKVP.Value.Subscribers.Read(sKVP =>
                             {
                                 result.Add(new CMqQueueDescriptor
                                 {
@@ -145,7 +147,7 @@ namespace NTDLS.CatMQ.Server
                                     DeliveryFailureCount = mqKVP.Value.Statistics.DeliveryFailureCount,
                                     ExpiredMessageCount = mqKVP.Value.Statistics.ExpiredMessageCount
                                 });
-                            }) && success;
+                            });
                         }) && success;
 
                         if (!success)
@@ -155,7 +157,7 @@ namespace NTDLS.CatMQ.Server
                             break;
                         }
                     }
-                }) && success;
+                });
 
                 if (success && result != null)
                 {
@@ -164,23 +166,25 @@ namespace NTDLS.CatMQ.Server
 
                 Thread.Sleep(CMqDefaults.DEFAULT_DEADLOCK_AVOIDANCE_WAIT_MS); //Failed to lock, sleep then try again.
             }
+
+            return null;
         }
 
         /// <summary>
         /// Returns a read-only copy of the queue subscribers.
         /// </summary>
-        public ReadOnlyCollection<CMqSubscriberDescriptor> GetSubscribers(string queueName)
+        public ReadOnlyCollection<CMqSubscriberDescriptor>? GetSubscribers(string queueName)
         {
-            while (true)
+            while (_keepRunning)
             {
                 bool success = true;
                 var result = new List<CMqSubscriberDescriptor>();
 
-                success = _messageQueues.TryRead(mqd =>
+                _messageQueues.Read(mqd =>
                 {
                     if (mqd.TryGetValue(queueName, out var messageQueue))
                     {
-                        success = messageQueue.Subscribers.TryRead(sKVP =>
+                        success = messageQueue.Subscribers.TryRead(CMqDefaults.DEFAULT_TRY_WAIT_MS, sKVP =>
                         {
                             foreach (var subscriber in sKVP)
                             {
@@ -192,7 +196,7 @@ namespace NTDLS.CatMQ.Server
                     {
                         throw new Exception($"Queue not found: [{queueName}].");
                     }
-                }) && success;
+                });
 
                 if (success)
                 {
@@ -201,26 +205,28 @@ namespace NTDLS.CatMQ.Server
 
                 Thread.Sleep(CMqDefaults.DEFAULT_DEADLOCK_AVOIDANCE_WAIT_MS); //Failed to lock, sleep then try again.
             }
+
+            return null;
         }
 
         /// <summary>
         /// Returns a read-only copy messages in the queue.
         /// </summary>
-        public ReadOnlyCollection<CMqEnqueuedMessageDescriptor> GetQueueMessages(string queueName, int offset, int take)
+        public ReadOnlyCollection<CMqEnqueuedMessageDescriptor>? GetQueueMessages(string queueName, int offset, int take)
         {
-            while (true)
+            while (_keepRunning)
             {
                 bool success = true;
                 List<CMqEnqueuedMessageDescriptor>? result = new();
 
-                success = _messageQueues.TryRead(mqd =>
+                _messageQueues.Read(mqd =>
                 {
                     var filteredQueues = mqd.Where(o => o.Value.Configuration.QueueName.Equals(queueName, StringComparison.OrdinalIgnoreCase));
                     foreach (var qKVP in filteredQueues)
                     {
-                        success = qKVP.Value.EnqueuedMessages.TryRead(m =>
+                        success = qKVP.Value.EnqueuedMessages.TryReadAll([qKVP.Value.Subscribers], CMqDefaults.DEFAULT_TRY_WAIT_MS, m =>
                         {
-                            success = qKVP.Value.Subscribers.TryRead(sKVP =>
+                            qKVP.Value.Subscribers.Read(sKVP =>
                             {
                                 foreach (var message in m.Messages.Skip(offset).Take(take))
                                 {
@@ -235,7 +241,7 @@ namespace NTDLS.CatMQ.Server
                                         MessageId = message.MessageId
                                     });
                                 }
-                            }) && success;
+                            });
                         }) && success;
 
                         if (!success)
@@ -245,7 +251,7 @@ namespace NTDLS.CatMQ.Server
                             break;
                         }
                     }
-                }) && success;
+                });
 
                 if (success && result != null)
                 {
@@ -254,23 +260,25 @@ namespace NTDLS.CatMQ.Server
 
                 Thread.Sleep(CMqDefaults.DEFAULT_DEADLOCK_AVOIDANCE_WAIT_MS); //Failed to lock, sleep then try again.
             }
+
+            return null;
         }
 
         /// <summary>
         /// Returns a read-only copy messages in the queue.
         /// </summary>
-        public CMqEnqueuedMessageDescriptor GetQueueMessage(string queueName, Guid messageId)
+        public CMqEnqueuedMessageDescriptor? GetQueueMessage(string queueName, Guid messageId)
         {
-            while (true)
+            while (_keepRunning)
             {
                 bool success = true;
                 CMqEnqueuedMessageDescriptor? result = null;
 
-                success = _messageQueues.TryRead(mqd =>
+                _messageQueues.Read(mqd =>
                 {
                     if (mqd.TryGetValue(queueName, out var messageQueue))
                     {
-                        success = messageQueue.EnqueuedMessages.TryRead(m =>
+                        success = messageQueue.EnqueuedMessages.TryRead(CMqDefaults.DEFAULT_TRY_WAIT_MS, m =>
                         {
                             var message = m.Messages.Where(o => o.MessageId == messageId).FirstOrDefault();
                             if (message != null)
@@ -295,7 +303,7 @@ namespace NTDLS.CatMQ.Server
                     {
                         throw new Exception($"Queue not found: [{queueName}].");
                     }
-                }) && success;
+                });
 
                 if (success && result != null)
                 {
@@ -304,6 +312,8 @@ namespace NTDLS.CatMQ.Server
 
                 Thread.Sleep(1); //Failed to lock, sleep then try again.
             }
+
+            return null;
         }
 
         #endregion
@@ -316,16 +326,16 @@ namespace NTDLS.CatMQ.Server
 
         private void RmServer_OnDisconnected(RmContext context)
         {
-            while (true)
+            while (_keepRunning)
             {
                 bool success = true;
 
                 //When a client disconnects, remove their subscriptions.
-                success = _messageQueues.TryRead(mqd =>
+                _messageQueues.Read(mqd =>
                 {
                     foreach (var mqKVP in mqd)
                     {
-                        success = mqKVP.Value.Subscribers.TryWrite(s =>
+                        success = mqKVP.Value.Subscribers.TryWrite(CMqDefaults.DEFAULT_TRY_WAIT_MS, s =>
                         {
                             s.Remove(context.ConnectionId);
                         }) && success;
@@ -334,7 +344,7 @@ namespace NTDLS.CatMQ.Server
                             break;
                         }
                     }
-                }) && success;
+                });
 
                 if (success)
                 {
@@ -383,6 +393,16 @@ namespace NTDLS.CatMQ.Server
                                 };
                                 messageQueuesToStart.Add(messageQueue);
                                 mqd.Add(queueMeta.Configuration.QueueName.ToLowerInvariant(), messageQueue);
+
+                                if (queueMeta.Configuration.DeadLetterConfiguration != null
+                                    && queueMeta.Configuration.DeadLetterConfiguration.PersistenceScheme == CMqPersistenceScheme.Ephemeral)
+                                {
+                                    //Persistent DLQs are created by default, if the queue has an Ephemeral DLQ then we need to manually create it.
+                                    var dlqConfig = queueMeta.Configuration.DeadLetterConfiguration.ToConfiguration(queueMeta.Configuration.QueueName);
+                                    var dlq = new MessageQueue(this, dlqConfig);
+                                    messageQueuesToStart.Add(dlq);
+                                    mqd.Add(dlqConfig.QueueName.ToLowerInvariant(), dlq);
+                                }
                             }
                         });
                     }
@@ -465,15 +485,15 @@ namespace NTDLS.CatMQ.Server
             var dlqName = $"{sourceQueueName}.dlq";
             var dlqKey = dlqName.ToLowerInvariant();
 
-            while (true)
+            while (_keepRunning)
             {
                 bool success = true;
 
-                success = _messageQueues.TryRead(mqd =>
+                _messageQueues.Read(mqd =>
                 {
                     if (mqd.TryGetValue(dlqKey, out var messageQueue))
                     {
-                        success = messageQueue.EnqueuedMessages.TryWrite(m =>
+                        success = messageQueue.EnqueuedMessages.TryWrite(CMqDefaults.DEFAULT_TRY_WAIT_MS, m =>
                         {
                             message.QueueName = dlqName; //Be sure to change the queue name to the DLQ name.
                             message.SubscriberMessageDeliveries.Clear();
@@ -481,6 +501,7 @@ namespace NTDLS.CatMQ.Server
                             message.FailedSubscribersSubscriberIDs.Clear();
 
                             messageQueue.Statistics.ReceivedMessageCount++;
+
                             if (messageQueue.Configuration.PersistenceScheme == CMqPersistenceScheme.Persistent && m.Database != null)
                             {
                                 //Serialize using System.Text.Json as opposed to Newtonsoft for efficiency.
@@ -491,13 +512,16 @@ namespace NTDLS.CatMQ.Server
                             m.Messages.Add(message);
 
                             messageQueue.DeliveryThreadWaitEvent.Set();
+
                         }) && success;
+
                     }
                     else
                     {
                         OnLog?.Invoke(this, CMqErrorLevel.Warning, $"Dead-letter queue does not exist, discarding message for [{sourceQueueName}].");
                     }
-                }) && success;
+
+                });
 
                 if (success)
                 {
@@ -558,17 +582,8 @@ namespace NTDLS.CatMQ.Server
 
                     if (queueConfiguration.DeadLetterConfiguration != null)
                     {
-                        var dlqConfiguration = new CMqQueueConfiguration($"{queueConfiguration.QueueName}.dlq")
-                        {
-                            DeadLetterConfiguration = null,
-                            ConsumptionScheme = queueConfiguration.DeadLetterConfiguration.ConsumptionScheme,
-                            MaxMessageAge = queueConfiguration.DeadLetterConfiguration.MaxMessageAge,
-                            PersistenceScheme = queueConfiguration.DeadLetterConfiguration.PersistenceScheme,
-                            MaxDeliveryAttempts = queueConfiguration.DeadLetterConfiguration.MaxDeliveryAttempts,
-                            DeliveryScheme = queueConfiguration.DeadLetterConfiguration.DeliveryScheme,
-                            DeliveryThrottle = queueConfiguration.DeadLetterConfiguration.DeliveryThrottle,
-                        };
-                        CreateQueue(dlqConfiguration);
+                        var dlqConfig = queueConfiguration.DeadLetterConfiguration.ToConfiguration(queueConfiguration.QueueName);
+                        CreateQueue(dlqConfig);
                     }
 
                     messageQueue.InitializePersistentDatabase();
@@ -586,17 +601,17 @@ namespace NTDLS.CatMQ.Server
 
             string queueKey = queueName.ToLowerInvariant();
 
-            while (true)
+            while (_keepRunning)
             {
                 bool success = true;
 
                 MessageQueue? waitOnStopMessageQueue = null;
 
-                success = _messageQueues.TryWrite(mqd =>
+                _messageQueues.Write(mqd =>
                 {
                     if (mqd.TryGetValue(queueKey, out var messageQueue))
                     {
-                        success = messageQueue.EnqueuedMessages.TryWrite(m =>
+                        success = messageQueue.EnqueuedMessages.TryWrite(CMqDefaults.DEFAULT_TRY_WAIT_MS, m =>
                         {
                             waitOnStopMessageQueue = messageQueue;
                             messageQueue.StopAsync();
@@ -619,7 +634,7 @@ namespace NTDLS.CatMQ.Server
                             }
                         }
                     }
-                }) && success;
+                });
 
                 if (success)
                 {
@@ -654,15 +669,15 @@ namespace NTDLS.CatMQ.Server
 
             string queueKey = queueName.ToLowerInvariant();
 
-            while (true)
+            while (_keepRunning)
             {
                 bool success = true;
 
-                success = _messageQueues.TryRead(mqd =>
+                _messageQueues.Read(mqd =>
                 {
                     if (mqd.TryGetValue(queueKey, out var messageQueue))
                     {
-                        success = messageQueue.Subscribers.TryWrite(s =>
+                        success = messageQueue.Subscribers.TryWrite(CMqDefaults.DEFAULT_TRY_WAIT_MS, s =>
                         {
                             if (s.ContainsKey(subscriberId) == false)
                             {
@@ -680,7 +695,7 @@ namespace NTDLS.CatMQ.Server
                     {
                         throw new Exception("The specified queue does not exist.");
                     }
-                }) && success;
+                });
 
                 if (success)
                 {
@@ -699,20 +714,20 @@ namespace NTDLS.CatMQ.Server
 
             string queueKey = queueName.ToLowerInvariant();
 
-            while (true)
+            while (_keepRunning)
             {
                 bool success = true;
 
-                success = _messageQueues.TryRead(mqd =>
+                _messageQueues.Read(mqd =>
                 {
                     if (mqd.TryGetValue(queueKey, out var messageQueue))
                     {
-                        success = messageQueue.Subscribers.TryWrite(s =>
+                        success = messageQueue.Subscribers.TryWrite(CMqDefaults.DEFAULT_TRY_WAIT_MS, s =>
                         {
                             s.Remove(subscriberId);
                         }) && success;
                     }
-                }) && success;
+                });
 
                 if (success)
                 {
@@ -731,15 +746,15 @@ namespace NTDLS.CatMQ.Server
 
             string queueKey = queueName.ToLowerInvariant();
 
-            while (true)
+            while (_keepRunning)
             {
                 bool success = true;
 
-                success = _messageQueues.TryRead(mqd =>
+                _messageQueues.Read(mqd =>
                 {
                     if (mqd.TryGetValue(queueKey, out var messageQueue))
                     {
-                        success = messageQueue.EnqueuedMessages.TryWrite(m =>
+                        success = messageQueue.EnqueuedMessages.TryWrite(CMqDefaults.DEFAULT_TRY_WAIT_MS, m =>
                         {
                             messageQueue.Statistics.ReceivedMessageCount++;
                             var message = new EnqueuedMessage(queueKey, assemblyQualifiedTypeName, messageJson);
@@ -758,7 +773,7 @@ namespace NTDLS.CatMQ.Server
                     {
                         throw new Exception($"Queue not found: [{queueName}].");
                     }
-                }) && success;
+                });
 
                 if (success)
                 {
@@ -775,16 +790,16 @@ namespace NTDLS.CatMQ.Server
         {
             OnLog?.Invoke(this, CMqErrorLevel.Verbose, $"Purging queue: [{queueName}].");
 
-            while (true)
+            while (_keepRunning)
             {
                 bool success = true;
 
-                success = _messageQueues.TryRead(mqd =>
+                _messageQueues.Read(mqd =>
                 {
                     string queueKey = queueName.ToLowerInvariant();
                     if (mqd.TryGetValue(queueKey, out var messageQueue))
                     {
-                        success = messageQueue.EnqueuedMessages.TryWrite(m =>
+                        success = messageQueue.EnqueuedMessages.TryWrite(CMqDefaults.DEFAULT_TRY_WAIT_MS, m =>
                         {
                             if (messageQueue.Configuration.PersistenceScheme == CMqPersistenceScheme.Persistent && m.Database != null)
                             {
@@ -800,7 +815,7 @@ namespace NTDLS.CatMQ.Server
                     {
                         throw new Exception($"Queue not found: [{queueName}].");
                     }
-                }) && success;
+                });
 
                 if (success)
                 {
