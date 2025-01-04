@@ -57,7 +57,7 @@ namespace Test.Stress
                     deadLetterConfig = new CMqDeadLetterQueueConfiguration()
                     {
                         PersistenceScheme = CMqPersistenceScheme.Persistent,
-                        MaxMessageAge = TimeSpan.FromMinutes(2)
+                        MaxMessageAge = TimeSpan.FromMinutes(15)
                     };
                 //}
 
