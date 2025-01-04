@@ -15,13 +15,13 @@
     <RepositoryUrl>https://github.com/NTDLS/NTDLS.CatMQ</RepositoryUrl>
     <PackageTags>ipc;message-queue;inter-process-communication;tcp-ip;message-broker;mq;</PackageTags>
     <PackageReleaseNotes>
-      Config enum string converters.
+      Configuration updates.
     </PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <Authors>NetworkDLS</Authors>
     <Company>NetworkDLS</Company>
-    <version>1.0.8</version>
+    <version>1.0.9</version>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>Logo.png</PackageIcon>
     <ApplicationIcon>Logo.ico</ApplicationIcon>
@@ -45,7 +45,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="NTDLS.ReliableMessaging" Version="1.11.4" />
+    <PackageReference Include="NTDLS.ReliableMessaging" Version="1.11.5" />
   </ItemGroup>
 
 </Project>
