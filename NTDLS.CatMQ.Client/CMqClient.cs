@@ -525,8 +525,7 @@ namespace NTDLS.CatMQ.Client
         /// <summary>
         /// Dispatches a message to the queue server to be enqueued in the given queue.
         /// </summary>
-        public void Enqueue<T>(string queueName, string assemblyQualifiedName, string messageJson)
-            where T : ICMqMessage
+        public void Enqueue(string queueName, string assemblyQualifiedName, string messageJson)
         {
             var result = _rmClient.Query(new CMqEnqueueMessageToQueue(queueName, assemblyQualifiedName, messageJson)).Result;
             if (result.IsSuccess == false)
