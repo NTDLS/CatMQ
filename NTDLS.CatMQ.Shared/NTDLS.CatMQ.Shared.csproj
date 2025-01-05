@@ -21,7 +21,7 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <Authors>NetworkDLS</Authors>
     <Company>NetworkDLS</Company>
-    <version>1.0.11</version> <!-- NTDLS.CatMQ.Shared is versioned seperately from NTDLS.CatMQ.Client and NTDLS.CatMQ.Server -->
+    <version>1.0.12</version> <!-- NTDLS.CatMQ.Shared is versioned seperately from NTDLS.CatMQ.Client and NTDLS.CatMQ.Server -->
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>Logo.png</PackageIcon>
     <ApplicationIcon>Logo.ico</ApplicationIcon>
