@@ -15,22 +15,24 @@
     <RepositoryUrl>https://github.com/NTDLS/NTDLS.CatMQ</RepositoryUrl>
     <PackageTags>ipc;message-queue;inter-process-communication;tcp-ip;message-broker;mq;</PackageTags>
     <PackageReleaseNotes>
-      Added dead-lettering.
+      Removed icon from package.
     </PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <Authors>NetworkDLS</Authors>
     <Company>NetworkDLS</Company>
-    <version>1.0.17</version>
+    <version>1.0.18</version>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>Logo.png</PackageIcon>
     <ApplicationIcon>Logo.ico</ApplicationIcon>
     <IncludeSymbols>True</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
-
+  
   <ItemGroup>
-    <Content Include="Logo.ico" />
+    <Content Include="Logo.ico">
+      <Pack>False</Pack>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>
@@ -45,7 +47,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="NTDLS.CatMQ.Shared" Version="1.0.10" />
+    <PackageReference Include="NTDLS.CatMQ.Shared" Version="1.0.11" />
   </ItemGroup>
 
 </Project>
