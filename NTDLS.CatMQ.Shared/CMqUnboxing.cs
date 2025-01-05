@@ -48,8 +48,8 @@ namespace NTDLS.CatMQ.Shared
                 var genericType = Type.GetType(assemblyQualifiedTypeName)
                     ?? throw new Exception($"Unknown extraction message type {assemblyQualifiedTypeName}.");
 
-                var toObjectMethod = typeof(CMqUnboxing).GetMethod("MqDeserializeToObject")
-                        ?? throw new Exception($"Could not resolve MqDeserializeToObject().");
+                var toObjectMethod = typeof(CMqUnboxing).GetMethod("MqDeserializeToObject", BindingFlags.NonPublic | BindingFlags.Static)
+                    ?? throw new Exception("Could not resolve MqDeserializeToObject.");
 
                 genericToObjectMethod = toObjectMethod.MakeGenericMethod(genericType);
 
