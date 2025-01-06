@@ -16,7 +16,7 @@ namespace NTDLS.CatMQ.Shared
         /// <summary>
         /// Deserialization function called from MessageDeliveryQuery via reflection.
         /// </summary>
-        internal static T? MqDeserializeToObject<T>(string json)
+        public static T? MqDeserializeToObject<T>(string json)
             => JsonConvert.DeserializeObject<T>(json, _typeNameHandlingAll);
 
         /// <summary>
@@ -48,7 +48,7 @@ namespace NTDLS.CatMQ.Shared
                 var genericType = Type.GetType(assemblyQualifiedTypeName)
                     ?? throw new Exception($"Unknown extraction message type {assemblyQualifiedTypeName}.");
 
-                var toObjectMethod = typeof(CMqUnboxing).GetMethod("MqDeserializeToObject", BindingFlags.NonPublic | BindingFlags.Static)
+                var toObjectMethod = typeof(CMqUnboxing).GetMethod("MqDeserializeToObject")
                     ?? throw new Exception("Could not resolve MqDeserializeToObject.");
 
                 genericToObjectMethod = toObjectMethod.MakeGenericMethod(genericType);
