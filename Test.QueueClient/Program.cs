@@ -26,7 +26,8 @@ namespace Test.QueueClient
             //Create a queue. These are highly configurable.
             client.CreateQueue(new CMqQueueConfiguration("MyFirstQueue")
             {
-                PersistenceScheme = CMqPersistenceScheme.Ephemeral
+                PersistenceScheme = CMqPersistenceScheme.Ephemeral,
+                ConsumptionScheme = CMqConsumptionScheme.FirstConsumedSubscriber
             });
 
             //Subscribe to the queue we just created.
@@ -48,6 +49,7 @@ namespace Test.QueueClient
             for (int i = 0; i < 10000000; i++)
             {
                 client.Enqueue("MyFirstQueue", new MyMessage($"Test message {i++:n0}"));
+                Thread.Sleep(1000);
             }
 
             Console.WriteLine("Press [enter] to shutdown.");
@@ -69,7 +71,7 @@ namespace Test.QueueClient
                 //Console.WriteLine($"Received: '{message.ObjectType}'->'{message.MessageJson}'");
             }
 
-            return true;
+            return false;
         }
 
         private static void OnBatchReceived(CMqClient client, List<CMqReceivedMessage> rawMessages)

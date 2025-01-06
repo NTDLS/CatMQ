@@ -242,11 +242,14 @@ namespace NTDLS.CatMQ.Server.Server
                             {
                                 removeSuccess = Subscribers.TryRead(CMqDefaults.DEFAULT_TRY_WAIT_MS, s =>
                                 {
-                                    if (successfulDeliveryAndConsume && Configuration.ConsumptionScheme == CMqConsumptionScheme.FirstConsumedSubscriber)
+                                    if (Configuration.ConsumptionScheme == CMqConsumptionScheme.FirstConsumedSubscriber)
                                     {
-                                        //The message was consumed by a subscriber, remove it from the message list.
-                                        m.Database?.Remove(topMessage.MessageId.ToString());
-                                        m.Messages.Remove(topMessage);
+                                        if (successfulDeliveryAndConsume)
+                                        {
+                                            //The message was consumed by a subscriber, remove it from the message list.
+                                            m.Database?.Remove(topMessage.MessageId.ToString());
+                                            m.Messages.Remove(topMessage);
+                                        }
                                     }
                                     else if (s.Keys.Except(topMessage.SatisfiedSubscribersSubscriberIDs).Any() == false)
                                     {
