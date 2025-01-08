@@ -69,7 +69,8 @@ namespace CatMQ.Service.Pages
                 {
                     var claims = new List<Claim>
                     {
-                        new Claim(ClaimTypes.Name, account.Username)
+                        new Claim(ClaimTypes.Name, account.Username),
+                        new Claim(ClaimTypes.Sid, account.Id.ToString())
                     };
 
                     var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
