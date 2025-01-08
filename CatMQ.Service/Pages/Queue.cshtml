@@ -35,7 +35,7 @@
                     <td>@Model.Queue.MaxMessageAge</td>
                     <td>@Html.Raw(ConfirmActionHelper.GenerateDangerLink(
                         $"Deleting the queue '{@Model.Queue.QueueName}' will result in permanent message loss and any subscribers will fail. Continue?",
-                        "Delete", $"/DeleteQueue/{@Model.Queue.QueueName}"))
+                        "Delete", $"/DeleteQueue/{@Model.Queue.QueueName}", "btn-thin"))
                     </td>
                 </tr>
             </tbody>
@@ -68,7 +68,7 @@
                     <td>@Model.Queue.DeliveryFailureCount.ToString("n0")</td>
                     <td>@Html.Raw(ConfirmActionHelper.GenerateDangerLink(
                         $"Purging the queue '{@Model.Queue.QueueName}' will result in permanent message loss. Continue?",
-                        "Purge", $"/PurgeQueue/{@Model.Queue.QueueName}"))
+                        "Purge", $"/PurgeQueue/{@Model.Queue.QueueName}", "btn-thin"))
                     </td>
                 </tr>
             </tbody>
@@ -103,7 +103,7 @@
                         <td>@queue.ConsumedMessages.ToString("n0")</td>
                         <td>@Html.Raw(ConfirmActionHelper.GenerateDangerLink(
                             $"Removing the subscription for '{@queue.SubscriberId}' from '{@Model.Queue.QueueName}' will cause the subscriber to fail. Continue?",
-                            "Remove", $"/RemoveSubscription/{@Model.Queue.QueueName}/{@queue.SubscriberId}"))
+                            "Remove", $"/RemoveSubscription/{@Model.Queue.QueueName}/{@queue.SubscriberId}", "btn-thin"))
                         </td>
                     </tr>
                 }
