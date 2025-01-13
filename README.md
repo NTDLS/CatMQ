@@ -14,6 +14,9 @@ So, we built one. __Welcome to CatMQ: a reliable yet slim message queue.__
 - Client Nuget package: https://www.nuget.org/packages/NTDLS.CatMQ.Client
 - Dedicated server install and web UI: https://github.com/NTDLS/CatMQ/releases
 
+## See also:
+ - https://github.com/NTDLS/KitKey
+
 ## Server
 Running the server is as simple as downloading and installing the [dedicated CatMQ Service](https://github.com/NTDLS/CatMQ/releases), which is a platform independent service that includes a web management interface.
 
