@@ -12,7 +12,6 @@ namespace Test.Stress
             public string Text { get; set; } = text;
         }
 
-
         static void Main()
         {
             Thread.Sleep(5000);
