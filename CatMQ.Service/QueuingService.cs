@@ -35,6 +35,7 @@ namespace CatMQ.Service
                 builder.Services.AddAuthentication("CookieAuth")
                     .AddCookie("CookieAuth", options =>
                     {
+                        options.Cookie.Name = "CatMQAuth";
                         options.LoginPath = "/Login";
                     });
 
