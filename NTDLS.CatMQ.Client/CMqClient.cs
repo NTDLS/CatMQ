@@ -72,6 +72,7 @@ namespace NTDLS.CatMQ.Client
             };
 
             _rmClient = new RmClient(rmConfiguration);
+
             _rmClient.AddHandler(new InternalClientQueryHandlers(this));
         }
 
@@ -89,6 +90,64 @@ namespace NTDLS.CatMQ.Client
 
             _rmClient.AddHandler(new InternalClientQueryHandlers(this));
         }
+
+        #region Reliable messaging Passthrough configuration.
+
+        /// <summary>
+        /// Sets the custom serialization provider.
+        /// Can be cleared by passing null or calling ClearCryptographyProvider().
+        /// </summary>
+        /// <param name="provider"></param>
+        public void SetSerializationProvider(IRmSerializationProvider? provider)
+        {
+            _rmClient.SetSerializationProvider(provider);
+        }
+
+        /// <summary>
+        /// Removes the serialization provider set by a previous call to SetSerializationProvider().
+        /// </summary>
+        public void ClearSerializationProvider()
+        {
+            _rmClient.ClearSerializationProvider();
+        }
+
+        /// <summary>
+        /// Sets the compression provider that this client should use when sending/receiving data.
+        /// Can be cleared by passing null or calling ClearCompressionProvider().
+        /// </summary>
+        /// <param name="provider"></param>
+        public void SetCompressionProvider(IRmCompressionProvider? provider)
+        {
+            _rmClient.SetCompressionProvider(provider);
+        }
+
+        /// <summary>
+        /// Removes the compression provider set by a previous call to SetCompressionProvider().
+        /// </summary>
+        public void ClearCompressionProvider()
+        {
+            _rmClient.ClearCompressionProvider();
+        }
+
+        /// <summary>
+        /// Sets the encryption provider that this client should use when sending/receiving data.
+        /// Can be cleared by passing null or calling ClearCryptographyProvider().
+        /// </summary>
+        /// <param name="provider"></param>
+        public void SetCryptographyProvider(IRmCryptographyProvider? provider)
+        {
+            _rmClient.SetCryptographyProvider(provider);
+        }
+
+        /// <summary>
+        /// Removes the encryption provider set by a previous call to SetCryptographyProvider().
+        /// </summary>
+        public void ClearCryptographyProvider()
+        {
+            _rmClient.ClearCryptographyProvider();
+        }
+
+        #endregion
 
         private void RmClient_OnConnected(RmContext context)
         {
