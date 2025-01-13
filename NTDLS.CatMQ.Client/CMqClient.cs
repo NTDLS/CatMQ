@@ -1,10 +1,10 @@
-﻿using Newtonsoft.Json;
-using NTDLS.CatMQ.Client.Client.QueryHandlers;
+﻿using NTDLS.CatMQ.Client.Client.QueryHandlers;
 using NTDLS.CatMQ.Shared;
 using NTDLS.CatMQ.Shared.Payload.ClientToServer;
 using NTDLS.ReliableMessaging;
 using NTDLS.Semaphore;
 using System.Net;
+using System.Text.Json;
 
 namespace NTDLS.CatMQ.Client
 {
@@ -13,11 +13,6 @@ namespace NTDLS.CatMQ.Client
     /// </summary>
     public class CMqClient
     {
-        private static readonly JsonSerializerSettings _typeNameHandlingAll = new()
-        {
-            TypeNameHandling = TypeNameHandling.All
-        };
-
         private readonly RmClient _rmClient;
         private bool _explicitDisconnect = false;
         private readonly CMqClientConfiguration _configuration;
@@ -510,10 +505,8 @@ namespace NTDLS.CatMQ.Client
         public void Enqueue<T>(string queueName, T message)
             where T : ICMqMessage
         {
-            var messageJson = JsonConvert.SerializeObject(message, _typeNameHandlingAll);
-            var assemblyQualifiedName = message.GetType()?.AssemblyQualifiedName ?? string.Empty;
-            var parts = assemblyQualifiedName.Split(','); //We only want the first two parts, not the version and such.
-            var objectType = parts.Length > 1 ? $"{parts[0]},{parts[1].Trim()}" : assemblyQualifiedName;
+            var messageJson = JsonSerializer.Serialize((object)message);
+            var objectType = CMqUnboxing.GetAssemblyQualifiedTypeName(message);
 
             var result = _rmClient.Query(new CMqEnqueueMessageToQueue(queueName, objectType, messageJson)).Result;
             if (result.IsSuccess == false)

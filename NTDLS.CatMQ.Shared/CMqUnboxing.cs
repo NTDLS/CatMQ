@@ -1,23 +1,56 @@
-﻿using Newtonsoft.Json;
-using NTDLS.Semaphore;
+﻿using NTDLS.Semaphore;
 using System.Reflection;
+using System.Text.Json;
 
 namespace NTDLS.CatMQ.Shared
 {
     public static class CMqUnboxing
     {
-        private static readonly JsonSerializerSettings _typeNameHandlingAll = new()
-        {
-            TypeNameHandling = TypeNameHandling.All
-        };
-
         private static readonly PessimisticCriticalResource<Dictionary<string, MethodInfo>> _reflectionCache = new();
 
         /// <summary>
         /// Deserialization function called from MessageDeliveryQuery via reflection.
         /// </summary>
         public static T? MqDeserializeToObject<T>(string json)
-            => JsonConvert.DeserializeObject<T>(json, _typeNameHandlingAll);
+            => JsonSerializer.Deserialize<T>(json);
+
+        public static string GetAssemblyQualifiedTypeName(object obj)
+        {
+            return GetAssemblyQualifiedTypeName(obj.GetType());
+        }
+
+        public static string GetAssemblyQualifiedTypeName(Type type)
+        {
+            if (Caching.CacheTryGet<string>(type, out var objectTypeName) && objectTypeName != null)
+            {
+                return objectTypeName;
+            }
+
+            string assemblyQualifiedName;
+
+            if (type.IsGenericType)
+            {
+                var typeDefinitionName = type.GetGenericTypeDefinition().FullName
+                     ?? throw new Exception("The generic type name is not available.");
+
+                var assemblyName = type.Assembly.FullName
+                     ?? throw new Exception("The generic assembly type name is not available.");
+
+                assemblyQualifiedName = $"{typeDefinitionName}, {assemblyName}";
+            }
+            else
+            {
+                assemblyQualifiedName = type.AssemblyQualifiedName ?? type.Name
+                    ?? throw new Exception("The type name is not available.");
+            }
+
+            objectTypeName = CompiledRegEx.TypeTagsRegex().Replace(assemblyQualifiedName, string.Empty);
+            objectTypeName = CompiledRegEx.TypeCleanupRegex().Replace(objectTypeName, ", ").Trim();
+
+            Caching.CacheSetOneMinute(type, objectTypeName);
+
+            return objectTypeName;
+        }
 
         /// <summary>
         /// Deserializes json to an object of the given type string.
