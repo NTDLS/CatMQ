@@ -11,7 +11,7 @@ namespace NTDLS.CatMQ.Shared
         /// <summary>
         /// Deserialization function called from MessageDeliveryQuery via reflection.
         /// </summary>
-        public static T? MqDeserializeToObject<T>(string json, ICMqSerializationProvider serializationProvider)
+        public static T? MqDeserializeToObject<T>(string json, ICMqSerializationProvider? serializationProvider = null)
         {
             if (serializationProvider == null)
             {
@@ -88,7 +88,7 @@ namespace NTDLS.CatMQ.Shared
             if (genericToObjectMethod != null) //Reflection cache hit.
             {
                 //Call the generic deserialization:
-                deserializedMessage = genericToObjectMethod.Invoke(null, [objectJson])
+                deserializedMessage = genericToObjectMethod.Invoke(null, [objectJson, serializationProvider])
                     ?? throw new Exception($"Extraction message can not be null.");
             }
             else
@@ -132,7 +132,7 @@ namespace NTDLS.CatMQ.Shared
             if (genericToObjectMethod != null) //Reflection cache hit.
             {
                 //Call the generic deserialization:
-                deserializedMessage = genericToObjectMethod.Invoke(null, [message.MessageJson]) as ICMqMessage
+                deserializedMessage = genericToObjectMethod.Invoke(null, [message.MessageJson, message.SerializationProvider]) as ICMqMessage
                     ?? throw new Exception($"Extraction message can not be null.");
             }
             else

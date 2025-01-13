@@ -21,7 +21,7 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <Authors>NetworkDLS</Authors>
     <Company>NetworkDLS</Company>
-    <version>2.0.2</version>
+    <version>2.0.3</version>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>Logo.png</PackageIcon>
     <ApplicationIcon>Logo.ico</ApplicationIcon>
@@ -47,7 +47,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="NTDLS.CatMQ.Shared" Version="2.0.2" />
+    <PackageReference Include="NTDLS.CatMQ.Shared" Version="2.0.3" />
     <PackageReference Include="RocksDB" Version="9.7.3.54622" />
   </ItemGroup>
 
