@@ -11,8 +11,17 @@ namespace NTDLS.CatMQ.Shared
         /// <summary>
         /// Deserialization function called from MessageDeliveryQuery via reflection.
         /// </summary>
-        public static T? MqDeserializeToObject<T>(string json)
-            => JsonSerializer.Deserialize<T>(json);
+        public static T? MqDeserializeToObject<T>(string json, ICMqSerializationProvider serializationProvider)
+        {
+            if (serializationProvider == null)
+            {
+                return JsonSerializer.Deserialize<T>(json);
+            }
+            else
+            {
+                return serializationProvider.DeserializeToObject<T>(json);
+            }
+        }
 
         public static string GetAssemblyQualifiedTypeName(object obj)
         {
@@ -55,7 +64,13 @@ namespace NTDLS.CatMQ.Shared
         /// <summary>
         /// Deserializes json to an object of the given type string.
         /// </summary>
-        public static object PolymorphicDeserialize(string assemblyQualifiedTypeName, string objectJson)
+        public static T? DynamicDeserialize<T>(string assemblyQualifiedTypeName, string objectJson) where T : class
+            => DynamicDeserialize(assemblyQualifiedTypeName, objectJson) as T;
+
+        /// <summary>
+        /// Deserializes json to an object of the given type string.
+        /// </summary>
+        public static object DynamicDeserialize(string assemblyQualifiedTypeName, string objectJson, ICMqSerializationProvider? serializationProvider = null)
         {
             string cacheKey = $"{assemblyQualifiedTypeName}";
 
@@ -89,7 +104,7 @@ namespace NTDLS.CatMQ.Shared
                 _reflectionCache.Use((o) => o.TryAdd(cacheKey, genericToObjectMethod));
 
                 //Call the generic deserialization:
-                deserializedMessage = genericToObjectMethod.Invoke(null, [objectJson])
+                deserializedMessage = genericToObjectMethod.Invoke(null, [objectJson, serializationProvider])
                     ?? throw new Exception($"Extraction message can not be null.");
             }
 
@@ -133,7 +148,7 @@ namespace NTDLS.CatMQ.Shared
                 _reflectionCache.Use((o) => o.TryAdd(cacheKey, genericToObjectMethod));
 
                 //Call the generic deserialization:
-                deserializedMessage = genericToObjectMethod.Invoke(null, [message.MessageJson]) as ICMqMessage
+                deserializedMessage = genericToObjectMethod.Invoke(null, [message.MessageJson, message.SerializationProvider]) as ICMqMessage
                     ?? throw new Exception($"Extraction message can not be null.");
             }
 

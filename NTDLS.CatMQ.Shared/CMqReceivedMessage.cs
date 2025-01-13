@@ -6,6 +6,11 @@
     public class CMqReceivedMessage(string queueName, string objectType, string messageJson)
     {
         /// <summary>
+        /// Provides access to the custom serialization provider, if configured.
+        /// </summary>
+        public ICMqSerializationProvider? SerializationProvider { get; set; }
+
+        /// <summary>
         /// The name of the queue which this message came from.
         /// </summary>
         public string QueueName { get; set; } = queueName;

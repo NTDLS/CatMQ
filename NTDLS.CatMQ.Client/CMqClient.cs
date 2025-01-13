@@ -20,6 +20,11 @@ namespace NTDLS.CatMQ.Client
         private readonly OptimisticCriticalResource<Dictionary<Guid, List<CMqReceivedMessage>>> _messageBuffer = new();
         private Thread? _bufferThread;
 
+        /// <summary>
+        /// Provides access to the custom serialization provider, if configured.
+        /// </summary>
+        public ICMqSerializationProvider? SerializationProvider { get; private set; }
+
         private string? _lastReconnectHost;
         private int _lastReconnectPort;
         private IPAddress? _lastReconnectIpAddress;
@@ -91,16 +96,14 @@ namespace NTDLS.CatMQ.Client
             _rmClient.AddHandler(new InternalClientQueryHandlers(this));
         }
 
-        #region Reliable messaging Passthrough configuration.
-
         /// <summary>
         /// Sets the custom serialization provider.
         /// Can be cleared by passing null or calling ClearCryptographyProvider().
         /// </summary>
         /// <param name="provider"></param>
-        public void SetSerializationProvider(IRmSerializationProvider? provider)
+        public void SetSerializationProvider(ICMqSerializationProvider? provider)
         {
-            _rmClient.SetSerializationProvider(provider);
+            SerializationProvider = provider;
         }
 
         /// <summary>
@@ -108,46 +111,8 @@ namespace NTDLS.CatMQ.Client
         /// </summary>
         public void ClearSerializationProvider()
         {
-            _rmClient.ClearSerializationProvider();
+            SerializationProvider = null;
         }
-
-        /// <summary>
-        /// Sets the compression provider that this client should use when sending/receiving data.
-        /// Can be cleared by passing null or calling ClearCompressionProvider().
-        /// </summary>
-        /// <param name="provider"></param>
-        public void SetCompressionProvider(IRmCompressionProvider? provider)
-        {
-            _rmClient.SetCompressionProvider(provider);
-        }
-
-        /// <summary>
-        /// Removes the compression provider set by a previous call to SetCompressionProvider().
-        /// </summary>
-        public void ClearCompressionProvider()
-        {
-            _rmClient.ClearCompressionProvider();
-        }
-
-        /// <summary>
-        /// Sets the encryption provider that this client should use when sending/receiving data.
-        /// Can be cleared by passing null or calling ClearCryptographyProvider().
-        /// </summary>
-        /// <param name="provider"></param>
-        public void SetCryptographyProvider(IRmCryptographyProvider? provider)
-        {
-            _rmClient.SetCryptographyProvider(provider);
-        }
-
-        /// <summary>
-        /// Removes the encryption provider set by a previous call to SetCryptographyProvider().
-        /// </summary>
-        public void ClearCryptographyProvider()
-        {
-            _rmClient.ClearCryptographyProvider();
-        }
-
-        #endregion
 
         private void RmClient_OnConnected(RmContext context)
         {
@@ -204,6 +169,9 @@ namespace NTDLS.CatMQ.Client
             });
 
             bool wasConsumed = false;
+
+            //If a custom serialization provider is configured, enrich the message with it so that it can be used for unboxiog.
+            message.SerializationProvider = SerializationProvider;
 
             if (filteredSubscriptions != null)
             {
@@ -564,7 +532,16 @@ namespace NTDLS.CatMQ.Client
         public void Enqueue<T>(string queueName, T message)
             where T : ICMqMessage
         {
-            var messageJson = JsonSerializer.Serialize((object)message);
+            string? messageJson;
+            if (SerializationProvider != null)
+            {
+                messageJson = SerializationProvider.SerializeToText(message);
+            }
+            else
+            {
+                messageJson = JsonSerializer.Serialize((object)message);
+            }
+
             var objectType = CMqUnboxing.GetAssemblyQualifiedTypeName(message);
 
             var result = _rmClient.Query(new CMqEnqueueMessageToQueue(queueName, objectType, messageJson)).Result;

@@ -68,64 +68,6 @@ namespace NTDLS.CatMQ.Server
             _rmServer.OnDisconnected += RmServer_OnDisconnected;
         }
 
-        #region Reliable messaging Passthrough configuration.
-
-        /// <summary>
-        /// Sets the custom serialization provider.
-        /// Can be cleared by passing null or calling ClearCryptographyProvider().
-        /// </summary>
-        /// <param name="provider"></param>
-        public void SetSerializationProvider(IRmSerializationProvider? provider)
-        {
-            _rmServer.SetSerializationProvider(provider);
-        }
-
-        /// <summary>
-        /// Removes the serialization provider set by a previous call to SetSerializationProvider().
-        /// </summary>
-        public void ClearSerializationProvider()
-        {
-            _rmServer.ClearSerializationProvider();
-        }
-
-        /// <summary>
-        /// Sets the compression provider that this client should use when sending/receiving data.
-        /// Can be cleared by passing null or calling ClearCompressionProvider().
-        /// </summary>
-        /// <param name="provider"></param>
-        public void SetCompressionProvider(IRmCompressionProvider? provider)
-        {
-            _rmServer.SetCompressionProvider(provider);
-        }
-
-        /// <summary>
-        /// Removes the compression provider set by a previous call to SetCompressionProvider().
-        /// </summary>
-        public void ClearCompressionProvider()
-        {
-            _rmServer.ClearCompressionProvider();
-        }
-
-        /// <summary>
-        /// Sets the encryption provider that this client should use when sending/receiving data.
-        /// Can be cleared by passing null or calling ClearCryptographyProvider().
-        /// </summary>
-        /// <param name="provider"></param>
-        public void SetCryptographyProvider(IRmCryptographyProvider? provider)
-        {
-            _rmServer.SetCryptographyProvider(provider);
-        }
-
-        /// <summary>
-        /// Removes the encryption provider set by a previous call to SetCryptographyProvider().
-        /// </summary>
-        public void ClearCryptographyProvider()
-        {
-            _rmServer.ClearCryptographyProvider();
-        }
-
-        #endregion
-
         #region Management.
 
         /// <summary>
