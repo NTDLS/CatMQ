@@ -28,8 +28,13 @@
         /// <summary>
         /// Deserializes the received message to its original type.
         /// </summary>
-        /// <returns></returns>
         public ICMqMessage Deserialize()
             => CMqUnboxing.Unbox(this);
+
+        /// <summary>
+        /// Deserializes the received message to its original type.
+        /// </summary>
+        public T? Deserialize<T>() where T : class
+            => CMqUnboxing.Unbox(this) as T;
     }
 }
