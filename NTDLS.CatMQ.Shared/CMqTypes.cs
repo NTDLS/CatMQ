@@ -1,5 +1,21 @@
 ﻿namespace NTDLS.CatMQ.Shared
 {
+    public enum CMqConsumptionDisposition
+    {
+        /// <summary>
+        /// The message was not consumed by the subscriber.
+        /// </summary>
+        NotConsumed,
+        /// <summary>
+        /// The message was consumed by the subscriber.
+        /// </summary>
+        Consumed,
+        /// <summary>
+        /// The subscriber is requesting that the message be delivered at a later time.
+        /// </summary>
+        Defer
+    }
+
     /// <summary>
     /// Determines when to remove messages from the queue as they are distributed to subscribers.
     /// </summary>

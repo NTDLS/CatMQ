@@ -15,8 +15,8 @@ namespace NTDLS.CatMQ.Client.Client.QueryHandlers
             try
             {
                 var message = new CMqReceivedMessage(param.QueueName, param.ObjectType, param.MessageJson);
-                var wasConsumed = mqClient.InvokeOnReceived(mqClient, message);
-                return new CMqMessageDeliveryQueryReply(wasConsumed);
+                var messageDisposition = mqClient.InvokeOnReceived(mqClient, message);
+                return new CMqMessageDeliveryQueryReply(messageDisposition);
             }
             catch (Exception ex)
             {

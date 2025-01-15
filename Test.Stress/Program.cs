@@ -15,8 +15,9 @@ namespace Test.Stress
         static void Main()
         {
             Thread.Sleep(5000);
+            int threadCount = 1;
 
-            for (int i = 0; i < 32; i++)
+            for (int i = 0; i < threadCount; i++)
             {
                 new Thread(() => InstanceThread()).Start();
             }
@@ -97,7 +98,7 @@ namespace Test.Stress
             int clientId = Math.Abs(Guid.NewGuid().GetHashCode());
 
             int messageNumber = 0;
-            while (messageNumber < 100000) //Send test messages as objects that inherit from IMqMessage
+            while (messageNumber < 1000) //Send test messages as objects that inherit from IMqMessage
             {
                 foreach (var queueName in myQueueNames)
                 {
@@ -112,7 +113,7 @@ namespace Test.Stress
             client.Disconnect();
         }
 
-        private static bool OnMessageReceived(CMqClient client, CMqReceivedMessage rawMessage)
+        private static CMqConsumeResult OnMessageReceived(CMqClient client, CMqReceivedMessage rawMessage)
         {
             var message = rawMessage.Deserialize();
             //Console.WriteLine($"Received single message.");
@@ -126,7 +127,16 @@ namespace Test.Stress
                 Console.WriteLine($"Received unknown message type.");
             }
             */
-            return true;
+
+            if (_random.Next(0, 100) > 75)
+            {
+                return new CMqConsumeResult(CMqConsumptionDisposition.Defer)
+                {
+                    DifferedDuration = TimeSpan.FromSeconds(10)
+                };
+            }
+
+            return new CMqConsumeResult(CMqConsumptionDisposition.Consumed);
         }
 
         private static void OnBatchReceived(CMqClient client, List<CMqReceivedMessage> rawMessages)

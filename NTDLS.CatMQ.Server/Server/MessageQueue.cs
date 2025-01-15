@@ -43,11 +43,12 @@ namespace NTDLS.CatMQ.Server.Server
 #if DEBUG
             Thread.CurrentThread.Name = $"DeliveryThreadProc_{Environment.CurrentManagedThreadId}";
 #endif
-
             var lastCheckpoint = DateTime.UtcNow;
 
             while (KeepRunning)
             {
+                var now = DateTime.UtcNow;
+
                 if (DateTime.UtcNow - lastCheckpoint > TimeSpan.FromSeconds(30))
                 {
                     if (Configuration.PersistenceScheme == CMqPersistenceScheme.Persistent)
@@ -63,7 +64,7 @@ namespace NTDLS.CatMQ.Server.Server
                         });
                     }
 
-                    lastCheckpoint = DateTime.UtcNow;
+                    lastCheckpoint = now;
                 }
 
                 bool shouldSleep = true; //Just used to omit waiting. We want to spin fast when we are delivering messages.
@@ -83,7 +84,10 @@ namespace NTDLS.CatMQ.Server.Server
                             //This is so we do not discard messages as delivered for queues with no subscribers.
                             if (s.Count > 0)
                             {
-                                topMessage = m.Messages.FirstOrDefault(); //Get the first message in the list, if any.
+                                //Get the first message in the list, if any.
+                                topMessage = m.Messages.FirstOrDefault(o => o.DeferredUntil == null || now >= o.DeferredUntil);
+
+                                //topMessage = m.Messages.FirstOrDefault();
 
                                 if (topMessage != null)
                                 {
@@ -141,7 +145,7 @@ namespace NTDLS.CatMQ.Server.Server
                     //We we have a message, deliver it to the queue subscribers.
                     if (topMessage != null && yetToBeDeliveredSubscribers != null)
                     {
-                        bool successfulDeliveryAndConsume = false;
+                        bool deliveredAndConsumed = false;
 
                         #region Deliver message to subscibers.
 
@@ -167,10 +171,42 @@ namespace NTDLS.CatMQ.Server.Server
                             {
                                 subscriber.DeliveryAttempts++;
 
-                                if (_queueServer.DeliverMessage(subscriber.SubscriberId, Configuration.QueueName, topMessage))
+                                var consumeResult = _queueServer.DeliverMessage(subscriber.SubscriberId, Configuration.QueueName, topMessage);
+
+                                if (consumeResult.Disposition == CMqConsumptionDisposition.Consumed)
                                 {
                                     subscriber.ConsumedMessages++;
-                                    successfulDeliveryAndConsume = true;
+                                    deliveredAndConsumed = true;
+
+                                    //The message was marked as consumed by the subscriber, so we are done with this subscriber.
+
+                                    //This thread is the only place we manage [SatisfiedSubscribersConnectionIDs], so we can use it without additional locking.
+                                    topMessage.SatisfiedSubscribersSubscriberIDs.Add(subscriber.SubscriberId);
+                                    shouldSleep = false;
+
+                                    if (Configuration.ConsumptionScheme == CMqConsumptionScheme.FirstConsumedSubscriber)
+                                    {
+                                        //Message was delivered and consumed, break the delivery loop so the message can be removed from the queue.
+                                        break;
+                                    }
+                                }
+                                else if (consumeResult.Disposition == CMqConsumptionDisposition.Defer)
+                                {
+                                    //the message was marked as deferred by the subscriber, we will retry this subscriber at a later time.
+                                    topMessage.DeferredUntil = now + consumeResult.DifferedDuration;
+                                    subscriber.DeferredMessages++;
+
+                                    if (Configuration.ConsumptionScheme == CMqConsumptionScheme.FirstConsumedSubscriber)
+                                    {
+                                        //Message was delivered and consumed, break the delivery loop so the message can be removed from the queue.
+                                        break;
+                                    }
+                                }
+                                else if (consumeResult.Disposition == CMqConsumptionDisposition.NotConsumed)
+                                {
+                                    //The message was marked as not-consumed by the subscriber, so we are done with this subscriber.
+                                    topMessage.SatisfiedSubscribersSubscriberIDs.Add(subscriber.SubscriberId);
+                                    shouldSleep = false;
                                 }
 
                                 Statistics.DeliveredMessageCount++;
@@ -178,17 +214,6 @@ namespace NTDLS.CatMQ.Server.Server
 
                                 if (KeepRunning == false)
                                 {
-                                    break;
-                                }
-
-                                //This thread is the only place we manage [SatisfiedSubscribersConnectionIDs], so we can use it without additional locking.
-                                topMessage.SatisfiedSubscribersSubscriberIDs.Add(subscriber.SubscriberId);
-                                shouldSleep = false;
-
-                                if (successfulDeliveryAndConsume
-                                    && Configuration.ConsumptionScheme == CMqConsumptionScheme.FirstConsumedSubscriber)
-                                {
-                                    //Message was delivered and consumed, break the delivery loop so the message can be removed from the queue.
                                     break;
                                 }
                             }
@@ -244,7 +269,7 @@ namespace NTDLS.CatMQ.Server.Server
                                 {
                                     if (Configuration.ConsumptionScheme == CMqConsumptionScheme.FirstConsumedSubscriber)
                                     {
-                                        if (successfulDeliveryAndConsume)
+                                        if (deliveredAndConsumed)
                                         {
                                             //The message was consumed by a subscriber, remove it from the message list.
                                             m.Database?.Remove(topMessage.MessageId.ToString());

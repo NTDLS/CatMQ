@@ -2,10 +2,16 @@
 
 namespace NTDLS.CatMQ.Shared.Payload.ClientToServer
 {
-    public class CMqEnqueueMessageToQueue(string queueName, string objectType, string messageJson)
+    public class CMqEnqueueMessageToQueue(string queueName, TimeSpan? deferredDelivery, string objectType, string messageJson)
         : IRmQuery<CMqEnqueueMessageToQueueReply>
     {
         public string QueueName { get; set; } = queueName;
+
+        /// <summary>
+        /// The amount of time, when if set, in which the server will delay delivery of the message.
+        /// </summary>
+        public TimeSpan? DeferredDelivery { get; set; } = deferredDelivery;
+
         /// <summary>
         /// The full assembly qualified name of the type of MessageJson.
         /// </summary>

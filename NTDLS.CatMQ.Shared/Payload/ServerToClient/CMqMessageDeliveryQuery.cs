@@ -24,22 +24,23 @@ namespace NTDLS.CatMQ.Shared.Payload.ServerToClient
         /// the message. The message will not leave the top of the queue until it has been
         /// consumed by all subscribers (or the message expires or is dead-lettered).
         /// </summary>
-        public bool WasMessageConsumed { get; set; }
+        public CMqConsumeResult ConsumeResult { get; set; }
         public string? ErrorMessage { get; set; }
 
         public CMqMessageDeliveryQueryReply(Exception exception)
         {
-            WasMessageConsumed = false;
+            ConsumeResult = new CMqConsumeResult(CMqConsumptionDisposition.NotConsumed);
             ErrorMessage = exception.Message;
         }
 
-        public CMqMessageDeliveryQueryReply(bool wasMessageConsumed)
+        public CMqMessageDeliveryQueryReply(CMqConsumeResult consumeResult)
         {
-            WasMessageConsumed = wasMessageConsumed;
+            ConsumeResult = consumeResult;
         }
 
         public CMqMessageDeliveryQueryReply()
         {
+            ConsumeResult = new CMqConsumeResult(CMqConsumptionDisposition.NotConsumed);
         }
     }
 }

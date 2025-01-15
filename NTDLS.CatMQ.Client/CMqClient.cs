@@ -16,7 +16,11 @@ namespace NTDLS.CatMQ.Client
         private readonly RmClient _rmClient;
         private bool _explicitDisconnect = false;
         private readonly CMqClientConfiguration _configuration;
-        private readonly OptimisticCriticalResource<Dictionary<string, List<CMqSubscription>>> _subscriptions;
+
+        /// <summary>
+        /// Contains the queue name and the handler delegate function for that queue.
+        /// </summary>
+        private readonly OptimisticCriticalResource<Dictionary<string, CMqSubscription>> _subscriptions;
         private readonly OptimisticCriticalResource<Dictionary<Guid, List<CMqReceivedMessage>>> _messageBuffer = new();
         private Thread? _bufferThread;
 
@@ -65,7 +69,7 @@ namespace NTDLS.CatMQ.Client
         public CMqClient(CMqClientConfiguration configuration)
         {
             _configuration = configuration;
-            _subscriptions = new(() => new Dictionary<string, List<CMqSubscription>>(StringComparer.OrdinalIgnoreCase));
+            _subscriptions = new(() => new Dictionary<string, CMqSubscription>(StringComparer.OrdinalIgnoreCase));
 
             var rmConfiguration = new RmConfiguration()
             {
@@ -87,7 +91,7 @@ namespace NTDLS.CatMQ.Client
         public CMqClient()
         {
             _configuration = new CMqClientConfiguration();
-            _subscriptions = new(() => new Dictionary<string, List<CMqSubscription>>(StringComparer.OrdinalIgnoreCase));
+            _subscriptions = new(() => new Dictionary<string, CMqSubscription>(StringComparer.OrdinalIgnoreCase));
             _rmClient = new RmClient();
 
             _rmClient.OnConnected += RmClient_OnConnected;
@@ -156,55 +160,42 @@ namespace NTDLS.CatMQ.Client
             }
         }
 
-        internal bool InvokeOnReceived(CMqClient client, CMqReceivedMessage message)
+        internal CMqConsumeResult InvokeOnReceived(CMqClient client, CMqReceivedMessage message)
         {
-            List<CMqSubscription>? filteredSubscriptions = null;
-
-            _subscriptions.Read(s =>
+            var subscriptionHandler = _subscriptions.Read(s =>
             {
-                if (s.TryGetValue(message.QueueName, out var subscriptions))
-                {
-                    filteredSubscriptions = subscriptions.ToList();
-                }
+                s.TryGetValue(message.QueueName, out var handler);
+                return handler;
             });
 
-            bool wasConsumed = false;
-
-            //If a custom serialization provider is configured, enrich the message with it so that it can be used for unboxiog.
-            message.SerializationProvider = SerializationProvider;
-
-            if (filteredSubscriptions != null)
+            if (subscriptionHandler != null)
             {
-                foreach (var subscription in filteredSubscriptions)
-                {
-                    if (subscription.BufferSize != null && subscription.BufferedFunction != null)
-                    {
-                        _messageBuffer.Write(mb =>
-                        {
-                            if (mb.TryGetValue(subscription.Id, out var buffer))
-                            {
-                                buffer.Add(message);
-                            }
-                            else
-                            {
-                                mb.Add(subscription.Id, new List<CMqReceivedMessage> { message });
-                            }
-                        });
+                //If a custom serialization provider is configured, enrich the message with it so that it can be used for unboxiog.
+                message.SerializationProvider = SerializationProvider;
 
-                        wasConsumed = true;
-                    }
-                    else if (subscription.MessageFunction != null)
+                if (subscriptionHandler.BufferSize != null && subscriptionHandler.BufferedFunction != null)
+                {
+                    _messageBuffer.Write(mb =>
                     {
-                        bool consumed = subscription.MessageFunction.Invoke(client, message);
-                        if (consumed)
+                        if (mb.TryGetValue(subscriptionHandler.Id, out var buffer))
                         {
-                            wasConsumed = true;
+                            buffer.Add(message);
                         }
-                    }
+                        else
+                        {
+                            mb.Add(subscriptionHandler.Id, new List<CMqReceivedMessage> { message });
+                        }
+                    });
+
+                    return new CMqConsumeResult(CMqConsumptionDisposition.Consumed);
+                }
+                else if (subscriptionHandler.MessageFunction != null)
+                {
+                    return subscriptionHandler.MessageFunction.Invoke(client, message);
                 }
             }
 
-            return wasConsumed;
+            return new CMqConsumeResult(CMqConsumptionDisposition.NotConsumed);
         }
 
         internal void InvokeOnException(CMqClient client, string? queueName, Exception ex)
@@ -238,29 +229,26 @@ namespace NTDLS.CatMQ.Client
 
                     success = _subscriptions.TryRead(s =>
                     {
-                        foreach (var subscriptions in s.Values)
+                        foreach (var subscription in s.Values)
                         {
-                            foreach (var subscription in subscriptions)
+                            foreach (var messageBuffer in mb)
                             {
-                                foreach (var messageBuffer in mb)
+                                if (messageBuffer.Value.Count == 0)
                                 {
-                                    if (messageBuffer.Value.Count == 0)
+                                    subscription.LastBufferFlushed = DateTime.UtcNow;
+                                }
+                                else if (messageBuffer.Value.Count >= subscription.BufferSize
+                                    || (subscription.AutoFlushInterval != TimeSpan.Zero
+                                    && (DateTime.UtcNow - subscription.LastBufferFlushed) >= subscription.AutoFlushInterval))
+                                {
+                                    if (messageBuffer.Key == subscription.Id)
                                     {
-                                        subscription.LastBufferFlushed = DateTime.UtcNow;
+                                        var bufferedValueClone = messageBuffer.Value.ToList();
+                                        Task.Run(() => subscription.BufferedFunction?.Invoke(this, bufferedValueClone));
+                                        messageBuffer.Value.Clear();
                                     }
-                                    else if (messageBuffer.Value.Count >= subscription.BufferSize
-                                        || (subscription.AutoFlushInterval != TimeSpan.Zero
-                                            && (DateTime.UtcNow - subscription.LastBufferFlushed) >= subscription.AutoFlushInterval))
-                                    {
-                                        if (messageBuffer.Key == subscription.Id)
-                                        {
-                                            var bufferedValueClone = messageBuffer.Value.ToList();
-                                            Task.Run(() => subscription.BufferedFunction?.Invoke(this, bufferedValueClone));
-                                            messageBuffer.Value.Clear();
-                                        }
 
-                                        subscription.LastBufferFlushed = DateTime.UtcNow;
-                                    }
+                                    subscription.LastBufferFlushed = DateTime.UtcNow;
                                 }
                             }
                         }
@@ -420,32 +408,20 @@ namespace NTDLS.CatMQ.Client
         {
             bool wasFirstSubscriptionToThisQueue = false;
 
-            var newSubscription = new CMqSubscription(queueName, messageFunction);
+            var subscription = new CMqSubscription(queueName, messageFunction);
 
             _subscriptions.Write(s =>
             {
-                if (s.TryGetValue(queueName, out var subscriptions))
-                {
-                    wasFirstSubscriptionToThisQueue = subscriptions.Count == 0;
-                    subscriptions.Add(newSubscription);
-                }
-                else
-                {
-                    s.Add(queueName, new List<CMqSubscription>() { newSubscription });
-                    wasFirstSubscriptionToThisQueue = true;
-                }
+                s[queueName] = subscription;
             });
 
-            if (wasFirstSubscriptionToThisQueue)
+            var result = _rmClient.Query(new CMqSubscribeToQueueQuery(queueName)).Result;
+            if (result.IsSuccess == false)
             {
-                var result = _rmClient.Query(new CMqSubscribeToQueueQuery(queueName)).Result;
-                if (result.IsSuccess == false)
-                {
-                    throw new Exception(result.ErrorMessage);
-                }
+                throw new Exception(result.ErrorMessage);
             }
 
-            return newSubscription;
+            return subscription;
         }
 
         /// <summary>
@@ -455,20 +431,11 @@ namespace NTDLS.CatMQ.Client
         {
             bool wasFirstSubscriptionToThisQueue = false;
 
-            var newSubscription = new CMqSubscription(queueName, bufferSize, autoFlushInterval, batchFunction);
+            var subscription = new CMqSubscription(queueName, bufferSize, autoFlushInterval, batchFunction);
 
             _subscriptions.Write(s =>
             {
-                if (s.TryGetValue(queueName, out var subscriptions))
-                {
-                    wasFirstSubscriptionToThisQueue = subscriptions.Count == 0;
-                    subscriptions.Add(newSubscription);
-                }
-                else
-                {
-                    s.Add(queueName, new List<CMqSubscription>() { newSubscription });
-                    wasFirstSubscriptionToThisQueue = true;
-                }
+                s[queueName] = subscription;
             });
 
             if (wasFirstSubscriptionToThisQueue)
@@ -480,7 +447,7 @@ namespace NTDLS.CatMQ.Client
                 }
             }
 
-            return newSubscription;
+            return subscription;
         }
 
         /// <summary>
@@ -488,29 +455,15 @@ namespace NTDLS.CatMQ.Client
         /// </summary>
         public void Unsubscribe(CMqSubscription subscription)
         {
-            bool wasLastSubscriptionToThisQueue = false;
-
             _subscriptions.Write(s =>
             {
-                if (s.TryGetValue(subscription.QueueName, out var subscriptions))
-                {
-                    subscriptions.RemoveAll(o => o.Id == subscription.Id);
-                    wasLastSubscriptionToThisQueue = subscriptions.Count == 0;
-                }
-                else
-                {
-                    wasLastSubscriptionToThisQueue = true;
-                }
+                s.Remove(subscription.QueueName);
             });
 
-            if (wasLastSubscriptionToThisQueue)
+            var result = _rmClient.Query(new CMqUnsubscribeFromQueueQuery(subscription.QueueName)).Result;
+            if (result.IsSuccess == false)
             {
-                //We only actually unsubscribe from the server queue when we have removed all subscribed client events.
-                var result = _rmClient.Query(new CMqUnsubscribeFromQueueQuery(subscription.QueueName)).Result;
-                if (result.IsSuccess == false)
-                {
-                    throw new Exception(result.ErrorMessage);
-                }
+                throw new Exception(result.ErrorMessage);
             }
         }
 
@@ -529,7 +482,11 @@ namespace NTDLS.CatMQ.Client
         /// <summary>
         /// Dispatches a message to the queue server to be enqueued in the given queue.
         /// </summary>
-        public void Enqueue<T>(string queueName, T message)
+        /// <typeparam name="T">Type of the payload contained in the message </typeparam>
+        /// <param name="queueName">Name of the queue in which to place the message into.</param>
+        /// <param name="message">Payload message inheriting from ICMqMessage.</param>
+        /// <param name="deferredDelivery">Amount of time, when if set, which the server will delay delivery of the message.</param>
+        public void Enqueue<T>(string queueName, T message, TimeSpan? deferredDelivery = null)
             where T : ICMqMessage
         {
             string? messageJson;
@@ -544,7 +501,7 @@ namespace NTDLS.CatMQ.Client
 
             var objectType = CMqUnboxing.GetAssemblyQualifiedTypeName(message);
 
-            var result = _rmClient.Query(new CMqEnqueueMessageToQueue(queueName, objectType, messageJson)).Result;
+            var result = _rmClient.Query(new CMqEnqueueMessageToQueue(queueName, deferredDelivery, objectType, messageJson)).Result;
             if (result.IsSuccess == false)
             {
                 throw new Exception(result.ErrorMessage);
@@ -552,11 +509,16 @@ namespace NTDLS.CatMQ.Client
         }
 
         /// <summary>
-        /// Dispatches a message to the queue server to be enqueued in the given queue.
+        /// Dispatches a pre-serialized message to the queue server to be enqueued in the given queue.
         /// </summary>
-        public void Enqueue(string queueName, string assemblyQualifiedName, string messageJson)
+        /// <typeparam name="T">Type of the payload contained in the message </typeparam>
+        /// <param name="queueName">Name of the queue in which to place the message into.</param>
+        /// <param name="assemblyQualifiedName">Fully assembly qualified type of the message type for deserialization.</param>
+        /// <param name="messageJson">Json for payload message of type inheriting from ICMqMessage.</param>
+        /// <param name="deferredDelivery">Amount of time, when if set, which the server will delay delivery of the message.</param>
+        public void Enqueue(string queueName, string assemblyQualifiedName, string messageJson, TimeSpan? deferredDelivery = null)
         {
-            var result = _rmClient.Query(new CMqEnqueueMessageToQueue(queueName, assemblyQualifiedName, messageJson)).Result;
+            var result = _rmClient.Query(new CMqEnqueueMessageToQueue(queueName, deferredDelivery, assemblyQualifiedName, messageJson)).Result;
             if (result.IsSuccess == false)
             {
                 throw new Exception(result.ErrorMessage);

@@ -23,6 +23,11 @@ namespace NTDLS.CatMQ.Server.Server
         public DateTime Timestamp { get; set; } = DateTime.UtcNow;
 
         /// <summary>
+        /// The UTC date and time, when if set, that the message will be delivered.
+        /// </summary>
+        public DateTime? DeferredUntil { get; set; }
+
+        /// <summary>
         /// The full assembly qualified name of the type of MessageJson.
         /// </summary>
         public string AssemblyQualifiedTypeName { get; set; } = assemblyQualifiedTypeName;

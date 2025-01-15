@@ -534,14 +534,14 @@ namespace NTDLS.CatMQ.Server
         /// <summary>
         /// Deliver a message from a server queue to a subscribed client.
         /// </summary>
-        internal bool DeliverMessage(Guid subscriberId, string queueName, EnqueuedMessage enqueuedMessage)
+        internal CMqConsumeResult DeliverMessage(Guid subscriberId, string queueName, EnqueuedMessage enqueuedMessage)
         {
             var result = _rmServer.Query(subscriberId, new CMqMessageDeliveryQuery(queueName, enqueuedMessage.AssemblyQualifiedTypeName, enqueuedMessage.MessageJson)).Result;
             if (string.IsNullOrEmpty(result.ErrorMessage) == false)
             {
                 throw new Exception(result.ErrorMessage);
             }
-            return result.WasMessageConsumed;
+            return result.ConsumeResult;
         }
 
         #endregion
@@ -740,7 +740,7 @@ namespace NTDLS.CatMQ.Server
         /// <summary>
         /// Removes a subscription from a queue for a given connection id.
         /// </summary>
-        public void EnqueueMessage(string queueName, string assemblyQualifiedTypeName, string messageJson)
+        public void EnqueueMessage(string queueName, TimeSpan? deferredDelivery, string assemblyQualifiedTypeName, string messageJson)
         {
             OnLog?.Invoke(this, CMqErrorLevel.Verbose, $"Enqueuing message to queue: [{queueName}].");
 
@@ -757,7 +757,11 @@ namespace NTDLS.CatMQ.Server
                         success = messageQueue.EnqueuedMessages.TryWrite(CMqDefaults.DEFAULT_TRY_WAIT_MS, m =>
                         {
                             messageQueue.Statistics.ReceivedMessageCount++;
-                            var message = new EnqueuedMessage(queueKey, assemblyQualifiedTypeName, messageJson);
+                            var message = new EnqueuedMessage(queueKey, assemblyQualifiedTypeName, messageJson)
+                            {
+                                DeferredUntil = deferredDelivery == null ? null : DateTime.Now + deferredDelivery
+                            };
+
                             if (messageQueue.Configuration.PersistenceScheme == CMqPersistenceScheme.Persistent && m.Database != null)
                             {
                                 //Serialize using System.Text.Json as opposed to Newtonsoft for efficiency.

@@ -31,6 +31,11 @@
         public ulong FailedMessagesDeliveries { get; internal set; }
 
         /// <summary>
+        /// The number of messages that have been successfully delivered, but marked as deferred by the subscriber.
+        /// </summary>
+        public ulong DeferredMessages { get; internal set; }
+
+        /// <summary>
         /// The number of messages that have been successfully delivered to and marked as consumed by the subscriber.
         /// </summary>
         public ulong ConsumedMessages { get; internal set; }

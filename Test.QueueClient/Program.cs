@@ -59,7 +59,7 @@ namespace Test.QueueClient
             client.Disconnect();
         }
 
-        private static bool OnMessageReceived(CMqClient client, CMqReceivedMessage rawMessage)
+        private static CMqConsumeResult OnMessageReceived(CMqClient client, CMqReceivedMessage rawMessage)
         {
             var message = rawMessage.Deserialize();
             if (message is MyMessage myMessage)
@@ -71,7 +71,7 @@ namespace Test.QueueClient
                 //Console.WriteLine($"Received: '{message.ObjectType}'->'{message.MessageJson}'");
             }
 
-            return false;
+            return new CMqConsumeResult(CMqConsumptionDisposition.Consumed);
         }
 
         private static void OnBatchReceived(CMqClient client, List<CMqReceivedMessage> rawMessages)
