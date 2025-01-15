@@ -406,8 +406,6 @@ namespace NTDLS.CatMQ.Client
         /// </summary>
         public CMqSubscription Subscribe(string queueName, OnMessageReceived messageFunction)
         {
-            bool wasFirstSubscriptionToThisQueue = false;
-
             var subscription = new CMqSubscription(queueName, messageFunction);
 
             _subscriptions.Write(s =>
@@ -429,8 +427,6 @@ namespace NTDLS.CatMQ.Client
         /// </summary>
         public CMqSubscription SubscribeBuffered(string queueName, int bufferSize, TimeSpan autoFlushInterval, OnBatchReceived batchFunction)
         {
-            bool wasFirstSubscriptionToThisQueue = false;
-
             var subscription = new CMqSubscription(queueName, bufferSize, autoFlushInterval, batchFunction);
 
             _subscriptions.Write(s =>
@@ -438,13 +434,10 @@ namespace NTDLS.CatMQ.Client
                 s[queueName] = subscription;
             });
 
-            if (wasFirstSubscriptionToThisQueue)
+            var result = _rmClient.Query(new CMqSubscribeToQueueQuery(queueName)).Result;
+            if (result.IsSuccess == false)
             {
-                var result = _rmClient.Query(new CMqSubscribeToQueueQuery(queueName)).Result;
-                if (result.IsSuccess == false)
-                {
-                    throw new Exception(result.ErrorMessage);
-                }
+                throw new Exception(result.ErrorMessage);
             }
 
             return subscription;

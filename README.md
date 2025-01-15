@@ -82,7 +82,7 @@ static void Main()
     client.Disconnect();
 }
 
-private static bool OnMessageReceived(CMqClient client, CMqReceivedMessage rawMessage)
+private static CMqConsumeResult OnMessageReceived(CMqClient client, CMqReceivedMessage rawMessage)
 {
     var message = rawMessage.Deserialize();
 
@@ -96,7 +96,7 @@ private static bool OnMessageReceived(CMqClient client, CMqReceivedMessage rawMe
     {
         Console.WriteLine($"Received unknown message type.");
     }
-    return true;
+    return new CMqConsumeResult(CMqConsumptionDisposition.Consumed);
 }
 ```
 
