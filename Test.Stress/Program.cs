@@ -132,7 +132,7 @@ namespace Test.Stress
             {
                 return new CMqConsumeResult(CMqConsumptionDisposition.Defer)
                 {
-                    DifferedDuration = TimeSpan.FromSeconds(10)
+                    DeferDuration = TimeSpan.FromSeconds(10)
                 };
             }
 

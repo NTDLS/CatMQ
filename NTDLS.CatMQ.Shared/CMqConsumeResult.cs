@@ -13,7 +13,7 @@ namespace NTDLS.CatMQ.Shared
         /// <summary>
         /// When the consumption disposition is deferred, this is the amount of time to delay the redelivery of the message.
         /// </summary>
-        public TimeSpan? DifferedDuration { get; set; }
+        public TimeSpan? DeferDuration { get; set; }
 
         public CMqConsumeResult(CMqConsumptionDisposition disposition)
         {

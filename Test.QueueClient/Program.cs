@@ -12,6 +12,8 @@ namespace Test.QueueClient
 
         static void Main()
         {
+            Thread.Sleep(2500);
+
             var client = new CMqClient(); //Create an instance of the client.
             client.Connect("127.0.0.1", 45784); //Connect to the queue server.
 
@@ -48,7 +50,7 @@ namespace Test.QueueClient
             //Enqueue a few messages, note that the message is just a class and it must inherit from ICMqMessage.
             for (int i = 0; i < 10000000; i++)
             {
-                client.Enqueue("MyFirstQueue", new MyMessage($"Test message {i++:n0}"));
+                client.Enqueue("MyFirstQueue", new MyMessage($"Test message {i++:n0}"), TimeSpan.FromSeconds(10));
                 Thread.Sleep(1000);
             }
 

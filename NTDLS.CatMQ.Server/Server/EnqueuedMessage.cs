@@ -40,19 +40,19 @@ namespace NTDLS.CatMQ.Server.Server
         /// <summary>
         /// The list of connection IDs that the message has been successfully delivered to.
         /// </summary>
-        [JsonIgnore] //Serialize using System.Text.Json as opposed to Newtonsoft for efficiency.
+        [JsonIgnore]
         public Dictionary<Guid, SubscriberMessageDelivery> SubscriberMessageDeliveries { get; set; } = new();
 
         /// <summary>
         /// List of subscribers which have been delivered to or for which the retry-attempts have been reached.
         /// </summary>
-        [JsonIgnore] //Serialize using System.Text.Json as opposed to Newtonsoft for efficiency.
+        [JsonIgnore]
         public HashSet<Guid> SatisfiedSubscribersSubscriberIDs { get; set; } = new();
 
         /// <summary>
         /// List of subscribers which failed to be delivered to or for which the retry-attempts have been reached.
         /// </summary>
-        [JsonIgnore] //Serialize using System.Text.Json as opposed to Newtonsoft for efficiency.
+        [JsonIgnore]
         public HashSet<Guid> FailedSubscribersSubscriberIDs { get; set; } = new();
     }
 }

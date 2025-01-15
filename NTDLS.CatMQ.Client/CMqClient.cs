@@ -478,8 +478,8 @@ namespace NTDLS.CatMQ.Client
         /// <typeparam name="T">Type of the payload contained in the message </typeparam>
         /// <param name="queueName">Name of the queue in which to place the message into.</param>
         /// <param name="message">Payload message inheriting from ICMqMessage.</param>
-        /// <param name="deferredDelivery">Amount of time, when if set, which the server will delay delivery of the message.</param>
-        public void Enqueue<T>(string queueName, T message, TimeSpan? deferredDelivery = null)
+        /// <param name="deferDeliveryDuration">Amount of time, when if set, which the server will delay delivery of the message.</param>
+        public void Enqueue<T>(string queueName, T message, TimeSpan? deferDeliveryDuration = null)
             where T : ICMqMessage
         {
             string? messageJson;
@@ -494,7 +494,7 @@ namespace NTDLS.CatMQ.Client
 
             var objectType = CMqUnboxing.GetAssemblyQualifiedTypeName(message);
 
-            var result = _rmClient.Query(new CMqEnqueueMessageToQueue(queueName, deferredDelivery, objectType, messageJson)).Result;
+            var result = _rmClient.Query(new CMqEnqueueMessageToQueue(queueName, deferDeliveryDuration, objectType, messageJson)).Result;
             if (result.IsSuccess == false)
             {
                 throw new Exception(result.ErrorMessage);
@@ -508,10 +508,10 @@ namespace NTDLS.CatMQ.Client
         /// <param name="queueName">Name of the queue in which to place the message into.</param>
         /// <param name="assemblyQualifiedName">Fully assembly qualified type of the message type for deserialization.</param>
         /// <param name="messageJson">Json for payload message of type inheriting from ICMqMessage.</param>
-        /// <param name="deferredDelivery">Amount of time, when if set, which the server will delay delivery of the message.</param>
-        public void Enqueue(string queueName, string assemblyQualifiedName, string messageJson, TimeSpan? deferredDelivery = null)
+        /// <param name="deferDeliveryDuration">Amount of time, when if set, which the server will delay delivery of the message.</param>
+        public void Enqueue(string queueName, string assemblyQualifiedName, string messageJson, TimeSpan? deferDeliveryDuration = null)
         {
-            var result = _rmClient.Query(new CMqEnqueueMessageToQueue(queueName, deferredDelivery, assemblyQualifiedName, messageJson)).Result;
+            var result = _rmClient.Query(new CMqEnqueueMessageToQueue(queueName, deferDeliveryDuration, assemblyQualifiedName, messageJson)).Result;
             if (result.IsSuccess == false)
             {
                 throw new Exception(result.ErrorMessage);

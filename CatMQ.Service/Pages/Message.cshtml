@@ -29,25 +29,27 @@
         <table class="table table-striped table-bordered">
             <thead class="table-light">
                 <tr>
-                    <th colspan="5">Metadata</th>
+                    <th colspan="6">Metadata</th>
                 </tr>
             </thead>
             <thead class="table-light">
                 <tr>
                     <th>Message Id</th>
                     <th>Timestamp</th>
-                    <th>Object Type</th>
+                    <th>Deferred</th>
                     <th>Delivered</th>
                     <th>Consumed</th>
+                    <th>Object</th>
                 </tr>
             </thead>
             <tbody>
                 <tr>
                     <td>@Model.Message.MessageId</td>
                     <td>@Model.Message.Timestamp</td>
-                    <td>@Model.Message.AssemblyQualifiedTypeName</td>
+                    <td>@Model.Message.DeferredUntil.ToString()</td>
                     <td>@Model.Message.SubscriberMessageDeliveries.Count.ToString("n0")</td>
                     <td>@Model.Message.SatisfiedSubscribersSubscriberIDs.Count.ToString("n0")</td>
+                    <td>@Model.Message.AssemblyQualifiedTypeName</td>
                 </tr>
             </tbody>
         </table>

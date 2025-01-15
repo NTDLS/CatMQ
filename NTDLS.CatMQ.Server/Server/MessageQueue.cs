@@ -87,8 +87,6 @@ namespace NTDLS.CatMQ.Server.Server
                                 //Get the first message in the list, if any.
                                 topMessage = m.Messages.FirstOrDefault(o => o.DeferredUntil == null || now >= o.DeferredUntil);
 
-                                //topMessage = m.Messages.FirstOrDefault();
-
                                 if (topMessage != null)
                                 {
                                     //Get list of subscribers that have yet to get a copy of the message.
@@ -146,6 +144,8 @@ namespace NTDLS.CatMQ.Server.Server
                     if (topMessage != null && yetToBeDeliveredSubscribers != null)
                     {
                         bool deliveredAndConsumed = false;
+                        bool deadLetterRequested = false;
+                        bool dropMessageRequested = false;
 
                         #region Deliver message to subscibers.
 
@@ -169,13 +169,13 @@ namespace NTDLS.CatMQ.Server.Server
 
                             try
                             {
-                                subscriber.DeliveryAttempts++;
+                                subscriber.AttemptedDeliveryCount++;
 
                                 var consumeResult = _queueServer.DeliverMessage(subscriber.SubscriberId, Configuration.QueueName, topMessage);
 
                                 if (consumeResult.Disposition == CMqConsumptionDisposition.Consumed)
                                 {
-                                    subscriber.ConsumedMessages++;
+                                    subscriber.ConsumedDeliveryCount++;
                                     deliveredAndConsumed = true;
 
                                     //The message was marked as consumed by the subscriber, so we are done with this subscriber.
@@ -193,8 +193,9 @@ namespace NTDLS.CatMQ.Server.Server
                                 else if (consumeResult.Disposition == CMqConsumptionDisposition.Defer)
                                 {
                                     //the message was marked as deferred by the subscriber, we will retry this subscriber at a later time.
-                                    topMessage.DeferredUntil = now + consumeResult.DifferedDuration;
-                                    subscriber.DeferredMessages++;
+                                    topMessage.DeferredUntil = now + consumeResult.DeferDuration;
+                                    subscriber.DeferredDeliveryCount++;
+                                    Statistics.DeferredDeliveryCount++;
 
                                     if (Configuration.ConsumptionScheme == CMqConsumptionScheme.FirstConsumedSubscriber)
                                     {
@@ -208,9 +209,23 @@ namespace NTDLS.CatMQ.Server.Server
                                     topMessage.SatisfiedSubscribersSubscriberIDs.Add(subscriber.SubscriberId);
                                     shouldSleep = false;
                                 }
+                                else if (consumeResult.Disposition == CMqConsumptionDisposition.DeadLetter)
+                                {
+                                    Statistics.ExplicitDeadLetterCount++;
+                                    deadLetterRequested = true;
+                                    shouldSleep = false;
+                                    break;
+                                }
+                                else if (consumeResult.Disposition == CMqConsumptionDisposition.Drop)
+                                {
+                                    Statistics.ExplicitDropCount++;
+                                    dropMessageRequested = true;
+                                    shouldSleep = false;
+                                    break;
+                                }
 
                                 Statistics.DeliveredMessageCount++;
-                                subscriber.SuccessfulMessagesDeliveries++;
+                                subscriber.SuccessfulDeliveryCount++;
 
                                 if (KeepRunning == false)
                                 {
@@ -219,8 +234,8 @@ namespace NTDLS.CatMQ.Server.Server
                             }
                             catch (Exception ex) //Delivery failure.
                             {
-                                Statistics.DeliveryFailureCount++;
-                                subscriber.FailedMessagesDeliveries++;
+                                Statistics.FailedDeliveryCount++;
+                                subscriber.FailedDeliveryCount++;
                                 _queueServer.InvokeOnLog(ex.GetBaseException());
                             }
 
@@ -267,17 +282,49 @@ namespace NTDLS.CatMQ.Server.Server
                             {
                                 removeSuccess = Subscribers.TryRead(CMqDefaults.DEFAULT_TRY_WAIT_MS, s =>
                                 {
-                                    if (Configuration.ConsumptionScheme == CMqConsumptionScheme.FirstConsumedSubscriber)
+                                    if (dropMessageRequested)
                                     {
+                                        //A subscriber requested that the message be dropped, so remove the message from the queue and cache.
+                                        m.Database?.Remove(topMessage.MessageId.ToString());
+                                        m.Messages.Remove(topMessage);
+                                    }
+                                    else if (deadLetterRequested)
+                                    {
+                                        //A subscriber requested that we dead-letter this message.
+
+                                        if (Configuration.DeadLetterConfiguration != null)
+                                        {
+                                            if ((DateTime.UtcNow - topMessage.Timestamp) > Configuration.DeadLetterConfiguration.MaxMessageAge)
+                                            {
+                                                //Message is even too old for the dead-letter queue, discard expired message.
+                                            }
+                                            else
+                                            {
+                                                _queueServer.ShovelToDeadLetter(Configuration.QueueName, topMessage);
+                                            }
+                                        }
+
+                                        //Remove the message from the queue and cache.
+                                        m.Database?.Remove(topMessage.MessageId.ToString());
+                                        m.Messages.Remove(topMessage);
+                                    }
+                                    else if (Configuration.ConsumptionScheme == CMqConsumptionScheme.FirstConsumedSubscriber)
+                                    {
+                                        //If the queue uses the FirstConsumedSubscriber schema and the message was successfully consumed
+                                        //  by a subscriber, then remove the message from the queue.
                                         if (deliveredAndConsumed)
                                         {
-                                            //The message was consumed by a subscriber, remove it from the message list.
+                                            //The message was consumed by a subscriber, remove it from the queue and cache.
                                             m.Database?.Remove(topMessage.MessageId.ToString());
                                             m.Messages.Remove(topMessage);
                                         }
                                     }
                                     else if (s.Keys.Except(topMessage.SatisfiedSubscribersSubscriberIDs).Any() == false)
                                     {
+                                        //All subscribers have received a copy of the message or have received their maximum number
+                                        //  of retries, so we can now remove the message from the queue.
+
+                                        //If there were any failed deliveries, then we want to retain a copy of the message in the DLQ.
                                         if (topMessage.FailedSubscribersSubscriberIDs.Count != 0)
                                         {
                                             if (Configuration.DeadLetterConfiguration != null)
@@ -293,7 +340,7 @@ namespace NTDLS.CatMQ.Server.Server
                                             }
                                         }
 
-                                        //If all subscribers are satisfied (delivered or max attempts reached), then remove the message.
+                                        //Remove the message from the queue and cache.
                                         m.Database?.Remove(topMessage.MessageId.ToString());
                                         m.Messages.Remove(topMessage);
                                     }

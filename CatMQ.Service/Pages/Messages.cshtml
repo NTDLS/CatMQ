@@ -21,29 +21,31 @@
         <table class="table table-striped table-bordered">
             <thead class="table-light">
                 <tr>
-                    <th colspan="6">Messages</th>
+                    <th colspan="7">Messages</th>
                 </tr>
             </thead>
             <thead class="table-light">
                 <tr>
                     <th>Message Id</th>
                     <th>Timestamp</th>
-                    <th>Object Type</th>
+                    <th>Deferred</th>
                     <th>Subscribers</th>
                     <th>Delivered</th>
                     <th>Consumed</th>
+                    <th>Type</th>
                 </tr>
             </thead>
             <tbody>
-                @foreach (var queue in Model.Messages)
+                @foreach (var message in Model.Messages)
                 {
                     <tr>
-                        <td><a href="/message/@Model.QueueName/@queue.MessageId">@queue.MessageId</a></td>
-                        <td>@queue.Timestamp</td>
-                        <td>@queue.AssemblyQualifiedTypeName</td>
-                        <td>@queue.SubscriberCount.ToString("n0")</td>
-                        <td>@queue.SubscriberMessageDeliveries.Count.ToString("n0")</td>
-                        <td>@queue.SatisfiedSubscribersSubscriberIDs.Count.ToString("n0")</td>
+                        <td><a href="/message/@Model.QueueName/@message.MessageId">@message.MessageId</a></td>
+                        <td>@message.Timestamp</td>
+                        <td>@message.DeferredUntil.ToString()</td>
+                        <td>@message.SubscriberCount.ToString("n0")</td>
+                        <td>@message.SubscriberMessageDeliveries.Count.ToString("n0")</td>
+                        <td>@message.SatisfiedSubscribersSubscriberIDs.Count.ToString("n0")</td>
+                        <td>@message.AssemblyQualifiedTypeName</td>
                     </tr>
                 }
             </tbody>

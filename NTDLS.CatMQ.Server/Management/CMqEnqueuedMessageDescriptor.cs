@@ -26,9 +26,14 @@
         public string MessageJson { get; internal set; } = string.Empty;
 
         /// <summary>
-        /// The number of sunscribers expecting to receive this message.
+        /// The number of subscribers expecting to receive this message.
         /// </summary>
         public int SubscriberCount { get; internal set; }
+
+        /// <summary>
+        /// The UTC date and time, when if set, that the message will be delivered.
+        /// </summary>
+        public DateTime? DeferredUntil { get; set; }
 
         /// <summary>
         /// The list of connection IDs that the message has been successfully delivered to.

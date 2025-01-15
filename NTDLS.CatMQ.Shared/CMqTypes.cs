@@ -4,6 +4,7 @@
     {
         /// <summary>
         /// The message was not consumed by the subscriber.
+        /// The message will not be re-attempted to the subscriber but will continue to be delivered to other subscribers.
         /// </summary>
         NotConsumed,
         /// <summary>
@@ -11,9 +12,18 @@
         /// </summary>
         Consumed,
         /// <summary>
-        /// The subscriber is requesting that the message be delivered at a later time.
+        /// Subscriber requesting that the message be delivered at a later time.
         /// </summary>
-        Defer
+        Defer,
+        /// <summary>
+        /// Subscriber requesting that the message be immediately sent to the dead-letter queue, if any. Otherwise the message is dropped.
+        /// Note that the dead-letter queue expiration times are also respected.
+        /// </summary>
+        DeadLetter,
+        /// <summary>
+        /// Subscriber requesting that the message be immediately dropped from the queue and cache.
+        /// </summary>
+        Drop
     }
 
     /// <summary>

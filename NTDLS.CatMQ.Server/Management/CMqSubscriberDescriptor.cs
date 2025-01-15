@@ -18,27 +18,27 @@
         /// <summary>
         /// The number of messages that have been attempted to the subscriber.
         /// </summary>
-        public ulong DeliveryAttempts { get; internal set; }
+        public ulong AttemptedDeliveryCount { get; internal set; }
 
         /// <summary>
         /// The number of messages that have been successfully delivered to the subscriber.
         /// </summary>
-        public ulong SuccessfulMessagesDeliveries { get; internal set; }
+        public ulong SuccessfulDeliveryCount { get; internal set; }
 
         /// <summary>
         /// The number of messages that failed when attempting to deliver to the subscriber.
         /// </summary>
-        public ulong FailedMessagesDeliveries { get; internal set; }
+        public ulong FailedDeliveryCount { get; internal set; }
 
         /// <summary>
-        /// The number of messages that have been successfully delivered, but marked as deferred by the subscriber.
+        /// The total number messages deliveries that have been attempted but were requested to be deferred to a later time.
         /// </summary>
-        public ulong DeferredMessages { get; internal set; }
+        public ulong DeferredDeliveryCount { get; internal set; }
 
         /// <summary>
         /// The number of messages that have been successfully delivered to and marked as consumed by the subscriber.
         /// </summary>
-        public ulong ConsumedMessages { get; internal set; }
+        public ulong ConsumedDeliveryCount { get; internal set; }
 
         /// <summary>
         /// The remote address of the connected client.

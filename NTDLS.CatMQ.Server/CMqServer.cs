@@ -87,7 +87,6 @@ namespace NTDLS.CatMQ.Server
                 var queueMetas = mqd.Where(q => q.Value.Configuration.PersistenceScheme == CMqPersistenceScheme.Persistent)
                     .Select(q => new MessageQueueMetadata(q.Value.Configuration, q.Value.Statistics)).ToList();
 
-                //Serialize using System.Text.Json as opposed to Newtonsoft for efficiency.
                 var persistedQueuesJson = JsonSerializer.Serialize(queueMetas, _indentedJsonOptions);
                 File.WriteAllText(Path.Join(_configuration.PersistencePath, "queues.json"), persistedQueuesJson);
             }
@@ -144,8 +143,11 @@ namespace NTDLS.CatMQ.Server
 
                                     ReceivedMessageCount = mqKVP.Value.Statistics.ReceivedMessageCount,
                                     DeliveredMessageCount = mqKVP.Value.Statistics.DeliveredMessageCount,
-                                    DeliveryFailureCount = mqKVP.Value.Statistics.DeliveryFailureCount,
-                                    ExpiredMessageCount = mqKVP.Value.Statistics.ExpiredMessageCount
+                                    FailedDeliveryCount = mqKVP.Value.Statistics.FailedDeliveryCount,
+                                    ExpiredMessageCount = mqKVP.Value.Statistics.ExpiredMessageCount,
+                                    DeferredDeliveryCount = mqKVP.Value.Statistics.DeferredDeliveryCount,
+                                    ExplicitDeadLetterCount = mqKVP.Value.Statistics.ExplicitDeadLetterCount,
+                                    ExplicitDropCount = mqKVP.Value.Statistics.ExplicitDropCount,
                                 });
                             });
                         }) && success;
@@ -234,6 +236,7 @@ namespace NTDLS.CatMQ.Server
                                     {
                                         Timestamp = message.Timestamp,
                                         SubscriberCount = sKVP.Count,
+                                        DeferredUntil = message.DeferredUntil,
                                         SubscriberMessageDeliveries = message.SubscriberMessageDeliveries.Keys.ToHashSet(),
                                         SatisfiedSubscribersSubscriberIDs = message.SatisfiedSubscribersSubscriberIDs,
                                         AssemblyQualifiedTypeName = message.AssemblyQualifiedTypeName,
@@ -504,7 +507,6 @@ namespace NTDLS.CatMQ.Server
 
                             if (messageQueue.Configuration.PersistenceScheme == CMqPersistenceScheme.Persistent && m.Database != null)
                             {
-                                //Serialize using System.Text.Json as opposed to Newtonsoft for efficiency.
                                 var persistedJson = JsonSerializer.Serialize(message);
                                 m.Database?.Put(message.MessageId.ToString(), persistedJson);
                             }
@@ -740,7 +742,7 @@ namespace NTDLS.CatMQ.Server
         /// <summary>
         /// Removes a subscription from a queue for a given connection id.
         /// </summary>
-        public void EnqueueMessage(string queueName, TimeSpan? deferredDelivery, string assemblyQualifiedTypeName, string messageJson)
+        public void EnqueueMessage(string queueName, TimeSpan? deferDeliveryDuration, string assemblyQualifiedTypeName, string messageJson)
         {
             OnLog?.Invoke(this, CMqErrorLevel.Verbose, $"Enqueuing message to queue: [{queueName}].");
 
@@ -759,12 +761,11 @@ namespace NTDLS.CatMQ.Server
                             messageQueue.Statistics.ReceivedMessageCount++;
                             var message = new EnqueuedMessage(queueKey, assemblyQualifiedTypeName, messageJson)
                             {
-                                DeferredUntil = deferredDelivery == null ? null : DateTime.Now + deferredDelivery
+                                DeferredUntil = deferDeliveryDuration == null ? null : DateTime.UtcNow + deferDeliveryDuration
                             };
 
                             if (messageQueue.Configuration.PersistenceScheme == CMqPersistenceScheme.Persistent && m.Database != null)
                             {
-                                //Serialize using System.Text.Json as opposed to Newtonsoft for efficiency.
                                 var persistedJson = JsonSerializer.Serialize(message);
                                 m.Database?.Put(message.MessageId.ToString(), persistedJson);
                             }

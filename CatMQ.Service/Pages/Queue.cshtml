@@ -44,7 +44,7 @@
         <table class="table table-striped table-bordered">
             <thead class="table-light">
                 <tr>
-                    <th colspan="7">Statistics</th>
+                    <th colspan="8">Statistics</th>
                 </tr>
             </thead>
             <thead class="table-light">
@@ -53,6 +53,7 @@
                     <th>Depth</th>
                     <th>Received</th>
                     <th>Delivered</th>
+                    <th>Deferred</th>
                     <th>Expired</th>
                     <th>Failures</th>
                     <th>Action</th>
@@ -64,8 +65,9 @@
                     <td><a href="/messages/@Model.Queue.QueueName">@Model.Queue.CurrentMessageCount.ToString("n0")</a></td>
                     <td>@Model.Queue.ReceivedMessageCount.ToString("n0")</td>
                     <td>@Model.Queue.DeliveredMessageCount.ToString("n0")</td>
+                    <td>@Model.Queue.DeferredDeliveryCount.ToString("n0")</td>
                     <td>@Model.Queue.ExpiredMessageCount.ToString("n0")</td>
-                    <td>@Model.Queue.DeliveryFailureCount.ToString("n0")</td>
+                    <td>@Model.Queue.FailedDeliveryCount.ToString("n0")</td>
                     <td>@Html.Raw(ConfirmActionHelper.GenerateDangerLink(
                         $"Purging the queue '{@Model.Queue.QueueName}' will result in permanent message loss. Continue?",
                         "Purge", $"/PurgeQueue/{@Model.Queue.QueueName}", "btn-thin"))
@@ -97,10 +99,11 @@
                     <tr>
                         <td>@queue.SubscriberId</td>
                         <td>@queue.RemoteAddress : @queue.RemotePort</td>
-                        <td>@queue.DeliveryAttempts.ToString("n0")</td>
-                        <td>@queue.SuccessfulMessagesDeliveries.ToString("n0")</td>
-                        <td>@queue.FailedMessagesDeliveries.ToString("n0")</td>
-                        <td>@queue.ConsumedMessages.ToString("n0")</td>
+                        <td>@queue.AttemptedDeliveryCount.ToString("n0")</td>
+                        <td>@queue.SuccessfulDeliveryCount.ToString("n0")</td>
+                        <td>@queue.DeferredDeliveryCount.ToString("n0")</td>
+                        <td>@queue.FailedDeliveryCount.ToString("n0")</td>
+                        <td>@queue.ConsumedDeliveryCount.ToString("n0")</td>
                         <td>@Html.Raw(ConfirmActionHelper.GenerateDangerLink(
                             $"Removing the subscription for '{@queue.SubscriberId}' from '{@Model.Queue.QueueName}' will cause the subscriber to fail. Continue?",
                             "Remove", $"/RemoveSubscription/{@Model.Queue.QueueName}/{@queue.SubscriberId}", "btn-thin"))
