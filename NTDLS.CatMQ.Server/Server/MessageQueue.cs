@@ -1,5 +1,6 @@
 ﻿using NTDLS.CatMQ.Server.Management;
 using NTDLS.CatMQ.Shared;
+using NTDLS.Helpers;
 using NTDLS.Semaphore;
 using RocksDbSharp;
 using System.Text.Json;
@@ -44,6 +45,7 @@ namespace NTDLS.CatMQ.Server.Server
             Thread.CurrentThread.Name = $"DeliveryThreadProc_{Environment.CurrentManagedThreadId}";
 #endif
             var lastCheckpoint = DateTime.UtcNow;
+            bool attemptBufferRehydration = false;
 
             while (KeepRunning)
             {
@@ -76,6 +78,12 @@ namespace NTDLS.CatMQ.Server.Server
 
                     #region Get top message and its subscribers.
 
+                    if (attemptBufferRehydration)
+                    {
+                        attemptBufferRehydration = false;
+                        RehydrateMessageQueueFromDatabase();
+                    }
+
                     EnqueuedMessages.TryReadAll([Subscribers], CMqDefaults.DEFAULT_TRY_WAIT_MS, m =>
                     {
                         Subscribers.Read(s =>
@@ -85,7 +93,20 @@ namespace NTDLS.CatMQ.Server.Server
                             if (s.Count > 0)
                             {
                                 //Get the first message in the list, if any.
-                                topMessage = m.Messages.FirstOrDefault(o => o.DeferredUntil == null || now >= o.DeferredUntil);
+                                topMessage = m.MessageBuffer.FirstOrDefault(o => o.DeferredUntil == null || now >= o.DeferredUntil);
+
+                                if (Configuration.PersistenceScheme == CMqPersistenceScheme.Persistent)
+                                {
+                                    //We rehydrate the queue from the database when we have a queue-depth and either we didn't
+                                    //  get a top-message or we are under the minimum buffer size. We have to check for the NULL
+                                    //  top-message because it could be that we do not have any qualified messages in the buffer
+                                    //  (because all of them are deferred) even though we do have messages in the buffer.
+                                    if (Statistics.QueueDepth > 0 && (topMessage == null || m.MessageBuffer.Count < CMqDefaults.DEFAULT_PERSISTENT_MESSAGES_MIN_BUFFER))
+                                    {
+                                        //If we have more items in the queue than we have in the buffer, then trigger a rehydrate.
+                                        attemptBufferRehydration = (Statistics.QueueDepth > m.MessageBuffer.Count);
+                                    }
+                                }
 
                                 if (topMessage != null)
                                 {
@@ -107,7 +128,7 @@ namespace NTDLS.CatMQ.Server.Server
                         {
                             //Get the first message in the list, if any.
                             //We do this so that we can test for expired messages even when no subscribers are present.
-                            var testExpired = topMessage ?? m.Messages.FirstOrDefault();
+                            var testExpired = topMessage ?? m.MessageBuffer.FirstOrDefault();
 
                             if (testExpired != null)
                             {
@@ -128,7 +149,8 @@ namespace NTDLS.CatMQ.Server.Server
                                     }
 
                                     m.Database?.Remove(testExpired.SerialNumber.ToString());
-                                    m.Messages.Remove(testExpired);
+                                    m.MessageBuffer.Remove(testExpired);
+                                    Statistics.DecrementQueueDepth();
                                     Statistics.ExpiredMessageCount++;
 
                                     topMessage = null; //Make sure we do not process the topMessage (if any).
@@ -159,11 +181,11 @@ namespace NTDLS.CatMQ.Server.Server
                             //Keep track of per-message-subscriber delivery metrics.
                             if (topMessage.SubscriberMessageDeliveries.TryGetValue(subscriber.SubscriberId, out var subscriberMessageDelivery))
                             {
-                                subscriberMessageDelivery.DeliveryAttempts++;
+                                subscriberMessageDelivery.DeliveryAttemptCount++;
                             }
                             else
                             {
-                                subscriberMessageDelivery = new SubscriberMessageDelivery() { DeliveryAttempts = 1 };
+                                subscriberMessageDelivery = new SubscriberMessageDelivery() { DeliveryAttemptCount = 1 };
                                 topMessage.SubscriberMessageDeliveries.Add(subscriber.SubscriberId, subscriberMessageDelivery);
                             }
 
@@ -172,6 +194,9 @@ namespace NTDLS.CatMQ.Server.Server
                                 subscriber.AttemptedDeliveryCount++;
 
                                 var consumeResult = _queueServer.DeliverMessage(subscriber.SubscriberId, Configuration.QueueName, topMessage);
+
+                                Statistics.DeliveredMessageCount++;
+                                subscriber.SuccessfulDeliveryCount++;
 
                                 if (consumeResult.Disposition == CMqConsumptionDisposition.Consumed)
                                 {
@@ -224,9 +249,6 @@ namespace NTDLS.CatMQ.Server.Server
                                     break;
                                 }
 
-                                Statistics.DeliveredMessageCount++;
-                                subscriber.SuccessfulDeliveryCount++;
-
                                 if (KeepRunning == false)
                                 {
                                     break;
@@ -234,14 +256,14 @@ namespace NTDLS.CatMQ.Server.Server
                             }
                             catch (Exception ex) //Delivery failure.
                             {
-                                Statistics.FailedDeliveryCount++;
+                                Statistics.ExpiredMessageCount++;
                                 subscriber.FailedDeliveryCount++;
                                 _queueServer.InvokeOnLog(ex.GetBaseException());
                             }
 
                             //If we have tried to deliver this message to this subscriber too many times, then mark this subscriber-message as satisfied.
                             if (Configuration.MaxDeliveryAttempts > 0
-                                && subscriberMessageDelivery.DeliveryAttempts >= Configuration.MaxDeliveryAttempts)
+                                && subscriberMessageDelivery.DeliveryAttemptCount >= Configuration.MaxDeliveryAttempts)
                             {
                                 topMessage.FailedSubscribersSubscriberIDs.Add(subscriber.SubscriberId);
                                 topMessage.SatisfiedSubscribersSubscriberIDs.Add(subscriber.SubscriberId);
@@ -286,7 +308,8 @@ namespace NTDLS.CatMQ.Server.Server
                                     {
                                         //A subscriber requested that the message be dropped, so remove the message from the queue and cache.
                                         m.Database?.Remove(topMessage.SerialNumber.ToString());
-                                        m.Messages.Remove(topMessage);
+                                        m.MessageBuffer.Remove(topMessage);
+                                        Statistics.DecrementQueueDepth();
                                     }
                                     else if (deadLetterRequested)
                                     {
@@ -306,7 +329,8 @@ namespace NTDLS.CatMQ.Server.Server
 
                                         //Remove the message from the queue and cache.
                                         m.Database?.Remove(topMessage.SerialNumber.ToString());
-                                        m.Messages.Remove(topMessage);
+                                        m.MessageBuffer.Remove(topMessage);
+                                        Statistics.DecrementQueueDepth();
                                     }
                                     else if (Configuration.ConsumptionScheme == CMqConsumptionScheme.FirstConsumedSubscriber)
                                     {
@@ -316,7 +340,8 @@ namespace NTDLS.CatMQ.Server.Server
                                         {
                                             //The message was consumed by a subscriber, remove it from the queue and cache.
                                             m.Database?.Remove(topMessage.SerialNumber.ToString());
-                                            m.Messages.Remove(topMessage);
+                                            m.MessageBuffer.Remove(topMessage);
+                                            Statistics.DecrementQueueDepth();
                                         }
                                     }
                                     else if (s.Keys.Except(topMessage.SatisfiedSubscribersSubscriberIDs).Any() == false)
@@ -342,7 +367,8 @@ namespace NTDLS.CatMQ.Server.Server
 
                                         //Remove the message from the queue and cache.
                                         m.Database?.Remove(topMessage.SerialNumber.ToString());
-                                        m.Messages.Remove(topMessage);
+                                        m.MessageBuffer.Remove(topMessage);
+                                        Statistics.DecrementQueueDepth();
                                     }
                                 }) && removeSuccess;
                             });
@@ -374,6 +400,47 @@ namespace NTDLS.CatMQ.Server.Server
             }
         }
 
+        private bool RehydrateMessageQueueFromDatabase()
+        {
+            if (Configuration.PersistenceScheme != CMqPersistenceScheme.Persistent)
+            {
+                return false;
+            }
+
+            _queueServer.InvokeOnLog(CMqErrorLevel.Verbose, $"Re-hydrating message buffer for [{Configuration.QueueName}].");
+
+            return EnqueuedMessages.TryWrite(m =>
+            {
+                if (m.Database == null)
+                {
+                    return;
+                }
+
+                ulong? maxSerialNumber = null;
+
+                if (m.MessageBuffer.Count > 0)
+                {
+                    maxSerialNumber = ulong.Parse(m.MessageBuffer.Max(o => o.SerialNumber).EnsureNotNull());
+                }
+
+                int messagesLoaded = 0;
+
+                using var iterator = m.Database.NewIterator();
+                for (iterator.SeekToFirst(); iterator.Valid() && messagesLoaded < CMqDefaults.DEFAULT_PERSISTENT_MESSAGES_BUFFER_SIZE; iterator.Next())
+                {
+                    var persistedMessage = JsonSerializer.Deserialize<EnqueuedMessage>(iterator.StringValue());
+                    if (persistedMessage != null)
+                    {
+                        if (maxSerialNumber == null || ulong.Parse(persistedMessage.SerialNumber) > maxSerialNumber)
+                        {
+                            m.MessageBuffer.Add(persistedMessage);
+                            messagesLoaded++;
+                        }
+                    }
+                }
+            });
+        }
+
         public void InitializePersistentDatabase()
         {
             if (Configuration.PersistenceScheme != CMqPersistenceScheme.Persistent)
@@ -381,11 +448,9 @@ namespace NTDLS.CatMQ.Server.Server
                 return;
             }
 
-            var deadLetterQueueMessages = new Dictionary<string, List<EnqueuedMessage>>(StringComparer.OrdinalIgnoreCase);
+            var deadLetterSerialNumbers = new HashSet<string>();
 
-            #region Load persisted messages.
-
-            _queueServer.InvokeOnLog(CMqErrorLevel.Verbose, $"Creating persistent path for [{Configuration.QueueName}].");
+            _queueServer.InvokeOnLog(CMqErrorLevel.Information, $"Creating persistent path for [{Configuration.QueueName}].");
 
             var databasePath = Path.Join(_queueServer.Configuration.PersistencePath, "messages", Configuration.QueueName);
             Directory.CreateDirectory(databasePath);
@@ -397,16 +462,24 @@ namespace NTDLS.CatMQ.Server.Server
             _queueServer.InvokeOnLog(CMqErrorLevel.Information, $"Loading persistent messages for [{Configuration.QueueName}].");
             using var iterator = persistenceDatabase.NewIterator();
 
+            ulong maxSerialNumber = 0;
+
             EnqueuedMessages.Write(m =>
             {
-                //The keys in RocksDB are not stored in the order they were added, so we
-                // need to load all messages into the messages queues then sort them in place.
+                Statistics.SetQueueDepth(0);
+
                 for (iterator.SeekToFirst(); iterator.Valid(); iterator.Next())
                 {
-                    //Deserialize using System.Text.Json as opposed to Newtonsoft for efficiency.
                     var persistedMessage = JsonSerializer.Deserialize<EnqueuedMessage>(iterator.StringValue());
                     if (persistedMessage != null)
                     {
+                        var serialNumber = ulong.Parse(persistedMessage.SerialNumber);
+
+                        if (serialNumber > maxSerialNumber)
+                        {
+                            maxSerialNumber = serialNumber;
+                        }
+
                         //If we have a MaxMessageAge, check it and if the message is expired, either
                         //  dead-letter or discard it instead of adding it to its original queue.
                         if (Configuration.MaxMessageAge > TimeSpan.Zero)
@@ -419,15 +492,11 @@ namespace NTDLS.CatMQ.Server.Server
                                     {
                                         //Message is even too old for the dead-letter queue, discard expired message.
                                     }
-                                    else if (deadLetterQueueMessages.TryGetValue(persistedMessage.QueueName, out var deadLetterMessages))
-                                    {
-                                        //Add to dead-letter queue.
-                                        deadLetterMessages.Add(persistedMessage);
-                                    }
                                     else
                                     {
-                                        //Add to dead-letter queue.
-                                        deadLetterQueueMessages.Add(persistedMessage.QueueName, new List<EnqueuedMessage> { persistedMessage });
+                                        Statistics.ExpiredMessageCount++;
+                                        _queueServer.ShovelToDeadLetter(Configuration.QueueName, persistedMessage);
+                                        deadLetterSerialNumbers.Add(persistedMessage.SerialNumber);
                                     }
                                 }
                                 else
@@ -438,37 +507,47 @@ namespace NTDLS.CatMQ.Server.Server
                             else
                             {
                                 //Add the message back to its original queue.
-                                m.Messages.Add(persistedMessage);
+                                if (m.MessageBuffer.Count < CMqDefaults.DEFAULT_PERSISTENT_MESSAGES_MAX_BUFFER)
+                                {
+                                    //We only keep the most current n-messages in memory, they are loaded
+                                    //  from the database when the count falls below a given threshold.
+                                    m.MessageBuffer.Add(persistedMessage);
+                                }
+                                else
+                                {
+                                    //We could break here, but we just roll though them so we can properly
+                                    //  populate the QueueDepth and also dead-letter expired messages.
+                                }
+                                Statistics.IncrementQueueDepth();
                             }
                         }
                         else
                         {
                             //Add the message back to its original queue.
-                            m.Messages.Add(persistedMessage);
+                            if (m.MessageBuffer.Count < CMqDefaults.DEFAULT_PERSISTENT_MESSAGES_MAX_BUFFER)
+                            {
+                                //We only keep the most current n-messages in memory, they are loaded
+                                //  from the database when the count falls below a given threshold.
+                                m.MessageBuffer.Add(persistedMessage);
+                            }
+                            Statistics.IncrementQueueDepth();
                         }
                     }
                 }
 
-                //Sort the message in the queues by their timestamps.
-                _queueServer.InvokeOnLog(CMqErrorLevel.Information, $"Sorting {m.Messages.Count:n0} messages for [{Configuration.QueueName}].");
-                m.Messages.Sort((m1, m2) => m1.Timestamp.CompareTo(m2.Timestamp));
-
-                if (deadLetterQueueMessages.TryGetValue(Configuration.QueueName, out var expiredMessages))
+                if (deadLetterSerialNumbers.Count > 0)
                 {
-                    _queueServer.InvokeOnLog(CMqErrorLevel.Information, $"Dead-lettering {expiredMessages.Count:n0} expired messages in [{Configuration.QueueName}].");
-
-                    foreach (var deadLetterMessage in expiredMessages)
+                    _queueServer.InvokeOnLog(CMqErrorLevel.Information, $"Removing {deadLetterSerialNumbers.Count:n0} dead-lettered messages from [{Configuration.QueueName}].");
+                    foreach (var deadLetterSerialNumber in deadLetterSerialNumbers)
                     {
-                        Statistics.ExpiredMessageCount++;
-                        _queueServer.ShovelToDeadLetter(Configuration.QueueName, deadLetterMessage);
-                        m.Database?.Remove(deadLetterMessage.SerialNumber.ToString());
+                        persistenceDatabase.Remove(deadLetterSerialNumber);
                     }
                 }
 
                 m.Database = persistenceDatabase;
             });
 
-            #endregion
+            Statistics.SetNextSerialNumber(maxSerialNumber + 1);
         }
 
         public void StartAsync()

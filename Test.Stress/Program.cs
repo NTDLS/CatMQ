@@ -65,7 +65,7 @@ namespace Test.Stress
                 client.CreateQueue(new CMqQueueConfiguration(queueName)
                 {
                     PersistenceScheme = CMqPersistenceScheme.Persistent,
-                    MaxMessageAge = TimeSpan.FromMinutes(1),
+                    //MaxMessageAge = TimeSpan.FromMinutes(1),
                     DeadLetterConfiguration = deadLetterConfig
                 });
 
@@ -98,7 +98,7 @@ namespace Test.Stress
             int clientId = Math.Abs(Guid.NewGuid().GetHashCode());
 
             int messageNumber = 0;
-            while (messageNumber < 1000000) //Send test messages as objects that inherit from IMqMessage
+            while (messageNumber < 10000) //Send test messages as objects that inherit from IMqMessage
             {
                 foreach (var queueName in myQueueNames)
                 {

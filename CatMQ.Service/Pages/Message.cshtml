@@ -45,7 +45,7 @@
                 </thead>
                 <tbody>
                     <tr>
-                        <td>@int.Parse(Model.Message.SerialNumber)</td>
+                        <td>@int.Parse(Model.Message.SerialNumber ?? string.Empty)</td>
                         <td>@Model.Message.Timestamp</td>
                         <td>@Model.Message.DeferredUntil.ToString()</td>
                         <td>@Model.Message.SubscriberMessageDeliveries.Count.ToString("n0")</td>

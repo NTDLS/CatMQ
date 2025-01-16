@@ -39,7 +39,7 @@
                 @foreach (var message in Model.Messages)
                 {
                     <tr>
-                        <td><a href="/message/@Model.QueueName/@message.SerialNumber">@int.Parse(@message.SerialNumber)</a></td>
+                        <td><a href="/message/@Model.QueueName/@message.SerialNumber">@int.Parse(@message.SerialNumber ?? string.Empty)</a></td>
                         <td>@message.Timestamp</td>
                         <td>@message.DeferredUntil.ToString()</td>
                         <td>@message.SubscriberCount.ToString("n0")</td>

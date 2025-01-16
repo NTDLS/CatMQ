@@ -124,31 +124,28 @@ namespace NTDLS.CatMQ.Server
                 {
                     foreach (var mqKVP in mqd)
                     {
-                        success = mqKVP.Value.EnqueuedMessages.TryReadAll([mqKVP.Value.Subscribers], CMqDefaults.DEFAULT_TRY_WAIT_MS, m =>
+                        success = mqKVP.Value.Subscribers.TryRead(sKVP =>
                         {
-                            mqKVP.Value.Subscribers.Read(sKVP =>
+                            result.Add(new CMqQueueDescriptor
                             {
-                                result.Add(new CMqQueueDescriptor
-                                {
-                                    ConsumptionScheme = mqKVP.Value.Configuration.ConsumptionScheme,
-                                    DeliveryScheme = mqKVP.Value.Configuration.DeliveryScheme,
-                                    DeliveryThrottle = mqKVP.Value.Configuration.DeliveryThrottle,
-                                    MaxDeliveryAttempts = mqKVP.Value.Configuration.MaxDeliveryAttempts,
-                                    MaxMessageAge = mqKVP.Value.Configuration.MaxMessageAge,
-                                    PersistenceScheme = mqKVP.Value.Configuration.PersistenceScheme,
-                                    QueueName = mqKVP.Value.Configuration.QueueName,
+                                ConsumptionScheme = mqKVP.Value.Configuration.ConsumptionScheme,
+                                DeliveryScheme = mqKVP.Value.Configuration.DeliveryScheme,
+                                DeliveryThrottle = mqKVP.Value.Configuration.DeliveryThrottle,
+                                MaxDeliveryAttempts = mqKVP.Value.Configuration.MaxDeliveryAttempts,
+                                MaxMessageAge = mqKVP.Value.Configuration.MaxMessageAge,
+                                PersistenceScheme = mqKVP.Value.Configuration.PersistenceScheme,
+                                QueueName = mqKVP.Value.Configuration.QueueName,
 
-                                    CurrentSubscriberCount = sKVP.Count,
-                                    CurrentMessageCount = m.Messages.Count,
+                                CurrentSubscriberCount = sKVP.Count,
+                                CurrentMessageCount = mqKVP.Value.Statistics.QueueDepth,
 
-                                    ReceivedMessageCount = mqKVP.Value.Statistics.ReceivedMessageCount,
-                                    DeliveredMessageCount = mqKVP.Value.Statistics.DeliveredMessageCount,
-                                    FailedDeliveryCount = mqKVP.Value.Statistics.FailedDeliveryCount,
-                                    ExpiredMessageCount = mqKVP.Value.Statistics.ExpiredMessageCount,
-                                    DeferredDeliveryCount = mqKVP.Value.Statistics.DeferredDeliveryCount,
-                                    ExplicitDeadLetterCount = mqKVP.Value.Statistics.ExplicitDeadLetterCount,
-                                    ExplicitDropCount = mqKVP.Value.Statistics.ExplicitDropCount,
-                                });
+                                ReceivedMessageCount = mqKVP.Value.Statistics.ReceivedMessageCount,
+                                DeliveredMessageCount = mqKVP.Value.Statistics.DeliveredMessageCount,
+                                FailedDeliveryCount = mqKVP.Value.Statistics.FailedDeliveryCount,
+                                ExpiredMessageCount = mqKVP.Value.Statistics.ExpiredMessageCount,
+                                DeferredDeliveryCount = mqKVP.Value.Statistics.DeferredDeliveryCount,
+                                ExplicitDeadLetterCount = mqKVP.Value.Statistics.ExplicitDeadLetterCount,
+                                ExplicitDropCount = mqKVP.Value.Statistics.ExplicitDropCount,
                             });
                         }) && success;
 
@@ -230,7 +227,7 @@ namespace NTDLS.CatMQ.Server
                         {
                             qKVP.Value.Subscribers.Read(sKVP =>
                             {
-                                foreach (var message in m.Messages.Skip(offset).Take(take))
+                                foreach (var message in m.MessageBuffer.Skip(offset).Take(take))
                                 {
                                     result.Add(new CMqEnqueuedMessageDescriptor(message.SerialNumber)
                                     {
@@ -282,7 +279,7 @@ namespace NTDLS.CatMQ.Server
                     {
                         success = messageQueue.EnqueuedMessages.TryRead(CMqDefaults.DEFAULT_TRY_WAIT_MS, m =>
                         {
-                            var message = m.Messages.Where(o => o.SerialNumber == serialNumber).FirstOrDefault();
+                            var message = m.MessageBuffer.Where(o => o.SerialNumber == serialNumber).FirstOrDefault();
                             if (message != null)
                             {
                                 result = new CMqEnqueuedMessageDescriptor(message.SerialNumber)
@@ -369,7 +366,9 @@ namespace NTDLS.CatMQ.Server
 
             _keepRunning = true;
 
-            var messageQueuesToStart = new List<MessageQueue>();
+            var messageQueuesToLoad = new List<MessageQueue>();
+            var deadLetterQueuesToLoad = new List<MessageQueue>();
+            var queuesToStart = new List<MessageQueue>();
 
             if (_configuration.PersistencePath != null)
             {
@@ -385,36 +384,49 @@ namespace NTDLS.CatMQ.Server
                     if (queueMetas != null)
                     {
                         _messageQueues.Write(mqd =>
-                        {
-                            foreach (var queueMeta in queueMetas)
-                            {
-                                var messageQueue = new MessageQueue(this, queueMeta.Configuration)
-                                {
-                                    Statistics = queueMeta.Statistics
-                                };
-                                messageQueuesToStart.Add(messageQueue);
-                                mqd.Add(queueMeta.Configuration.QueueName.ToLowerInvariant(), messageQueue);
+                       {
+                           foreach (var queueMeta in queueMetas)
+                           {
+                               var messageQueue = new MessageQueue(this, queueMeta.Configuration)
+                               {
+                                   Statistics = queueMeta.Statistics
+                               };
+                               queuesToStart.Add(messageQueue);
 
-                                if (queueMeta.Configuration.DeadLetterConfiguration != null
-                                    && queueMeta.Configuration.DeadLetterConfiguration.PersistenceScheme == CMqPersistenceScheme.Ephemeral)
-                                {
-                                    //Persistent DLQs are created by default, if the queue has an Ephemeral DLQ then we need to manually create it.
-                                    var dlqConfig = queueMeta.Configuration.DeadLetterConfiguration.ToConfiguration(queueMeta.Configuration.QueueName);
-                                    var dlq = new MessageQueue(this, dlqConfig);
-                                    messageQueuesToStart.Add(dlq);
-                                    mqd.Add(dlqConfig.QueueName.ToLowerInvariant(), dlq);
-                                }
-                            }
-                        });
+                               if (messageQueue.Configuration.QueueName.EndsWith(".dlq"))
+                               {
+                                   deadLetterQueuesToLoad.Add(messageQueue);
+                               }
+                               else
+                               {
+                                   messageQueuesToLoad.Add(messageQueue);
+                               }
+                               mqd.Add(queueMeta.Configuration.QueueName.ToLowerInvariant(), messageQueue);
+
+                               if (queueMeta.Configuration.DeadLetterConfiguration != null
+                                   && queueMeta.Configuration.DeadLetterConfiguration.PersistenceScheme == CMqPersistenceScheme.Ephemeral)
+                               {
+                                   //Persistent DLQs are created by default, if the queue has an Ephemeral DLQ then we need to manually create it.
+                                   var dlqConfig = queueMeta.Configuration.DeadLetterConfiguration.ToConfiguration(queueMeta.Configuration.QueueName);
+                                   var dlq = new MessageQueue(this, dlqConfig);
+                                   queuesToStart.Add(dlq);
+                                   mqd.Add(dlqConfig.QueueName.ToLowerInvariant(), dlq);
+                               }
+                           }
+                       });
                     }
                 }
             }
 
-            var loadTasks = messageQueuesToStart.Select(m => Task.Run(() => m.InitializePersistentDatabase())).ToArray();
+            //Load DLQs first, because the regular queues will need to use them when they load.
+            var loadTasks = deadLetterQueuesToLoad.Select(m => Task.Run(() => m.InitializePersistentDatabase())).ToArray();
+            Task.WaitAll(loadTasks);
+
+            loadTasks = messageQueuesToLoad.Select(m => Task.Run(() => m.InitializePersistentDatabase())).ToArray();
             Task.WaitAll(loadTasks);
 
             OnLog?.Invoke(this, CMqErrorLevel.Information, "Starting queues.");
-            foreach (var mq in messageQueuesToStart)
+            foreach (var mq in queuesToStart)
             {
                 mq.StartAsync();
             }
@@ -501,15 +513,29 @@ namespace NTDLS.CatMQ.Server
                             message.SatisfiedSubscribersSubscriberIDs.Clear();
                             message.FailedSubscribersSubscriberIDs.Clear();
 
-                            messageQueue.Statistics.ReceivedMessageCount++;
+                            messageQueue.Statistics.IncrementReceivedMessageCount();
+                            messageQueue.Statistics.IncrementQueueDepth();
+
+                            //Yes, DLQ messages get a new serial number, its a different queue after all.
+                            var serialNumber = messageQueue.Statistics.GetNextSerialNumber();
 
                             if (messageQueue.Configuration.PersistenceScheme == CMqPersistenceScheme.Persistent && m.Database != null)
                             {
                                 var persistedJson = JsonSerializer.Serialize(message);
                                 m.Database?.Put(message.SerialNumber.ToString(), persistedJson);
-                            }
 
-                            m.Messages.Add(message);
+                                if (m.MessageBuffer.Count < CMqDefaults.DEFAULT_PERSISTENT_MESSAGES_MAX_BUFFER)
+                                {
+                                    //We only keep the most current n-messages in memory, they are loaded
+                                    //  from the database when the count falls below a given threshold.
+                                    m.MessageBuffer.Add(message);
+                                }
+                            }
+                            else
+                            {
+                                //We have to keep all ephemeral messages in memory.
+                                m.MessageBuffer.Add(message);
+                            }
 
                             messageQueue.DeliveryThreadWaitEvent.Set();
 
@@ -619,7 +645,7 @@ namespace NTDLS.CatMQ.Server
 
                             if (messageQueue.Configuration.PersistenceScheme == CMqPersistenceScheme.Persistent && m.Database != null)
                             {
-                                foreach (var message in m.Messages)
+                                foreach (var message in m.MessageBuffer)
                                 {
                                     m.Database?.Remove(message.SerialNumber.ToString());
                                 }
@@ -756,9 +782,11 @@ namespace NTDLS.CatMQ.Server
                     {
                         success = messageQueue.EnqueuedMessages.TryWrite(CMqDefaults.DEFAULT_TRY_WAIT_MS, m =>
                         {
-                            var serialNumber = (messageQueue.Statistics.MessageSerialNumber++).ToString().PadLeft(20, '0');
+                            var serialNumber = messageQueue.Statistics.GetNextSerialNumber();
 
-                            messageQueue.Statistics.ReceivedMessageCount++;
+                            messageQueue.Statistics.IncrementReceivedMessageCount();
+                            messageQueue.Statistics.IncrementQueueDepth();
+
                             var message = new EnqueuedMessage(queueKey, assemblyQualifiedTypeName, messageJson, serialNumber)
                             {
                                 DeferredUntil = deferDeliveryDuration == null ? null : DateTime.UtcNow + deferDeliveryDuration
@@ -768,9 +796,15 @@ namespace NTDLS.CatMQ.Server
                             {
                                 var persistedJson = JsonSerializer.Serialize(message);
                                 m.Database?.Put(message.SerialNumber, persistedJson);
-                            }
 
-                            m.Messages.Add(message);
+                                //For persistent queues, the messages are only loaded into the database.
+                                //They will be buffered into the message buffer by the message queue delivery thread.
+                            }
+                            else
+                            {
+                                //We have to keep all ephemeral messages in memory.
+                                m.MessageBuffer.Add(message);
+                            }
                             messageQueue.DeliveryThreadWaitEvent.Set();
                         }) && success;
                     }
@@ -808,12 +842,13 @@ namespace NTDLS.CatMQ.Server
                         {
                             if (messageQueue.Configuration.PersistenceScheme == CMqPersistenceScheme.Persistent && m.Database != null)
                             {
-                                foreach (var message in m.Messages)
+                                foreach (var message in m.MessageBuffer)
                                 {
                                     m.Database?.Remove(message.SerialNumber.ToString());
                                 }
                             }
-                            m.Messages.Clear();
+                            m.MessageBuffer.Clear();
+                            messageQueue.Statistics.SetQueueDepth(0);
                         }) && success;
                     }
                     else

@@ -5,6 +5,6 @@
     /// </summary>
     internal class SubscriberMessageDelivery
     {
-        public int DeliveryAttempts { get; set; }
+        public int DeliveryAttemptCount { get; set; }
     }
 }

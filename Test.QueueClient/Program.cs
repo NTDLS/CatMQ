@@ -28,7 +28,7 @@ namespace Test.QueueClient
             //Create a queue. These are highly configurable.
             client.CreateQueue(new CMqQueueConfiguration("MyFirstQueue")
             {
-                PersistenceScheme = CMqPersistenceScheme.Ephemeral,
+                PersistenceScheme = CMqPersistenceScheme.Persistent,
                 ConsumptionScheme = CMqConsumptionScheme.FirstConsumedSubscriber
             });
 
@@ -48,16 +48,15 @@ namespace Test.QueueClient
             }
 
             //Enqueue a few messages, note that the message is just a class and it must inherit from ICMqMessage.
-            for (int i = 0; i < 10000000; i++)
+            for (int i = 0; i < 10000; i++)
             {
-                client.Enqueue("MyFirstQueue", new MyMessage($"Test message {i++:n0}"), TimeSpan.FromSeconds(10));
-                Thread.Sleep(1000);
+                //client.Enqueue("MyFirstQueue", new MyMessage($"Test message {i++:n0}"), TimeSpan.FromSeconds(10));
+                client.Enqueue("MyFirstQueue", new MyMessage($"Test message {i:n0}"));
             }
 
             Console.WriteLine("Press [enter] to shutdown.");
             Console.ReadLine();
 
-            //Cleanup.
             client.Disconnect();
         }
 
