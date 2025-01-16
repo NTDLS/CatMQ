@@ -128,15 +128,13 @@ namespace Test.Stress
             }
             */
 
-            /*
-            if (_random.Next(0, 100) > 75)
+            if (_random.Next(0, 100) > 95)
             {
                 return new CMqConsumeResult(CMqConsumptionDisposition.Defer)
                 {
                     DeferDuration = TimeSpan.FromSeconds(10)
                 };
             }
-            */
             return new CMqConsumeResult(CMqConsumptionDisposition.Consumed);
         }
 
