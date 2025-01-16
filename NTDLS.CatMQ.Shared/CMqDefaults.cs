@@ -3,14 +3,9 @@
     public static class CMqDefaults
     {
         /// <summary>
-        /// The number of messages to load from a persistence database when hydrating the buffer during delivery.
+        /// The number of messages to load from a persistence database when hydrating the message buffer.
         /// </summary>
         public const int DEFAULT_PERSISTENT_MESSAGES_BUFFER_SIZE = 1000;
-
-        /// <summary>
-        /// The maximum number of messages to keep in memory for persistent queues.
-        /// </summary>
-        public const int DEFAULT_PERSISTENT_MESSAGES_MAX_BUFFER = 1000;
 
         /// <summary>
         /// The minimum number of messages to keep in memory for persistent queues.

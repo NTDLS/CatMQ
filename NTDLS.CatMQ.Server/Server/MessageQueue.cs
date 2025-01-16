@@ -474,9 +474,9 @@ namespace NTDLS.CatMQ.Server.Server
                     if (persistedMessage != null)
                     {
                         var serialNumber = ulong.Parse(persistedMessage.SerialNumber);
-
                         if (serialNumber > maxSerialNumber)
                         {
+                            //Keep track of the max serial number so we know where to start from with the next message.
                             maxSerialNumber = serialNumber;
                         }
 
@@ -502,34 +502,20 @@ namespace NTDLS.CatMQ.Server.Server
                                 else
                                 {
                                     //No dead-letter queue, discard expired message.
+                                    deadLetterSerialNumbers.Add(persistedMessage.SerialNumber);
                                 }
                             }
                             else
                             {
-                                //Add the message back to its original queue.
-                                if (m.MessageBuffer.Count < CMqDefaults.DEFAULT_PERSISTENT_MESSAGES_MAX_BUFFER)
-                                {
-                                    //We only keep the most current n-messages in memory, they are loaded
-                                    //  from the database when the count falls below a given threshold.
-                                    m.MessageBuffer.Add(persistedMessage);
-                                }
-                                else
-                                {
-                                    //We could break here, but we just roll though them so we can properly
-                                    //  populate the QueueDepth and also dead-letter expired messages.
-                                }
+                                //For persistent queues, the messages are only loaded into the database.
+                                //They will be buffered into the message buffer by the message queue delivery thread.
                                 Statistics.IncrementQueueDepth();
                             }
                         }
                         else
                         {
-                            //Add the message back to its original queue.
-                            if (m.MessageBuffer.Count < CMqDefaults.DEFAULT_PERSISTENT_MESSAGES_MAX_BUFFER)
-                            {
-                                //We only keep the most current n-messages in memory, they are loaded
-                                //  from the database when the count falls below a given threshold.
-                                m.MessageBuffer.Add(persistedMessage);
-                            }
+                            //For persistent queues, the messages are only loaded into the database.
+                            //They will be buffered into the message buffer by the message queue delivery thread.
                             Statistics.IncrementQueueDepth();
                         }
                     }

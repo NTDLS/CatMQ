@@ -522,14 +522,10 @@ namespace NTDLS.CatMQ.Server
                             if (messageQueue.Configuration.PersistenceScheme == CMqPersistenceScheme.Persistent && m.Database != null)
                             {
                                 var persistedJson = JsonSerializer.Serialize(message);
-                                m.Database?.Put(message.SerialNumber.ToString(), persistedJson);
+                                m.Database.Put(message.SerialNumber.ToString(), persistedJson);
 
-                                if (m.MessageBuffer.Count < CMqDefaults.DEFAULT_PERSISTENT_MESSAGES_MAX_BUFFER)
-                                {
-                                    //We only keep the most current n-messages in memory, they are loaded
-                                    //  from the database when the count falls below a given threshold.
-                                    m.MessageBuffer.Add(message);
-                                }
+                                //For persistent queues, the messages are only loaded into the database.
+                                //They will be buffered into the message buffer by the message queue delivery thread.
                             }
                             else
                             {
@@ -795,7 +791,7 @@ namespace NTDLS.CatMQ.Server
                             if (messageQueue.Configuration.PersistenceScheme == CMqPersistenceScheme.Persistent && m.Database != null)
                             {
                                 var persistedJson = JsonSerializer.Serialize(message);
-                                m.Database?.Put(message.SerialNumber, persistedJson);
+                                m.Database.Put(message.SerialNumber, persistedJson);
 
                                 //For persistent queues, the messages are only loaded into the database.
                                 //They will be buffered into the message buffer by the message queue delivery thread.
