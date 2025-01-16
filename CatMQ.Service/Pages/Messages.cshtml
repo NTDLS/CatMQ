@@ -26,7 +26,7 @@
             </thead>
             <thead class="table-light">
                 <tr>
-                    <th>Message Id</th>
+                    <th>Serial#</th>
                     <th>Timestamp</th>
                     <th>Deferred</th>
                     <th>Subscribers</th>
@@ -39,7 +39,7 @@
                 @foreach (var message in Model.Messages)
                 {
                     <tr>
-                        <td><a href="/message/@Model.QueueName/@message.MessageId">@message.MessageId</a></td>
+                        <td><a href="/message/@Model.QueueName/@message.SerialNumber">@int.Parse(@message.SerialNumber)</a></td>
                         <td>@message.Timestamp</td>
                         <td>@message.DeferredUntil.ToString()</td>
                         <td>@message.SubscriberCount.ToString("n0")</td>

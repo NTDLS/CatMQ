@@ -6,9 +6,18 @@
     public class CMqEnqueuedMessageDescriptor
     {
         /// <summary>
+        /// Creates a new instance of the CMqEnqueuedMessageDescriptor.
+        /// </summary>
+        /// <param name="serialNumber"></param>
+        public CMqEnqueuedMessageDescriptor(string serialNumber)
+        {
+            SerialNumber = serialNumber;
+        }
+
+        /// <summary>
         /// The unique ID of the message.
         /// </summary>
-        public Guid MessageId { get; internal set; } = Guid.NewGuid();
+        public string? SerialNumber { get; internal set; }
 
         /// <summary>
         /// The UTC date and time when the message was enqueued.

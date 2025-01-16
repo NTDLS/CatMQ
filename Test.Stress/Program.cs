@@ -15,7 +15,7 @@ namespace Test.Stress
         static void Main()
         {
             Thread.Sleep(5000);
-            int threadCount = 1;
+            int threadCount = 4;
 
             for (int i = 0; i < threadCount; i++)
             {
@@ -98,7 +98,7 @@ namespace Test.Stress
             int clientId = Math.Abs(Guid.NewGuid().GetHashCode());
 
             int messageNumber = 0;
-            while (messageNumber < 1000) //Send test messages as objects that inherit from IMqMessage
+            while (messageNumber < 1000000) //Send test messages as objects that inherit from IMqMessage
             {
                 foreach (var queueName in myQueueNames)
                 {
@@ -128,6 +128,7 @@ namespace Test.Stress
             }
             */
 
+            /*
             if (_random.Next(0, 100) > 75)
             {
                 return new CMqConsumeResult(CMqConsumptionDisposition.Defer)
@@ -135,7 +136,7 @@ namespace Test.Stress
                     DeferDuration = TimeSpan.FromSeconds(10)
                 };
             }
-
+            */
             return new CMqConsumeResult(CMqConsumptionDisposition.Consumed);
         }
 

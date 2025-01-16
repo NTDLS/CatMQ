@@ -1,4 +1,4 @@
-﻿@page "/message/{QueueName}/{MessageId:Guid}"
+﻿@page "/message/{QueueName}/{SerialNumber}"
 @model MessageModel
 @{
     ViewData["Title"] = $"{@Model.QueueName} Queue";
@@ -21,44 +21,46 @@
         }
 </style>
 
-<div>
-    <h6 class="display-6">@Model.QueueName</h6>
-
-    <div class="container mt-4">
-
-        <table class="table table-striped table-bordered">
-            <thead class="table-light">
-                <tr>
-                    <th colspan="6">Metadata</th>
-                </tr>
-            </thead>
-            <thead class="table-light">
-                <tr>
-                    <th>Message Id</th>
-                    <th>Timestamp</th>
-                    <th>Deferred</th>
-                    <th>Delivered</th>
-                    <th>Consumed</th>
-                    <th>Object</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td>@Model.Message.MessageId</td>
-                    <td>@Model.Message.Timestamp</td>
-                    <td>@Model.Message.DeferredUntil.ToString()</td>
-                    <td>@Model.Message.SubscriberMessageDeliveries.Count.ToString("n0")</td>
-                    <td>@Model.Message.SatisfiedSubscribersSubscriberIDs.Count.ToString("n0")</td>
-                    <td>@Model.Message.AssemblyQualifiedTypeName</td>
-                </tr>
-            </tbody>
-        </table>
+@if (Model.Message != null)
+{
+    <div>
+        <h6 class="display-6">@Model.QueueName</h6>
 
         <div class="container mt-4">
-            <div class="label-value">
-                <div class="label">Message Body:</div>
-                <div class="value">@Model.Message.MessageJson</div>
+            <table class="table table-striped table-bordered">
+                <thead class="table-light">
+                    <tr>
+                        <th colspan="6">Metadata</th>
+                    </tr>
+                </thead>
+                <thead class="table-light">
+                    <tr>
+                        <th>Serial#</th>
+                        <th>Timestamp</th>
+                        <th>Deferred</th>
+                        <th>Delivered</th>
+                        <th>Consumed</th>
+                        <th>Object</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>@int.Parse(Model.Message.SerialNumber)</td>
+                        <td>@Model.Message.Timestamp</td>
+                        <td>@Model.Message.DeferredUntil.ToString()</td>
+                        <td>@Model.Message.SubscriberMessageDeliveries.Count.ToString("n0")</td>
+                        <td>@Model.Message.SatisfiedSubscribersSubscriberIDs.Count.ToString("n0")</td>
+                        <td>@Model.Message.AssemblyQualifiedTypeName</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="container mt-4">
+                <div class="label-value">
+                    <div class="label">Message Body:</div>
+                    <div class="value">@Model.Message.MessageJson</div>
+                </div>
             </div>
         </div>
     </div>
-</div>
+}

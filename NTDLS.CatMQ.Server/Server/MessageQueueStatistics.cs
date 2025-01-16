@@ -6,6 +6,10 @@
     internal class MessageQueueStatistics
     {
         /// <summary>
+        /// Used to keep the messages in order inside the persistence database.
+        /// </summary>
+        public ulong MessageSerialNumber { get; set; }
+        /// <summary>
         /// The total number of messages that have been enqueued into this queue.
         /// </summary>
         public ulong ReceivedMessageCount { get; set; }

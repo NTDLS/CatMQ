@@ -170,7 +170,7 @@ namespace NTDLS.CatMQ.Client
 
             if (subscriptionHandler != null)
             {
-                //If a custom serialization provider is configured, enrich the message with it so that it can be used for unboxiog.
+                //If a custom serialization provider is configured, enrich the message with it so that it can be used for unboxing.
                 message.SerializationProvider = SerializationProvider;
 
                 if (subscriptionHandler.BufferSize != null && subscriptionHandler.BufferedFunction != null)
@@ -504,7 +504,6 @@ namespace NTDLS.CatMQ.Client
         /// <summary>
         /// Dispatches a pre-serialized message to the queue server to be enqueued in the given queue.
         /// </summary>
-        /// <typeparam name="T">Type of the payload contained in the message </typeparam>
         /// <param name="queueName">Name of the queue in which to place the message into.</param>
         /// <param name="assemblyQualifiedName">Fully assembly qualified type of the message type for deserialization.</param>
         /// <param name="messageJson">Json for payload message of type inheriting from ICMqMessage.</param>

@@ -232,7 +232,7 @@ namespace NTDLS.CatMQ.Server
                             {
                                 foreach (var message in m.Messages.Skip(offset).Take(take))
                                 {
-                                    result.Add(new CMqEnqueuedMessageDescriptor
+                                    result.Add(new CMqEnqueuedMessageDescriptor(message.SerialNumber)
                                     {
                                         Timestamp = message.Timestamp,
                                         SubscriberCount = sKVP.Count,
@@ -241,7 +241,6 @@ namespace NTDLS.CatMQ.Server
                                         SatisfiedSubscribersSubscriberIDs = message.SatisfiedSubscribersSubscriberIDs,
                                         AssemblyQualifiedTypeName = message.AssemblyQualifiedTypeName,
                                         MessageJson = message.MessageJson,
-                                        MessageId = message.MessageId
                                     });
                                 }
                             });
@@ -270,7 +269,7 @@ namespace NTDLS.CatMQ.Server
         /// <summary>
         /// Returns a read-only copy messages in the queue.
         /// </summary>
-        public CMqEnqueuedMessageDescriptor? GetQueueMessage(string queueName, Guid messageId)
+        public CMqEnqueuedMessageDescriptor? GetQueueMessage(string queueName, string serialNumber)
         {
             while (_keepRunning)
             {
@@ -283,22 +282,21 @@ namespace NTDLS.CatMQ.Server
                     {
                         success = messageQueue.EnqueuedMessages.TryRead(CMqDefaults.DEFAULT_TRY_WAIT_MS, m =>
                         {
-                            var message = m.Messages.Where(o => o.MessageId == messageId).FirstOrDefault();
+                            var message = m.Messages.Where(o => o.SerialNumber == serialNumber).FirstOrDefault();
                             if (message != null)
                             {
-                                result = new CMqEnqueuedMessageDescriptor
+                                result = new CMqEnqueuedMessageDescriptor(message.SerialNumber)
                                 {
                                     Timestamp = message.Timestamp,
                                     SubscriberMessageDeliveries = message.SubscriberMessageDeliveries.Keys.ToHashSet(),
                                     SatisfiedSubscribersSubscriberIDs = message.SatisfiedSubscribersSubscriberIDs,
                                     AssemblyQualifiedTypeName = message.AssemblyQualifiedTypeName,
                                     MessageJson = message.MessageJson,
-                                    MessageId = message.MessageId
                                 };
                             }
                             else
                             {
-                                throw new Exception($"Message not found: [{messageId}].");
+                                throw new Exception($"Message not found: [{serialNumber}].");
                             }
                         }) && success;
                     }
@@ -508,7 +506,7 @@ namespace NTDLS.CatMQ.Server
                             if (messageQueue.Configuration.PersistenceScheme == CMqPersistenceScheme.Persistent && m.Database != null)
                             {
                                 var persistedJson = JsonSerializer.Serialize(message);
-                                m.Database?.Put(message.MessageId.ToString(), persistedJson);
+                                m.Database?.Put(message.SerialNumber.ToString(), persistedJson);
                             }
 
                             m.Messages.Add(message);
@@ -623,7 +621,7 @@ namespace NTDLS.CatMQ.Server
                             {
                                 foreach (var message in m.Messages)
                                 {
-                                    m.Database?.Remove(message.MessageId.ToString());
+                                    m.Database?.Remove(message.SerialNumber.ToString());
                                 }
                             }
                         }) && success;
@@ -758,8 +756,10 @@ namespace NTDLS.CatMQ.Server
                     {
                         success = messageQueue.EnqueuedMessages.TryWrite(CMqDefaults.DEFAULT_TRY_WAIT_MS, m =>
                         {
+                            var serialNumber = (messageQueue.Statistics.MessageSerialNumber++).ToString().PadLeft(20, '0');
+
                             messageQueue.Statistics.ReceivedMessageCount++;
-                            var message = new EnqueuedMessage(queueKey, assemblyQualifiedTypeName, messageJson)
+                            var message = new EnqueuedMessage(queueKey, assemblyQualifiedTypeName, messageJson, serialNumber)
                             {
                                 DeferredUntil = deferDeliveryDuration == null ? null : DateTime.UtcNow + deferDeliveryDuration
                             };
@@ -767,7 +767,7 @@ namespace NTDLS.CatMQ.Server
                             if (messageQueue.Configuration.PersistenceScheme == CMqPersistenceScheme.Persistent && m.Database != null)
                             {
                                 var persistedJson = JsonSerializer.Serialize(message);
-                                m.Database?.Put(message.MessageId.ToString(), persistedJson);
+                                m.Database?.Put(message.SerialNumber, persistedJson);
                             }
 
                             m.Messages.Add(message);
@@ -810,7 +810,7 @@ namespace NTDLS.CatMQ.Server
                             {
                                 foreach (var message in m.Messages)
                                 {
-                                    m.Database?.Remove(message.MessageId.ToString());
+                                    m.Database?.Remove(message.SerialNumber.ToString());
                                 }
                             }
                             m.Messages.Clear();

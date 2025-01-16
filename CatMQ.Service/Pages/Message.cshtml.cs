@@ -11,16 +11,16 @@ namespace CatMQ.Service.Pages
         [BindProperty(SupportsGet = true)]
         public string QueueName { get; set; } = string.Empty;
         [BindProperty(SupportsGet = true)]
-        public Guid MessageId { get; set; }
+        public string? SerialNumber { get; set; }
 
         private readonly ILogger<MessageModel> _logger = logger;
-        public CMqEnqueuedMessageDescriptor Message { get; set; } = new();
+        public CMqEnqueuedMessageDescriptor? Message { get; set; }
 
         public void OnGet()
         {
             try
             {
-                Message = mqServer.GetQueueMessage(QueueName, MessageId) ?? new();
+                Message = mqServer.GetQueueMessage(QueueName, SerialNumber ?? string.Empty);
             }
             catch (Exception ex)
             {

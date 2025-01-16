@@ -127,7 +127,7 @@ namespace NTDLS.CatMQ.Server.Server
                                         }
                                     }
 
-                                    m.Database?.Remove(testExpired.MessageId.ToString());
+                                    m.Database?.Remove(testExpired.SerialNumber.ToString());
                                     m.Messages.Remove(testExpired);
                                     Statistics.ExpiredMessageCount++;
 
@@ -285,7 +285,7 @@ namespace NTDLS.CatMQ.Server.Server
                                     if (dropMessageRequested)
                                     {
                                         //A subscriber requested that the message be dropped, so remove the message from the queue and cache.
-                                        m.Database?.Remove(topMessage.MessageId.ToString());
+                                        m.Database?.Remove(topMessage.SerialNumber.ToString());
                                         m.Messages.Remove(topMessage);
                                     }
                                     else if (deadLetterRequested)
@@ -305,7 +305,7 @@ namespace NTDLS.CatMQ.Server.Server
                                         }
 
                                         //Remove the message from the queue and cache.
-                                        m.Database?.Remove(topMessage.MessageId.ToString());
+                                        m.Database?.Remove(topMessage.SerialNumber.ToString());
                                         m.Messages.Remove(topMessage);
                                     }
                                     else if (Configuration.ConsumptionScheme == CMqConsumptionScheme.FirstConsumedSubscriber)
@@ -315,7 +315,7 @@ namespace NTDLS.CatMQ.Server.Server
                                         if (deliveredAndConsumed)
                                         {
                                             //The message was consumed by a subscriber, remove it from the queue and cache.
-                                            m.Database?.Remove(topMessage.MessageId.ToString());
+                                            m.Database?.Remove(topMessage.SerialNumber.ToString());
                                             m.Messages.Remove(topMessage);
                                         }
                                     }
@@ -341,7 +341,7 @@ namespace NTDLS.CatMQ.Server.Server
                                         }
 
                                         //Remove the message from the queue and cache.
-                                        m.Database?.Remove(topMessage.MessageId.ToString());
+                                        m.Database?.Remove(topMessage.SerialNumber.ToString());
                                         m.Messages.Remove(topMessage);
                                     }
                                 }) && removeSuccess;
@@ -461,7 +461,7 @@ namespace NTDLS.CatMQ.Server.Server
                     {
                         Statistics.ExpiredMessageCount++;
                         _queueServer.ShovelToDeadLetter(Configuration.QueueName, deadLetterMessage);
-                        m.Database?.Remove(deadLetterMessage.MessageId.ToString());
+                        m.Database?.Remove(deadLetterMessage.SerialNumber.ToString());
                     }
                 }
 

@@ -5,7 +5,7 @@ namespace NTDLS.CatMQ.Server.Server
     /// <summary>
     /// A message that is in the queue and waiting to be delivered to all subscribers.
     /// </summary>
-    internal class EnqueuedMessage(string queueName, string assemblyQualifiedTypeName, string messageJson)
+    internal class EnqueuedMessage(string queueName, string assemblyQualifiedTypeName, string messageJson, string serialNumber)
     {
         /// <summary>
         /// The name of the queue which contains this message.
@@ -15,7 +15,7 @@ namespace NTDLS.CatMQ.Server.Server
         /// <summary>
         /// The unique ID of the message.
         /// </summary>
-        public Guid MessageId { get; set; } = Guid.NewGuid();
+        public string SerialNumber { get; set; } = serialNumber;
 
         /// <summary>
         /// The UTC date and time when the message was enqueued.
