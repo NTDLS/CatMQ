@@ -65,7 +65,7 @@ namespace Test.Stress
                 client.CreateQueue(new CMqQueueConfiguration(queueName)
                 {
                     PersistenceScheme = CMqPersistenceScheme.Persistent,
-                    MaxMessageAge = TimeSpan.FromMinutes(15),
+                    MaxMessageAge = TimeSpan.FromHours(2),
                     DeadLetterConfiguration = deadLetterConfig
                 });
 
@@ -128,7 +128,7 @@ namespace Test.Stress
             }
             */
 
-            if (_random.Next(0, 100) > 95)
+            if (_random.Next(0, 100) == 50)
             {
                 return new CMqConsumeResult(CMqConsumptionDisposition.Defer)
                 {

@@ -222,6 +222,8 @@ namespace NTDLS.CatMQ.Server.Server
                                     subscriber.DeferredDeliveryCount++;
                                     Statistics.DeferredDeliveryCount++;
 
+                                    EnqueuedMessages.Read(m => m.Database.Store(topMessage));
+
                                     if (Configuration.ConsumptionScheme == CMqConsumptionScheme.FirstConsumedSubscriber)
                                     {
                                         //Message was delivered and consumed, break the delivery loop so the message can be removed from the queue.
