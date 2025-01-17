@@ -78,7 +78,23 @@ namespace NTDLS.CatMQ.Server
         }
 
         internal void InvokeOnLog(Exception ex)
-            => OnLog?.Invoke(this, CMqErrorLevel.Error, ex.Message, ex);
+        {
+            if (ex.Message.Equals("The connection was terminated.", StringComparison.OrdinalIgnoreCase))
+            {
+                //This is not really an error.
+                OnLog?.Invoke(this, CMqErrorLevel.Warning, ex.Message);
+            }
+            else if (ex.Message.StartsWith("Connection with id", StringComparison.OrdinalIgnoreCase)
+                && ex.Message.EndsWith("was not found.", StringComparison.OrdinalIgnoreCase))
+            {
+                //This is not really an error.
+                OnLog?.Invoke(this, CMqErrorLevel.Warning, ex.Message);
+            }
+            else
+            {
+                OnLog?.Invoke(this, CMqErrorLevel.Error, ex.Message, ex);
+            }
+        }
 
         internal void InvokeOnLog(CMqErrorLevel errorLevel, string message)
             => OnLog?.Invoke(this, errorLevel, message);

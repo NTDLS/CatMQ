@@ -50,6 +50,7 @@ namespace NTDLS.CatMQ.Server.Server
             while (KeepRunning)
             {
                 var now = DateTime.UtcNow;
+                bool yieldThread = true; //Just used to omit waiting. We want to spin fast when we are delivering messages.
 
                 if (DateTime.UtcNow - lastCheckpoint > TimeSpan.FromSeconds(30))
                 {
@@ -68,8 +69,6 @@ namespace NTDLS.CatMQ.Server.Server
 
                     lastCheckpoint = now;
                 }
-
-                bool shouldSleep = true; //Just used to omit waiting. We want to spin fast when we are delivering messages.
 
                 try
                 {
@@ -152,7 +151,6 @@ namespace NTDLS.CatMQ.Server.Server
                                     Statistics.ExpiredMessageCount++;
 
                                     topMessage = null; //Make sure we do not process the topMessage (if any).
-                                    shouldSleep = false;
                                 }
                             }
                         }
@@ -163,6 +161,8 @@ namespace NTDLS.CatMQ.Server.Server
                     //We we have a message, deliver it to the queue subscribers.
                     if (topMessage != null && yetToBeDeliveredSubscribers != null)
                     {
+                        yieldThread = false;
+
                         bool deliveredAndConsumed = false;
                         bool deadLetterRequested = false;
                         bool dropMessageRequested = false;
@@ -205,7 +205,6 @@ namespace NTDLS.CatMQ.Server.Server
 
                                     //This thread is the only place we manage [SatisfiedSubscribersConnectionIDs], so we can use it without additional locking.
                                     topMessage.SatisfiedSubscriberIDs.Add(subscriber.SubscriberId);
-                                    shouldSleep = false;
 
                                     if (Configuration.ConsumptionScheme == CMqConsumptionScheme.FirstConsumedSubscriber)
                                     {
@@ -234,20 +233,17 @@ namespace NTDLS.CatMQ.Server.Server
                                 {
                                     //The message was marked as not-consumed by the subscriber, so we are done with this subscriber.
                                     topMessage.SatisfiedSubscriberIDs.Add(subscriber.SubscriberId);
-                                    shouldSleep = false;
                                 }
                                 else if (consumeResult.Disposition == CMqConsumptionDisposition.DeadLetter)
                                 {
                                     Statistics.ExplicitDeadLetterCount++;
                                     deadLetterRequested = true;
-                                    shouldSleep = false;
                                     break;
                                 }
                                 else if (consumeResult.Disposition == CMqConsumptionDisposition.Drop)
                                 {
                                     Statistics.ExplicitDropCount++;
                                     dropMessageRequested = true;
-                                    shouldSleep = false;
                                     break;
                                 }
 
@@ -392,7 +388,7 @@ namespace NTDLS.CatMQ.Server.Server
                     _queueServer.InvokeOnLog(ex.GetBaseException());
                 }
 
-                if (shouldSleep)
+                if (yieldThread && KeepRunning)
                 {
                     //If nothing was successfully delivered, then delay for a period.
                     DeliveryThreadWaitEvent.WaitOne(10);

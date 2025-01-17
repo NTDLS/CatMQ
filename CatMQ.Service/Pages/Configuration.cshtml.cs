@@ -25,7 +25,7 @@ namespace CatMQ.Service.Pages
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, MethodBase.GetCurrentMethod()?.Name ?? string.Empty);
+                _logger.LogWarning(ex.Message);
                 ErrorMessage = ex.Message;
             }
 
@@ -40,7 +40,7 @@ namespace CatMQ.Service.Pages
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, MethodBase.GetCurrentMethod()?.Name ?? string.Empty);
+                _logger.LogWarning(ex.Message);
                 ErrorMessage = ex.Message;
             }
         }
