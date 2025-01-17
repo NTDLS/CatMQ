@@ -43,7 +43,7 @@ namespace Test.QueueClient
             try
             {
                 //Wire up an event to listen for messages.
-                //client.Subscribe("MyFirstQueue", OnMessageReceived);
+                client.Subscribe("MyFirstQueue", OnMessageReceived);
                 //client.SubscribeBuffered("MyFirstQueue", 1000, TimeSpan.FromMilliseconds(500), OnBatchReceived);
                 Console.WriteLine("Subscribed...");
             }

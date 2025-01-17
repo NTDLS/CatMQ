@@ -98,7 +98,7 @@ namespace Test.Stress
             int clientId = Math.Abs(Guid.NewGuid().GetHashCode());
 
             int messageNumber = 0;
-            while (messageNumber < 100000) //Send test messages as objects that inherit from IMqMessage
+            while (messageNumber < 1000000) //Send test messages as objects that inherit from IMqMessage
             {
                 foreach (var queueName in myQueueNames)
                 {
