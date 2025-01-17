@@ -1,13 +1,31 @@
 ﻿using NTDLS.CatMQ.Client;
 using NTDLS.CatMQ.Shared;
+using System.Text;
 
 namespace Test.QueueClient
 {
     internal class Program
     {
+        static Random _random = new Random();
         internal class MyMessage(string text) : ICMqMessage
         {
             public string Text { get; set; } = text;
+        }
+
+        static string CreateLargeString(int targetSizeInMB)
+        {
+            int targetSizeInBytes = targetSizeInMB * 1024 * 1024;
+            string pattern = "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
+            int patternLength = pattern.Length;
+
+            var builder = new StringBuilder(targetSizeInBytes);
+
+            while (builder.Length < targetSizeInBytes)
+            {
+                builder.Append(pattern);
+            }
+
+            return builder.ToString();
         }
 
         static void Main()
@@ -28,8 +46,13 @@ namespace Test.QueueClient
             //Create a queue. These are highly configurable.
             client.CreateQueue(new CMqQueueConfiguration("MyFirstQueue")
             {
-                PersistenceScheme = CMqPersistenceScheme.Ephemeral,
-                ConsumptionScheme = CMqConsumptionScheme.FirstConsumedSubscriber
+                PersistenceScheme = CMqPersistenceScheme.Persistent,
+                ConsumptionScheme = CMqConsumptionScheme.FirstConsumedSubscriber,
+                DeadLetterConfiguration = new CMqDeadLetterQueueConfiguration()
+                {
+                    PersistenceScheme = CMqPersistenceScheme.Persistent,
+                    MaxMessageAge = TimeSpan.FromMinutes(30)
+                }
             });
 
             //Subscribe to the queue we just created.
@@ -48,16 +71,18 @@ namespace Test.QueueClient
             }
 
             //Enqueue a few messages, note that the message is just a class and it must inherit from ICMqMessage.
-            for (int i = 0; i < 10000000; i++)
+            for (int i = 0; i < 100000; i++)
             {
-                client.Enqueue("MyFirstQueue", new MyMessage($"Test message {i++:n0}"), TimeSpan.FromSeconds(10));
-                Thread.Sleep(1000);
+                //var message = CreateLargeString(_random.Next(1, 32));
+                //client.Enqueue("MyFirstQueue", new MyMessage(message));
+
+                //client.Enqueue("MyFirstQueue", new MyMessage($"Test message {i:n0}"), TimeSpan.FromSeconds(60));
+                client.Enqueue("MyFirstQueue", new MyMessage($"Test message {i:n0}"));
             }
 
             Console.WriteLine("Press [enter] to shutdown.");
             Console.ReadLine();
 
-            //Cleanup.
             client.Disconnect();
         }
 
@@ -66,14 +91,22 @@ namespace Test.QueueClient
             var message = rawMessage.Deserialize();
             if (message is MyMessage myMessage)
             {
-                Console.WriteLine($"Received: '{myMessage.Text}'");
+                Console.WriteLine($"Received: {myMessage.Text.Length:n0} bytes");
             }
             else
             {
                 //Console.WriteLine($"Received: '{message.ObjectType}'->'{message.MessageJson}'");
             }
 
-            return new CMqConsumeResult(CMqConsumptionDisposition.Consumed);
+            if (rawMessage.DeferredCount > 2)
+            {
+                return new CMqConsumeResult(CMqConsumptionDisposition.DeadLetter);
+            }
+
+            return new CMqConsumeResult(CMqConsumptionDisposition.Defer)
+            {
+                DeferDuration = (rawMessage.DeferDuration ?? TimeSpan.Zero) + TimeSpan.FromSeconds(1)
+            };
         }
 
         private static void OnBatchReceived(CMqClient client, List<CMqReceivedMessage> rawMessages)

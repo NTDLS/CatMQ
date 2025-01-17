@@ -20,7 +20,7 @@ namespace NTDLS.CatMQ.Shared
         /// <summary>
         /// The maximum time that a message item can remain in the queue without being delivered before being removed. 0 = infinite.
         /// </summary>
-        public TimeSpan MaxMessageAge { get; set; } = TimeSpan.Zero;
+        public TimeSpan? MaxMessageAge { get; set; }
 
         /// <summary>
         /// Determines when to remove messages from the queue as they are distributed to subscribers.
@@ -51,6 +51,7 @@ namespace NTDLS.CatMQ.Shared
         {
             return new CMqQueueConfiguration($"{parentQueueName}.dlq")
             {
+                IsDeadLetter = true,
                 DeadLetterConfiguration = null,
                 ConsumptionScheme = ConsumptionScheme,
                 MaxMessageAge = MaxMessageAge,

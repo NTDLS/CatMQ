@@ -14,7 +14,15 @@ namespace NTDLS.CatMQ.Client.Client.QueryHandlers
         {
             try
             {
-                var message = new CMqReceivedMessage(param.QueueName, param.ObjectType, param.MessageJson);
+                var message = new CMqReceivedMessage(param.QueueName, param.SerialNumber, param.AssemblyQualifiedTypeName, param.MessageJson)
+                {
+                    Timestamp = param.Timestamp,
+                    DeferredCount = param.DeferredCount,
+                    DeferDuration = param.DeferDuration,
+                    SubscriberDeliveryCount = param.SubscriberDeliveryCount,
+                    SatisfiedSubscriberCount = param.SatisfiedSubscriberCount,
+                    FailedSubscriberCount = param.SatisfiedSubscriberCount
+                };
                 var messageDisposition = mqClient.InvokeOnReceived(mqClient, message);
                 return new CMqMessageDeliveryQueryReply(messageDisposition);
             }

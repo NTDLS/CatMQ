@@ -5,7 +5,7 @@ namespace NTDLS.CatMQ.Server.Server
     /// <summary>
     /// A message that is in the queue and waiting to be delivered to all subscribers.
     /// </summary>
-    internal class EnqueuedMessage(string queueName, string assemblyQualifiedTypeName, string messageJson)
+    internal class EnqueuedMessage(string queueName, string assemblyQualifiedTypeName, string messageJson, ulong serialNumber)
     {
         /// <summary>
         /// The name of the queue which contains this message.
@@ -13,9 +13,9 @@ namespace NTDLS.CatMQ.Server.Server
         public string QueueName { get; set; } = queueName;
 
         /// <summary>
-        /// The unique ID of the message.
+        /// The unique ID of the message per queue.
         /// </summary>
-        public Guid MessageId { get; set; } = Guid.NewGuid();
+        public ulong SerialNumber { get; set; } = serialNumber;
 
         /// <summary>
         /// The UTC date and time when the message was enqueued.
@@ -23,9 +23,19 @@ namespace NTDLS.CatMQ.Server.Server
         public DateTime Timestamp { get; set; } = DateTime.UtcNow;
 
         /// <summary>
+        /// The number of times this message has been delivered and the subscriber requested that delivery be deferred.
+        /// </summary>
+        public int DeferredCount { get; set; }
+
+        /// <summary>
         /// The UTC date and time, when if set, that the message will be delivered.
         /// </summary>
         public DateTime? DeferredUntil { get; set; }
+
+        /// <summary>
+        /// The amount of time to wait before delivering this message.
+        /// </summary>
+        public TimeSpan? DeferDuration { get; set; }
 
         /// <summary>
         /// The full assembly qualified name of the type of MessageJson.
@@ -47,12 +57,21 @@ namespace NTDLS.CatMQ.Server.Server
         /// List of subscribers which have been delivered to or for which the retry-attempts have been reached.
         /// </summary>
         [JsonIgnore]
-        public HashSet<Guid> SatisfiedSubscribersSubscriberIDs { get; set; } = new();
+        public HashSet<Guid> SatisfiedSubscriberIDs { get; set; } = new();
 
         /// <summary>
         /// List of subscribers which failed to be delivered to or for which the retry-attempts have been reached.
         /// </summary>
         [JsonIgnore]
-        public HashSet<Guid> FailedSubscribersSubscriberIDs { get; set; } = new();
+        public HashSet<Guid> FailedSubscriberIDs { get; set; } = new();
+
+        public EnqueuedMessage CloneForDeadLetter(string queueName, ulong serialNumber)
+        {
+            return new EnqueuedMessage(queueName, AssemblyQualifiedTypeName, MessageJson, serialNumber)
+            {
+                Timestamp = Timestamp,
+                DeferredCount = DeferredCount
+            };
+        }
     }
 }

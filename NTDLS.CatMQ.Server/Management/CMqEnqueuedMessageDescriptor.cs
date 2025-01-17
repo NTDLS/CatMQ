@@ -3,12 +3,12 @@
     /// <summary>
     /// Contains readonly information about messages.
     /// </summary>
-    public class CMqEnqueuedMessageDescriptor
+    public class CMqEnqueuedMessageDescriptor(ulong serialNumber)
     {
         /// <summary>
-        /// The unique ID of the message.
+        /// The unique ID of the message per queue.
         /// </summary>
-        public Guid MessageId { get; internal set; } = Guid.NewGuid();
+        public ulong SerialNumber { get; internal set; } = serialNumber;
 
         /// <summary>
         /// The UTC date and time when the message was enqueued.

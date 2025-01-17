@@ -24,5 +24,4 @@ namespace CatMQ.Service.Pages
             RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier;
         }
     }
-
 }

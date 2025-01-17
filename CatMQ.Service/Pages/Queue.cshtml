@@ -62,7 +62,7 @@
             <tbody>
                 <tr>
                     <td>@Model.Queue.CurrentSubscriberCount.ToString("n0")</td>
-                    <td><a href="/messages/@Model.Queue.QueueName">@Model.Queue.CurrentMessageCount.ToString("n0")</a></td>
+                    <td><a href="/messages/@Model.Queue.QueueName">@Model.Queue.QueueDepth.ToString("n0")</a></td>
                     <td>@Model.Queue.ReceivedMessageCount.ToString("n0")</td>
                     <td>@Model.Queue.DeliveredMessageCount.ToString("n0")</td>
                     <td>@Model.Queue.DeferredDeliveryCount.ToString("n0")</td>
@@ -88,8 +88,9 @@
                     <th>Address</th>
                     <th>Attempts</th>
                     <th>Successful</th>
-                    <th>Failures</th>
+                    <th>Deferred</th>
                     <th>Consumed</th>
+                    <th>Failures</th>
                     <th>Action</th>
                 </tr>
             </thead>
@@ -102,8 +103,8 @@
                         <td>@queue.AttemptedDeliveryCount.ToString("n0")</td>
                         <td>@queue.SuccessfulDeliveryCount.ToString("n0")</td>
                         <td>@queue.DeferredDeliveryCount.ToString("n0")</td>
-                        <td>@queue.FailedDeliveryCount.ToString("n0")</td>
                         <td>@queue.ConsumedDeliveryCount.ToString("n0")</td>
+                        <td>@queue.FailedDeliveryCount.ToString("n0")</td>
                         <td>@Html.Raw(ConfirmActionHelper.GenerateDangerLink(
                             $"Removing the subscription for '{@queue.SubscriberId}' from '{@Model.Queue.QueueName}' will cause the subscriber to fail. Continue?",
                             "Remove", $"/RemoveSubscription/{@Model.Queue.QueueName}/{@queue.SubscriberId}", "btn-thin"))

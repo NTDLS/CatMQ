@@ -116,7 +116,7 @@ namespace NTDLS.CatMQ.Shared
         /// </summary>
         internal static ICMqMessage Unbox(CMqReceivedMessage message)
         {
-            string cacheKey = $"{message.ObjectType}";
+            string cacheKey = $"{message.AssemblyQualifiedTypeName}";
 
             var genericToObjectMethod = _reflectionCache.Use((o) =>
             {
@@ -137,8 +137,8 @@ namespace NTDLS.CatMQ.Shared
             }
             else
             {
-                var genericType = Type.GetType(message.ObjectType)
-                    ?? throw new Exception($"Unknown extraction message type {message.ObjectType}.");
+                var genericType = Type.GetType(message.AssemblyQualifiedTypeName)
+                    ?? throw new Exception($"Unknown extraction message type {message.AssemblyQualifiedTypeName}.");
 
                 var toObjectMethod = typeof(CMqUnboxing).GetMethod("MqDeserializeToObject")
                         ?? throw new Exception($"Could not resolve MqDeserializeToObject().");

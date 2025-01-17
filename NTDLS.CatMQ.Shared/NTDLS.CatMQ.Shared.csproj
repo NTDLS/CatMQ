@@ -15,13 +15,13 @@
     <RepositoryUrl>https://github.com/NTDLS/NTDLS.CatMQ</RepositoryUrl>
     <PackageTags>ipc;message-queue;inter-process-communication;tcp-ip;message-broker;mq;</PackageTags>
     <PackageReleaseNotes>
-      Dependency updates.
+      Binary keys.
     </PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <Authors>NetworkDLS</Authors>
     <Company>NetworkDLS</Company>
-    <version>2.1.1</version> <!-- NTDLS.CatMQ.Shared is versioned seperately from NTDLS.CatMQ.Client and NTDLS.CatMQ.Server -->
+    <version>2.2.0</version> <!-- NTDLS.CatMQ.Shared is versioned seperately from NTDLS.CatMQ.Client and NTDLS.CatMQ.Server -->
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>Logo.png</PackageIcon>
     <ApplicationIcon>Logo.ico</ApplicationIcon>

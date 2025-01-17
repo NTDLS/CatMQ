@@ -14,6 +14,7 @@ namespace CatMQ.Service.Pages
         public string QueueName { get; set; } = string.Empty;
         [BindProperty(SupportsGet = true)]
         public int PageNumber { get; set; } = 0;
+        public int TotalPages { get; set; } = 0;
 
         private readonly ILogger<MessagesModel> _logger = logger;
         public List<CMqEnqueuedMessageDescriptor> Messages { get; set; } = new();
@@ -22,11 +23,14 @@ namespace CatMQ.Service.Pages
         {
             try
             {
-                Messages = mqServer.GetQueueMessages(QueueName, PageNumber * PageSize, PageSize)?.OrderBy(o => o.Timestamp)?.ToList() ?? new();
+                var descriptorCollection = mqServer.GetQueueMessages(QueueName, PageNumber * PageSize, PageSize);
+                Messages = descriptorCollection?.Messages.OrderBy(o => o.Timestamp)?.ToList() ?? new();
+
+                TotalPages = (int)Math.Ceiling(((descriptorCollection?.QueueDepth / (double)PageSize) - 1) ?? 0.0);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, MethodBase.GetCurrentMethod()?.Name ?? string.Empty);
+                _logger.LogWarning(ex.Message);
                 ErrorMessage = ex.Message;
             }
         }
