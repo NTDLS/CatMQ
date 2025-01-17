@@ -12,11 +12,26 @@
         <center>
             <a href="/messages/@Model.QueueName/0">&lt;&lt; First</a>
             &nbsp; | &nbsp;
-            <a href="/messages/@Model.QueueName/@(Model.PageNumber-1)">&lt; Previous</a>
+            @if (Model.PageNumber > 0)
+            {
+                <a href="/messages/@Model.QueueName/@(Model.PageNumber-1)">&lt; Previous</a>
+            }
+            else
+            {
+                <a>&lt; Previous</a>
+            }
             &nbsp; | &nbsp;
-            <a href="/messages/@Model.QueueName/@(Model.PageNumber+1)">Next &gt;</a>
+            @if (Model.PageNumber >= Model.TotalPages)
+            {
+                <a>Next &gt;</a>
+            }
+            else
+            {
+                <a href="/messages/@Model.QueueName/@(Model.PageNumber+1)">Next &gt;</a>
+            }
+            &nbsp; | &nbsp;
+            <a href="/messages/@Model.QueueName/@(Model.TotalPages)">Last &gt;&gt;</a>
         </center>
-
 
         <table class="table table-striped table-bordered">
             <thead class="table-light">
@@ -50,5 +65,29 @@
                 }
             </tbody>
         </table>
+
+        <center>
+            <a href="/messages/@Model.QueueName/0">&lt;&lt; First</a>
+            &nbsp; | &nbsp;
+            @if (Model.PageNumber > 0)
+            {
+                <a href="/messages/@Model.QueueName/@(Model.PageNumber-1)">&lt; Previous</a>
+            }
+            else
+            {
+                <a>&lt; Previous</a>
+            }
+            &nbsp; | &nbsp;
+            @if (Model.PageNumber >= Model.TotalPages)
+            {
+                <a>Next &gt;</a>
+            }
+            else
+            {
+                <a href="/messages/@Model.QueueName/@(Model.PageNumber+1)">Next &gt;</a>
+            }
+            &nbsp; | &nbsp;
+            <a href="/messages/@Model.QueueName/@(Model.TotalPages)">Last &gt;&gt;</a>
+        </center>
     </div>
 </div>

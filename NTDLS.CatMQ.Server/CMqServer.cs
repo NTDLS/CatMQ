@@ -221,12 +221,14 @@ namespace NTDLS.CatMQ.Server
         /// <summary>
         /// Returns a read-only copy messages in the queue.
         /// </summary>
-        public ReadOnlyCollection<CMqEnqueuedMessageDescriptor>? GetQueueMessages(string queueName, int offset, int take)
+        public CMqEnqueuedMessageDescriptorCollection? GetQueueMessages(string queueName, int offset, int take)
         {
             while (_keepRunning)
             {
                 bool success = true;
                 List<CMqEnqueuedMessageDescriptor>? result = new();
+
+                int queueDepth = 0;
 
                 _messageQueues.Read(mqd =>
                 {
@@ -237,6 +239,8 @@ namespace NTDLS.CatMQ.Server
                         {
                             qKVP.Value.Subscribers.Read(sKVP =>
                             {
+                                queueDepth = qKVP.Value.Statistics.QueueDepth;
+
                                 if (qKVP.Value.Configuration.PersistenceScheme == CMqPersistenceScheme.Ephemeral)
                                 {
                                     foreach (var message in m.MessageBuffer.Skip(offset).Take(take))
@@ -301,7 +305,13 @@ namespace NTDLS.CatMQ.Server
 
                 if (success && result != null)
                 {
-                    return new ReadOnlyCollection<CMqEnqueuedMessageDescriptor>(result);
+                    return new CMqEnqueuedMessageDescriptorCollection(result)
+                    {
+                        Offset = offset,
+                        Take = take,
+                        Count = result.Count,
+                        QueueDepth = queueDepth
+                    };
                 }
 
                 Thread.Sleep(CMqDefaults.DEFAULT_DEADLOCK_AVOIDANCE_WAIT_MS); //Failed to lock, sleep then try again.
