@@ -20,7 +20,7 @@ namespace CatMQ.Service.Pages
         {
             try
             {
-                Message = mqServer.GetQueueMessage(QueueName, SerialNumber);
+                Message = mqServer.GetQueueMessage(QueueName, SerialNumber, 1024 * 1024);
             }
             catch (Exception ex)
             {

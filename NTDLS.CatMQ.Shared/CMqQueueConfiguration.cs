@@ -24,6 +24,11 @@ namespace NTDLS.CatMQ.Shared
         public TimeSpan DeliveryThrottle { get; set; } = TimeSpan.Zero;
 
         /// <summary>
+        /// Denotes whether this is a dead-letter queue.
+        /// </summary>
+        public bool IsDeadLetter { get; set; } = false;
+
+        /// <summary>
         /// The maximum number of times the server will attempt to deliver any message to a subscriber before giving up. 0 = infinite.
         /// </summary>
         public int MaxDeliveryAttempts { get; set; } = 10;

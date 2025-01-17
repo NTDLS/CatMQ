@@ -40,7 +40,7 @@ namespace NTDLS.CatMQ.Server.Management
         /// <summary>
         /// The current number of messages that are enqueued in this message queue.
         /// </summary>
-        public int CurrentMessageCount { get; internal set; }
+        public int QueueDepth { get; internal set; }
 
         /// <summary>
         /// The number of subscriber for this queue.

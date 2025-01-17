@@ -2,13 +2,12 @@
 using NTDLS.CatMQ.Server.Server;
 using NTDLS.CatMQ.Server.Server.QueryHandlers;
 using NTDLS.CatMQ.Shared;
+using NTDLS.CatMQ.Shared.Payload.ClientToServer;
 using NTDLS.CatMQ.Shared.Payload.ServerToClient;
 using NTDLS.ReliableMessaging;
 using NTDLS.Semaphore;
-using RocksDbSharp;
 using System.Collections.ObjectModel;
 using System.Net;
-using System.Text;
 using System.Text.Json;
 
 namespace NTDLS.CatMQ.Server
@@ -76,6 +75,42 @@ namespace NTDLS.CatMQ.Server
         private void _rmServer_OnException(RmContext? context, Exception ex, IRmPayload? payload)
         {
             OnLog?.Invoke(this, CMqErrorLevel.Error, "Reliable messaging exception.", ex);
+        }
+
+        internal void InvokeOnLog(Exception ex)
+            => OnLog?.Invoke(this, CMqErrorLevel.Error, ex.Message, ex);
+
+        internal void InvokeOnLog(CMqErrorLevel errorLevel, string message)
+            => OnLog?.Invoke(this, errorLevel, message);
+
+        private void RmServer_OnDisconnected(RmContext context)
+        {
+            while (_keepRunning)
+            {
+                bool success = true;
+
+                //When a client disconnects, remove their subscriptions.
+                _messageQueues.Read(mqd =>
+                {
+                    foreach (var mqKVP in mqd)
+                    {
+                        success = mqKVP.Value.Subscribers.TryWrite(CMqDefaults.DEFAULT_TRY_WAIT_MS, s =>
+                        {
+                            s.Remove(context.ConnectionId);
+                        }) && success;
+                        if (!success)
+                        {
+                            break;
+                        }
+                    }
+                });
+
+                if (success)
+                {
+                    return;
+                }
+                Thread.Sleep(CMqDefaults.DEFAULT_DEADLOCK_AVOIDANCE_WAIT_MS);
+            }
         }
 
         #region Management.
@@ -147,7 +182,7 @@ namespace NTDLS.CatMQ.Server
                                 QueueName = mqKVP.Value.Configuration.QueueName,
 
                                 CurrentSubscriberCount = sKVP.Count,
-                                CurrentMessageCount = mqKVP.Value.Statistics.QueueDepth,
+                                QueueDepth = mqKVP.Value.Statistics.QueueDepth,
 
                                 ReceivedMessageCount = mqKVP.Value.Statistics.ReceivedMessageCount,
                                 DeliveredMessageCount = mqKVP.Value.Statistics.DeliveredMessageCount,
@@ -323,7 +358,7 @@ namespace NTDLS.CatMQ.Server
         /// <summary>
         /// Returns a read-only copy messages in the queue.
         /// </summary>
-        public CMqEnqueuedMessageDescriptor? GetQueueMessage(string queueName, ulong serialNumber)
+        public CMqEnqueuedMessageDescriptor? GetQueueMessage(string queueName, ulong serialNumber, int? truncateToBytes = null)
         {
             while (_keepRunning)
             {
@@ -338,37 +373,27 @@ namespace NTDLS.CatMQ.Server
                         {
                             if (messageQueue.Configuration.PersistenceScheme == CMqPersistenceScheme.Ephemeral)
                             {
-                                var message = m.MessageBuffer.Where(o => o.SerialNumber == serialNumber).FirstOrDefault();
-                                if (message != null)
+                                var message = m.MessageBuffer.Where(o => o.SerialNumber == serialNumber).FirstOrDefault()
+                                    ?? throw new Exception($"Message not found: [{serialNumber}].");
+
+                                result = new CMqEnqueuedMessageDescriptor(message.SerialNumber)
                                 {
-                                    result = new CMqEnqueuedMessageDescriptor(message.SerialNumber)
-                                    {
-                                        Timestamp = message.Timestamp,
-                                        SubscriberMessageDeliveries = message.SubscriberMessageDeliveries.Keys.ToHashSet(),
-                                        SatisfiedSubscribersSubscriberIDs = message.SatisfiedSubscriberIDs,
-                                        AssemblyQualifiedTypeName = message.AssemblyQualifiedTypeName,
-                                        MessageJson = message.MessageJson,
-                                    };
-                                }
-                                else
-                                {
-                                    throw new Exception($"Message not found: [{serialNumber}].");
-                                }
+                                    Timestamp = message.Timestamp,
+                                    SubscriberMessageDeliveries = message.SubscriberMessageDeliveries.Keys.ToHashSet(),
+                                    SatisfiedSubscribersSubscriberIDs = message.SatisfiedSubscriberIDs,
+                                    AssemblyQualifiedTypeName = message.AssemblyQualifiedTypeName,
+                                    MessageJson = message.MessageJson,
+                                };
                             }
-                            else if (messageQueue.Configuration.PersistenceScheme == CMqPersistenceScheme.Persistent && m.Database != null)
+                            else if (messageQueue.Configuration.PersistenceScheme == CMqPersistenceScheme.Persistent)
                             {
-                                var keyBytes = CMqSerialNumber.ToKey(serialNumber);
-                                var jsonBytes = m.Database.Get(keyBytes, keyBytes.Length);
-                                if (jsonBytes == null)
+                                if (m.Database == null)
                                 {
-                                    throw new Exception($"Message not found: [{serialNumber}].");
+                                    throw new Exception($"Persistence database has not been initialized for [{queueName}].");
                                 }
-                                var json = Encoding.UTF8.GetString(jsonBytes);
-                                var persistedMessage = JsonSerializer.Deserialize<EnqueuedMessage>(json);
-                                if (persistedMessage == null)
-                                {
-                                    throw new Exception($"Failed to deserialize message: [{serialNumber}].");
-                                }
+
+                                var persistedMessage = m.Database.RetrieveMessage(serialNumber)
+                                    ?? throw new Exception($"Failed to deserialize message: [{serialNumber}].");
 
                                 result = new CMqEnqueuedMessageDescriptor(persistedMessage.SerialNumber)
                                 {
@@ -378,7 +403,6 @@ namespace NTDLS.CatMQ.Server
                                     AssemblyQualifiedTypeName = persistedMessage.AssemblyQualifiedTypeName,
                                     MessageJson = persistedMessage.MessageJson,
                                 };
-
                             }
                         }) && success;
                     }
@@ -390,6 +414,14 @@ namespace NTDLS.CatMQ.Server
 
                 if (success && result != null)
                 {
+                    if (truncateToBytes != null)
+                    {
+                        if (result.MessageJson.Length > truncateToBytes)
+                        {
+                            result.MessageJson = result.MessageJson.Substring(0, truncateToBytes.Value);
+                        }
+                    }
+
                     return result;
                 }
 
@@ -400,42 +432,6 @@ namespace NTDLS.CatMQ.Server
         }
 
         #endregion
-
-        internal void InvokeOnLog(Exception ex)
-            => OnLog?.Invoke(this, CMqErrorLevel.Error, ex.Message, ex);
-
-        internal void InvokeOnLog(CMqErrorLevel errorLevel, string message)
-            => OnLog?.Invoke(this, errorLevel, message);
-
-        private void RmServer_OnDisconnected(RmContext context)
-        {
-            while (_keepRunning)
-            {
-                bool success = true;
-
-                //When a client disconnects, remove their subscriptions.
-                _messageQueues.Read(mqd =>
-                {
-                    foreach (var mqKVP in mqd)
-                    {
-                        success = mqKVP.Value.Subscribers.TryWrite(CMqDefaults.DEFAULT_TRY_WAIT_MS, s =>
-                        {
-                            s.Remove(context.ConnectionId);
-                        }) && success;
-                        if (!success)
-                        {
-                            break;
-                        }
-                    }
-                });
-
-                if (success)
-                {
-                    return;
-                }
-                Thread.Sleep(CMqDefaults.DEFAULT_DEADLOCK_AVOIDANCE_WAIT_MS);
-            }
-        }
 
         #region Start & Stop.
 
@@ -451,9 +447,9 @@ namespace NTDLS.CatMQ.Server
 
             _keepRunning = true;
 
-            var messageQueuesToLoad = new List<MessageQueue>();
-            var deadLetterQueuesToLoad = new List<MessageQueue>();
-            var queuesToStart = new List<MessageQueue>();
+            var messageQueuesToLoad = new List<SingleMessageQueueServer>();
+            var deadLetterQueuesToLoad = new List<SingleMessageQueueServer>();
+            var queuesToStart = new List<SingleMessageQueueServer>();
 
             if (_configuration.PersistencePath != null)
             {
@@ -472,7 +468,7 @@ namespace NTDLS.CatMQ.Server
                        {
                            foreach (var queueMeta in queueMetas)
                            {
-                               var messageQueue = new MessageQueue(this, queueMeta.Configuration)
+                               var messageQueue = new SingleMessageQueueServer(this, queueMeta.Configuration)
                                {
                                    Statistics = queueMeta.Statistics
                                };
@@ -493,7 +489,7 @@ namespace NTDLS.CatMQ.Server
                                {
                                    //Persistent DLQs are created by default, if the queue has an Ephemeral DLQ then we need to manually create it.
                                    var dlqConfig = queueMeta.Configuration.DeadLetterConfiguration.ToConfiguration(queueMeta.Configuration.QueueName);
-                                   var dlq = new MessageQueue(this, dlqConfig);
+                                   var dlq = new SingleMessageQueueServer(this, dlqConfig);
                                    queuesToStart.Add(dlq);
                                    mqd.Add(dlqConfig.QueueName.ToLowerInvariant(), dlq);
                                }
@@ -548,7 +544,7 @@ namespace NTDLS.CatMQ.Server
             OnLog?.Invoke(this, CMqErrorLevel.Information, "Stopping reliable messaging.");
             _rmServer.Stop();
 
-            var messageQueues = new List<MessageQueue>();
+            var messageQueues = new List<SingleMessageQueueServer>();
 
             _messageQueues.Read(mqd =>
             {
@@ -599,12 +595,14 @@ namespace NTDLS.CatMQ.Server
                             messageQueue.Statistics.IncrementReceivedMessageCount();
                             messageQueue.Statistics.IncrementQueueDepth();
 
-                            if (messageQueue.Configuration.PersistenceScheme == CMqPersistenceScheme.Persistent && m.Database != null)
+                            if (messageQueue.Configuration.PersistenceScheme == CMqPersistenceScheme.Persistent)
                             {
-                                var keyBytes = CMqSerialNumber.ToKey(message.SerialNumber);
-                                var persistedBytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(message));
-                                m.Database.Put(keyBytes, keyBytes.Length, persistedBytes, persistedBytes.Length);
+                                if (m.Database == null)
+                                {
+                                    throw new Exception($"Persistence database has not been initialized for [{messageQueue.Configuration.QueueName}].");
+                                }
 
+                                m.Database.Store(message);
                                 //For persistent queues, the messages are only loaded into the database.
                                 //They will be buffered into the message buffer by the message queue delivery thread.
                             }
@@ -621,7 +619,6 @@ namespace NTDLS.CatMQ.Server
                     {
                         OnLog?.Invoke(this, CMqErrorLevel.Warning, $"Dead-letter queue does not exist, discarding message for [{sourceQueueName}].");
                     }
-
                 });
 
                 if (success)
@@ -665,6 +662,23 @@ namespace NTDLS.CatMQ.Server
         /// </summary>
         public void CreateQueue(CMqQueueConfiguration queueConfiguration)
         {
+            if (queueConfiguration.IsDeadLetter)
+            {
+                throw new Exception("Dead-letter queues cannot be directly created. Use CMqQueueConfiguration.DeadLetterConfiguration instead.");
+            }
+            if (queueConfiguration.QueueName.EndsWith(".dlq", StringComparison.InvariantCultureIgnoreCase))
+            {
+                throw new Exception("Queue names cannot end with '.dlq'.");
+            }
+
+            CreateQueueInternal(queueConfiguration);
+        }
+
+        /// <summary>
+        /// Creates a new empty queue if it does not already exist.
+        /// </summary>
+        private void CreateQueueInternal(CMqQueueConfiguration queueConfiguration)
+        {
             if (string.IsNullOrEmpty(queueConfiguration.QueueName))
             {
                 throw new Exception("A queue name is required.");
@@ -677,7 +691,7 @@ namespace NTDLS.CatMQ.Server
                 string queueKey = queueConfiguration.QueueName.ToLowerInvariant();
                 if (mqd.ContainsKey(queueKey) == false)
                 {
-                    var messageQueue = new MessageQueue(this, queueConfiguration);
+                    var messageQueue = new SingleMessageQueueServer(this, queueConfiguration);
                     mqd.Add(queueKey, messageQueue);
 
                     if (queueConfiguration.PersistenceScheme == CMqPersistenceScheme.Persistent)
@@ -695,7 +709,7 @@ namespace NTDLS.CatMQ.Server
                     if (queueConfiguration.DeadLetterConfiguration != null)
                     {
                         var dlqConfig = queueConfiguration.DeadLetterConfiguration.ToConfiguration(queueConfiguration.QueueName);
-                        CreateQueue(dlqConfig);
+                        CreateQueueInternal(dlqConfig);
                     }
 
                     messageQueue.InitializePersistentDatabase();
@@ -717,7 +731,7 @@ namespace NTDLS.CatMQ.Server
             {
                 bool success = true;
 
-                MessageQueue? waitOnStopMessageQueue = null;
+                SingleMessageQueueServer? waitOnStopMessageQueue = null;
 
                 _messageQueues.Write(mqd =>
                 {
@@ -869,11 +883,14 @@ namespace NTDLS.CatMQ.Server
                                 DeferredUntil = deferDeliveryDuration == null ? null : DateTime.UtcNow + deferDeliveryDuration
                             };
 
-                            if (messageQueue.Configuration.PersistenceScheme == CMqPersistenceScheme.Persistent && m.Database != null)
+                            if (messageQueue.Configuration.PersistenceScheme == CMqPersistenceScheme.Persistent)
                             {
-                                var keyBytes = CMqSerialNumber.ToKey(message.SerialNumber);
-                                var persistedBytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(message));
-                                m.Database.Put(keyBytes, keyBytes.Length, persistedBytes, persistedBytes.Length);
+                                if (m.Database == null)
+                                {
+                                    throw new Exception($"Persistence database has not been initialized for [{queueName}].");
+                                }
+
+                                m.Database.Store(message);
                                 //For persistent queues, the messages are only loaded into the database.
                                 //They will be buffered into the message buffer by the message queue delivery thread.
                             }
@@ -917,12 +934,16 @@ namespace NTDLS.CatMQ.Server
                     {
                         success = messageQueue.EnqueuedMessages.TryWrite(CMqDefaults.DEFAULT_TRY_WAIT_MS, m =>
                         {
-                            if (messageQueue.Configuration.PersistenceScheme == CMqPersistenceScheme.Persistent && m.Database != null)
+                            if (messageQueue.Configuration.PersistenceScheme == CMqPersistenceScheme.Persistent)
                             {
+                                if (m.Database == null)
+                                {
+                                    throw new Exception($"Persistence database has not been initialized for [{queueName}].");
+                                }
+
                                 foreach (var message in m.MessageBuffer)
                                 {
-                                    var keyBytes = CMqSerialNumber.ToKey(message.SerialNumber);
-                                    m.Database?.Remove(keyBytes, keyBytes.Length);
+                                    m.Database?.Remove(message);
                                 }
                             }
                             m.MessageBuffer.Clear();

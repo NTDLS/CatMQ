@@ -10,7 +10,7 @@ namespace NTDLS.CatMQ.Server.Server
     /// <summary>
     /// A named message queue and its delivery thread.
     /// </summary>
-    internal class MessageQueue
+    internal class SingleMessageQueueServer
     {
         private readonly Thread _deliveryThread;
         private readonly CMqServer _queueServer;
@@ -32,7 +32,7 @@ namespace NTDLS.CatMQ.Server.Server
 
         internal MessageQueueStatistics Statistics { get; set; } = new();
 
-        public MessageQueue(CMqServer mqServer, CMqQueueConfiguration queueConfiguration)
+        public SingleMessageQueueServer(CMqServer mqServer, CMqQueueConfiguration queueConfiguration)
         {
             _queueServer = mqServer;
             Configuration = queueConfiguration;
@@ -81,7 +81,7 @@ namespace NTDLS.CatMQ.Server.Server
                     if (attemptBufferRehydration)
                     {
                         attemptBufferRehydration = false;
-                        HydrateMessageBuffer();
+                        HydrateMessageBuffer(CMqDefaults.DEFAULT_PERSISTENT_MESSAGES_BUFFER_SIZE);
                     }
 
                     EnqueuedMessages.TryReadAll([Subscribers], CMqDefaults.DEFAULT_TRY_WAIT_MS, m =>
@@ -147,9 +147,7 @@ namespace NTDLS.CatMQ.Server.Server
                                         }
                                     }
 
-                                    var keyBytes = CMqSerialNumber.ToKey(testExpired.SerialNumber);
-                                    m.Database?.Remove(keyBytes, keyBytes.Length);
-                                    m.MessageBuffer.Remove(testExpired);
+                                    m.RemoveFromBufferAndDatabase(testExpired);
                                     Statistics.DecrementQueueDepth();
                                     Statistics.ExpiredMessageCount++;
 
@@ -289,9 +287,7 @@ namespace NTDLS.CatMQ.Server.Server
                                     if (dropMessageRequested)
                                     {
                                         //A subscriber requested that the message be dropped, so remove the message from the queue and cache.
-                                        var keyBytes = CMqSerialNumber.ToKey(topMessage.SerialNumber);
-                                        m.Database?.Remove(keyBytes, keyBytes.Length);
-                                        m.MessageBuffer.Remove(topMessage);
+                                        m.RemoveFromBufferAndDatabase(topMessage);
                                         Statistics.DecrementQueueDepth();
                                     }
                                     else if (deadLetterRequested)
@@ -312,9 +308,7 @@ namespace NTDLS.CatMQ.Server.Server
                                         }
 
                                         //Remove the message from the queue and cache.
-                                        var keyBytes = CMqSerialNumber.ToKey(topMessage.SerialNumber);
-                                        m.Database?.Remove(keyBytes, keyBytes.Length);
-                                        m.MessageBuffer.Remove(topMessage);
+                                        m.RemoveFromBufferAndDatabase(topMessage);
                                         Statistics.DecrementQueueDepth();
                                     }
                                     else if (Configuration.ConsumptionScheme == CMqConsumptionScheme.FirstConsumedSubscriber)
@@ -324,9 +318,7 @@ namespace NTDLS.CatMQ.Server.Server
                                         if (deliveredAndConsumed)
                                         {
                                             //The message was consumed by a subscriber, remove it from the queue and cache.
-                                            var keyBytes = CMqSerialNumber.ToKey(topMessage.SerialNumber);
-                                            m.Database?.Remove(keyBytes, keyBytes.Length);
-                                            m.MessageBuffer.Remove(topMessage);
+                                            m.RemoveFromBufferAndDatabase(topMessage);
                                             Statistics.DecrementQueueDepth();
                                         }
                                     }
@@ -353,9 +345,7 @@ namespace NTDLS.CatMQ.Server.Server
                                         }
 
                                         //Remove the message from the queue and cache.
-                                        var keyBytes = CMqSerialNumber.ToKey(topMessage.SerialNumber);
-                                        m.Database?.Remove(keyBytes, keyBytes.Length);
-                                        m.MessageBuffer.Remove(topMessage);
+                                        m.RemoveFromBufferAndDatabase(topMessage);
                                         Statistics.DecrementQueueDepth();
                                     }
                                 }) && removeSuccess;
@@ -411,7 +401,7 @@ namespace NTDLS.CatMQ.Server.Server
         /// <summary>
         /// Load additional messages into the message buffer from the database.
         /// </summary>
-        private bool HydrateMessageBuffer()
+        private bool HydrateMessageBuffer(int countToGet)
         {
             if (Configuration.PersistenceScheme != CMqPersistenceScheme.Persistent)
             {
@@ -424,14 +414,14 @@ namespace NTDLS.CatMQ.Server.Server
             {
                 if (m.Database == null)
                 {
-                    return;
+                    throw new Exception($"Persistence database has not been initialized for [{Configuration.QueueName}].");
                 }
 
                 ulong? maxBufferedSerialNumber = m.MessageBuffer.Count > 0 ? m.MessageBuffer.Max(o => o.SerialNumber) : null;
                 int messagesLoaded = 0;
 
                 using var iterator = m.Database.NewIterator();
-                for (iterator.SeekToFirst(); iterator.Valid() && messagesLoaded < CMqDefaults.DEFAULT_PERSISTENT_MESSAGES_BUFFER_SIZE; iterator.Next())
+                for (iterator.SeekToFirst(); iterator.Valid() && messagesLoaded < countToGet; iterator.Next())
                 {
                     var persistedSerialNumberBytes = iterator.Key();
                     if (BitConverter.IsLittleEndian)
@@ -460,8 +450,6 @@ namespace NTDLS.CatMQ.Server.Server
             {
                 return;
             }
-
-            var deadLetterSerialNumbers = new HashSet<string>();
 
             _queueServer.InvokeOnLog(CMqErrorLevel.Information, $"Creating persistent path for [{Configuration.QueueName}].");
 
@@ -493,6 +481,8 @@ namespace NTDLS.CatMQ.Server.Server
                     Array.Reverse(lastSerialNumberBytes); // Convert back to little-endian.
                 }
                 var lastSerialNumber = BitConverter.ToUInt64(lastSerialNumberBytes);
+
+                _queueServer.InvokeOnLog(CMqErrorLevel.Information, $"Loaded {messagesLoaded:n0} messages for [{Configuration.QueueName}] with serial number 0x{lastSerialNumber:x}.");
 
                 Statistics.SetQueueDepth(messagesLoaded);
                 Statistics.SetLastSerialNumber(lastSerialNumber);

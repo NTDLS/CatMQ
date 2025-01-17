@@ -63,7 +63,7 @@
                     <tr>
                         <td><a href="/queue/@queue.QueueName">@queue.QueueName</a></td>
                         <td>@queue.CurrentSubscriberCount.ToString("n0")</td>
-                        <td><a href="/messages/@queue.QueueName">@queue.CurrentMessageCount.ToString("n0")</a></td>
+                        <td><a href="/messages/@queue.QueueName">@queue.QueueDepth.ToString("n0")</a></td>
                         <td>@queue.ReceivedMessageCount.ToString("n0")</td>
                         <td>@queue.DeliveredMessageCount.ToString("n0")</td>
                         <td>@queue.DeferredDeliveryCount.ToString("n0")</td>

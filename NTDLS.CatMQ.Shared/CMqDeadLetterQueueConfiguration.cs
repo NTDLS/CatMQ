@@ -51,6 +51,7 @@ namespace NTDLS.CatMQ.Shared
         {
             return new CMqQueueConfiguration($"{parentQueueName}.dlq")
             {
+                IsDeadLetter = true,
                 DeadLetterConfiguration = null,
                 ConsumptionScheme = ConsumptionScheme,
                 MaxMessageAge = MaxMessageAge,
