@@ -11,7 +11,7 @@ namespace CatMQ.Service.Pages
         [BindProperty(SupportsGet = true)]
         public string QueueName { get; set; } = string.Empty;
         [BindProperty(SupportsGet = true)]
-        public string? SerialNumber { get; set; }
+        public ulong SerialNumber { get; set; }
 
         private readonly ILogger<MessageModel> _logger = logger;
         public CMqEnqueuedMessageDescriptor? Message { get; set; }
@@ -20,7 +20,7 @@ namespace CatMQ.Service.Pages
         {
             try
             {
-                Message = mqServer.GetQueueMessage(QueueName, SerialNumber ?? string.Empty);
+                Message = mqServer.GetQueueMessage(QueueName, SerialNumber);
             }
             catch (Exception ex)
             {

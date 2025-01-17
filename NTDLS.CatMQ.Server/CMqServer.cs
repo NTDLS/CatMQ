@@ -5,8 +5,10 @@ using NTDLS.CatMQ.Shared;
 using NTDLS.CatMQ.Shared.Payload.ServerToClient;
 using NTDLS.ReliableMessaging;
 using NTDLS.Semaphore;
+using RocksDbSharp;
 using System.Collections.ObjectModel;
 using System.Net;
+using System.Text;
 using System.Text.Json;
 
 namespace NTDLS.CatMQ.Server
@@ -311,7 +313,7 @@ namespace NTDLS.CatMQ.Server
         /// <summary>
         /// Returns a read-only copy messages in the queue.
         /// </summary>
-        public CMqEnqueuedMessageDescriptor? GetQueueMessage(string queueName, string serialNumber)
+        public CMqEnqueuedMessageDescriptor? GetQueueMessage(string queueName, ulong serialNumber)
         {
             while (_keepRunning)
             {
@@ -324,21 +326,49 @@ namespace NTDLS.CatMQ.Server
                     {
                         success = messageQueue.EnqueuedMessages.TryRead(CMqDefaults.DEFAULT_TRY_WAIT_MS, m =>
                         {
-                            var message = m.MessageBuffer.Where(o => o.SerialNumber == serialNumber).FirstOrDefault();
-                            if (message != null)
+                            if (messageQueue.Configuration.PersistenceScheme == CMqPersistenceScheme.Ephemeral)
                             {
-                                result = new CMqEnqueuedMessageDescriptor(message.SerialNumber)
+                                var message = m.MessageBuffer.Where(o => o.SerialNumber == serialNumber).FirstOrDefault();
+                                if (message != null)
                                 {
-                                    Timestamp = message.Timestamp,
-                                    SubscriberMessageDeliveries = message.SubscriberMessageDeliveries.Keys.ToHashSet(),
-                                    SatisfiedSubscribersSubscriberIDs = message.SatisfiedSubscriberIDs,
-                                    AssemblyQualifiedTypeName = message.AssemblyQualifiedTypeName,
-                                    MessageJson = message.MessageJson,
-                                };
+                                    result = new CMqEnqueuedMessageDescriptor(message.SerialNumber)
+                                    {
+                                        Timestamp = message.Timestamp,
+                                        SubscriberMessageDeliveries = message.SubscriberMessageDeliveries.Keys.ToHashSet(),
+                                        SatisfiedSubscribersSubscriberIDs = message.SatisfiedSubscriberIDs,
+                                        AssemblyQualifiedTypeName = message.AssemblyQualifiedTypeName,
+                                        MessageJson = message.MessageJson,
+                                    };
+                                }
+                                else
+                                {
+                                    throw new Exception($"Message not found: [{serialNumber}].");
+                                }
                             }
-                            else
+                            else if (messageQueue.Configuration.PersistenceScheme == CMqPersistenceScheme.Persistent && m.Database != null)
                             {
-                                throw new Exception($"Message not found: [{serialNumber}].");
+                                var keyBytes = CMqSerialNumber.ToKey(serialNumber);
+                                var jsonBytes = m.Database.Get(keyBytes, keyBytes.Length);
+                                if (jsonBytes == null)
+                                {
+                                    throw new Exception($"Message not found: [{serialNumber}].");
+                                }
+                                var json = Encoding.UTF8.GetString(jsonBytes);
+                                var persistedMessage = JsonSerializer.Deserialize<EnqueuedMessage>(json);
+                                if (persistedMessage == null)
+                                {
+                                    throw new Exception($"Failed to deserialize message: [{serialNumber}].");
+                                }
+
+                                result = new CMqEnqueuedMessageDescriptor(persistedMessage.SerialNumber)
+                                {
+                                    Timestamp = persistedMessage.Timestamp,
+                                    SubscriberMessageDeliveries = persistedMessage.SubscriberMessageDeliveries.Keys.ToHashSet(),
+                                    SatisfiedSubscribersSubscriberIDs = persistedMessage.SatisfiedSubscriberIDs,
+                                    AssemblyQualifiedTypeName = persistedMessage.AssemblyQualifiedTypeName,
+                                    MessageJson = persistedMessage.MessageJson,
+                                };
+
                             }
                         }) && success;
                     }
@@ -536,7 +566,7 @@ namespace NTDLS.CatMQ.Server
 
         #region Message queue interactions.
 
-        internal void ShovelToDeadLetter(string sourceQueueName, EnqueuedMessage message)
+        internal void ShovelToDeadLetter(string sourceQueueName, EnqueuedMessage givenMessage)
         {
             OnLog?.Invoke(this, CMqErrorLevel.Verbose, $"Dead-lettering message for [{sourceQueueName}].");
 
@@ -553,21 +583,17 @@ namespace NTDLS.CatMQ.Server
                     {
                         success = messageQueue.EnqueuedMessages.TryWrite(CMqDefaults.DEFAULT_TRY_WAIT_MS, m =>
                         {
-                            message.QueueName = dlqName; //Be sure to change the queue name to the DLQ name.
-                            message.SubscriberMessageDeliveries.Clear();
-                            message.SatisfiedSubscriberIDs.Clear();
-                            message.FailedSubscriberIDs.Clear();
+                            //Yes, DLQ messages get a new serial number, its a different queue after all.
+                            var message = givenMessage.CloneForDeadLetter(dlqName, messageQueue.Statistics.GetNextSerialNumber());
 
                             messageQueue.Statistics.IncrementReceivedMessageCount();
                             messageQueue.Statistics.IncrementQueueDepth();
 
-                            //Yes, DLQ messages get a new serial number, its a different queue after all.
-                            var serialNumber = messageQueue.Statistics.GetNextSerialNumber();
-
                             if (messageQueue.Configuration.PersistenceScheme == CMqPersistenceScheme.Persistent && m.Database != null)
                             {
-                                var persistedJson = JsonSerializer.Serialize(message);
-                                m.Database.Put(message.SerialNumber.ToString(), persistedJson);
+                                var keyBytes = CMqSerialNumber.ToKey(message.SerialNumber);
+                                var persistedBytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(message));
+                                m.Database.Put(keyBytes, keyBytes.Length, persistedBytes, persistedBytes.Length);
 
                                 //For persistent queues, the messages are only loaded into the database.
                                 //They will be buffered into the message buffer by the message queue delivery thread.
@@ -579,9 +605,7 @@ namespace NTDLS.CatMQ.Server
                             }
 
                             messageQueue.DeliveryThreadWaitEvent.Set();
-
                         }) && success;
-
                     }
                     else
                     {
@@ -694,14 +718,6 @@ namespace NTDLS.CatMQ.Server
                             waitOnStopMessageQueue = messageQueue;
                             messageQueue.StopAsync();
                             mqd.Remove(queueKey);
-
-                            if (messageQueue.Configuration.PersistenceScheme == CMqPersistenceScheme.Persistent && m.Database != null)
-                            {
-                                foreach (var message in m.MessageBuffer)
-                                {
-                                    m.Database?.Remove(message.SerialNumber.ToString());
-                                }
-                            }
                         }) && success;
 
                         if (success)
@@ -834,12 +850,10 @@ namespace NTDLS.CatMQ.Server
                     {
                         success = messageQueue.EnqueuedMessages.TryWrite(CMqDefaults.DEFAULT_TRY_WAIT_MS, m =>
                         {
-                            var serialNumber = messageQueue.Statistics.GetNextSerialNumber();
-
                             messageQueue.Statistics.IncrementReceivedMessageCount();
                             messageQueue.Statistics.IncrementQueueDepth();
 
-                            var message = new EnqueuedMessage(queueKey, assemblyQualifiedTypeName, messageJson, serialNumber)
+                            var message = new EnqueuedMessage(queueKey, assemblyQualifiedTypeName, messageJson, messageQueue.Statistics.GetNextSerialNumber())
                             {
                                 DeferDuration = deferDeliveryDuration,
                                 DeferredUntil = deferDeliveryDuration == null ? null : DateTime.UtcNow + deferDeliveryDuration
@@ -847,9 +861,9 @@ namespace NTDLS.CatMQ.Server
 
                             if (messageQueue.Configuration.PersistenceScheme == CMqPersistenceScheme.Persistent && m.Database != null)
                             {
-                                var persistedJson = JsonSerializer.Serialize(message);
-                                m.Database.Put(message.SerialNumber, persistedJson);
-
+                                var keyBytes = CMqSerialNumber.ToKey(message.SerialNumber);
+                                var persistedBytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(message));
+                                m.Database.Put(keyBytes, keyBytes.Length, persistedBytes, persistedBytes.Length);
                                 //For persistent queues, the messages are only loaded into the database.
                                 //They will be buffered into the message buffer by the message queue delivery thread.
                             }
@@ -897,7 +911,8 @@ namespace NTDLS.CatMQ.Server
                             {
                                 foreach (var message in m.MessageBuffer)
                                 {
-                                    m.Database?.Remove(message.SerialNumber.ToString());
+                                    var keyBytes = CMqSerialNumber.ToKey(message.SerialNumber);
+                                    m.Database?.Remove(keyBytes, keyBytes.Length);
                                 }
                             }
                             m.MessageBuffer.Clear();

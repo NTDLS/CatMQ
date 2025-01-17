@@ -1,8 +1,8 @@
 ﻿using NTDLS.CatMQ.Server.Management;
 using NTDLS.CatMQ.Shared;
-using NTDLS.Helpers;
 using NTDLS.Semaphore;
 using RocksDbSharp;
+using System.Text;
 using System.Text.Json;
 
 namespace NTDLS.CatMQ.Server.Server
@@ -147,7 +147,8 @@ namespace NTDLS.CatMQ.Server.Server
                                         }
                                     }
 
-                                    m.Database?.Remove(testExpired.SerialNumber.ToString());
+                                    var keyBytes = CMqSerialNumber.ToKey(testExpired.SerialNumber);
+                                    m.Database?.Remove(keyBytes, keyBytes.Length);
                                     m.MessageBuffer.Remove(testExpired);
                                     Statistics.DecrementQueueDepth();
                                     Statistics.ExpiredMessageCount++;
@@ -288,7 +289,8 @@ namespace NTDLS.CatMQ.Server.Server
                                     if (dropMessageRequested)
                                     {
                                         //A subscriber requested that the message be dropped, so remove the message from the queue and cache.
-                                        m.Database?.Remove(topMessage.SerialNumber.ToString());
+                                        var keyBytes = CMqSerialNumber.ToKey(topMessage.SerialNumber);
+                                        m.Database?.Remove(keyBytes, keyBytes.Length);
                                         m.MessageBuffer.Remove(topMessage);
                                         Statistics.DecrementQueueDepth();
                                     }
@@ -310,7 +312,8 @@ namespace NTDLS.CatMQ.Server.Server
                                         }
 
                                         //Remove the message from the queue and cache.
-                                        m.Database?.Remove(topMessage.SerialNumber.ToString());
+                                        var keyBytes = CMqSerialNumber.ToKey(topMessage.SerialNumber);
+                                        m.Database?.Remove(keyBytes, keyBytes.Length);
                                         m.MessageBuffer.Remove(topMessage);
                                         Statistics.DecrementQueueDepth();
                                     }
@@ -321,7 +324,8 @@ namespace NTDLS.CatMQ.Server.Server
                                         if (deliveredAndConsumed)
                                         {
                                             //The message was consumed by a subscriber, remove it from the queue and cache.
-                                            m.Database?.Remove(topMessage.SerialNumber.ToString());
+                                            var keyBytes = CMqSerialNumber.ToKey(topMessage.SerialNumber);
+                                            m.Database?.Remove(keyBytes, keyBytes.Length);
                                             m.MessageBuffer.Remove(topMessage);
                                             Statistics.DecrementQueueDepth();
                                         }
@@ -349,7 +353,8 @@ namespace NTDLS.CatMQ.Server.Server
                                         }
 
                                         //Remove the message from the queue and cache.
-                                        m.Database?.Remove(topMessage.SerialNumber.ToString());
+                                        var keyBytes = CMqSerialNumber.ToKey(topMessage.SerialNumber);
+                                        m.Database?.Remove(keyBytes, keyBytes.Length);
                                         m.MessageBuffer.Remove(topMessage);
                                         Statistics.DecrementQueueDepth();
                                     }
@@ -422,22 +427,24 @@ namespace NTDLS.CatMQ.Server.Server
                     return;
                 }
 
-                ulong? maxSerialNumber = null;
-
-                if (m.MessageBuffer.Count > 0)
-                {
-                    maxSerialNumber = ulong.Parse(m.MessageBuffer.Max(o => o.SerialNumber).EnsureNotNull());
-                }
-
+                ulong? maxBufferedSerialNumber = m.MessageBuffer.Count > 0 ? m.MessageBuffer.Max(o => o.SerialNumber) : null;
                 int messagesLoaded = 0;
 
                 using var iterator = m.Database.NewIterator();
                 for (iterator.SeekToFirst(); iterator.Valid() && messagesLoaded < CMqDefaults.DEFAULT_PERSISTENT_MESSAGES_BUFFER_SIZE; iterator.Next())
                 {
-                    var persistedMessage = JsonSerializer.Deserialize<EnqueuedMessage>(iterator.StringValue());
-                    if (persistedMessage != null)
+                    var persistedSerialNumberBytes = iterator.Key();
+                    if (BitConverter.IsLittleEndian)
                     {
-                        if (maxSerialNumber == null || ulong.Parse(persistedMessage.SerialNumber) > maxSerialNumber)
+                        Array.Reverse(persistedSerialNumberBytes); // Convert key back to little-endian.
+                    }
+                    var persistedSerialNumber = BitConverter.ToUInt64(persistedSerialNumberBytes);
+
+                    if (maxBufferedSerialNumber == null || persistedSerialNumber > maxBufferedSerialNumber)
+                    {
+                        var json = Encoding.UTF8.GetString(iterator.Value());
+                        var persistedMessage = JsonSerializer.Deserialize<EnqueuedMessage>(json);
+                        if (persistedMessage != null)
                         {
                             m.MessageBuffer.Add(persistedMessage);
                             messagesLoaded++;
@@ -466,80 +473,32 @@ namespace NTDLS.CatMQ.Server.Server
             var persistenceDatabase = RocksDb.Open(options, databasePath);
 
             _queueServer.InvokeOnLog(CMqErrorLevel.Information, $"Loading persistent messages for [{Configuration.QueueName}].");
-            using var iterator = persistenceDatabase.NewIterator();
-
-            ulong maxSerialNumber = 0;
 
             EnqueuedMessages.Write(m =>
             {
                 Statistics.SetQueueDepth(0);
 
+                int messagesLoaded = 0;
+                var lastSerialNumberBytes = BitConverter.GetBytes((ulong)0);
+
+                using var iterator = persistenceDatabase.NewIterator();
                 for (iterator.SeekToFirst(); iterator.Valid(); iterator.Next())
                 {
-                    var persistedMessage = JsonSerializer.Deserialize<EnqueuedMessage>(iterator.StringValue());
-                    if (persistedMessage != null)
-                    {
-                        var serialNumber = ulong.Parse(persistedMessage.SerialNumber);
-                        if (serialNumber > maxSerialNumber)
-                        {
-                            //Keep track of the max serial number so we know where to start from with the next message.
-                            maxSerialNumber = serialNumber;
-                        }
-
-                        //If we have a MaxMessageAge, check it and if the message is expired, either
-                        //  dead-letter or discard it instead of adding it to its original queue.
-                        if (Configuration.MaxMessageAge > TimeSpan.Zero)
-                        {
-                            if ((DateTime.UtcNow - persistedMessage.Timestamp) > Configuration.MaxMessageAge)
-                            {
-                                if (Configuration.DeadLetterConfiguration != null)
-                                {
-                                    if ((DateTime.UtcNow - persistedMessage.Timestamp) > Configuration.DeadLetterConfiguration.MaxMessageAge)
-                                    {
-                                        //Message is even too old for the dead-letter queue, discard expired message.
-                                    }
-                                    else
-                                    {
-                                        Statistics.ExpiredMessageCount++;
-                                        _queueServer.ShovelToDeadLetter(Configuration.QueueName, persistedMessage);
-                                        deadLetterSerialNumbers.Add(persistedMessage.SerialNumber);
-                                    }
-                                }
-                                else
-                                {
-                                    //No dead-letter queue, discard expired message.
-                                    deadLetterSerialNumbers.Add(persistedMessage.SerialNumber);
-                                }
-                            }
-                            else
-                            {
-                                //For persistent queues, the messages are only loaded into the database.
-                                //They will be buffered into the message buffer by the message queue delivery thread.
-                                Statistics.IncrementQueueDepth();
-                            }
-                        }
-                        else
-                        {
-                            //For persistent queues, the messages are only loaded into the database.
-                            //They will be buffered into the message buffer by the message queue delivery thread.
-                            Statistics.IncrementQueueDepth();
-                        }
-                    }
+                    lastSerialNumberBytes = iterator.Key();
+                    messagesLoaded++;
                 }
 
-                if (deadLetterSerialNumbers.Count > 0)
+                if (BitConverter.IsLittleEndian)
                 {
-                    _queueServer.InvokeOnLog(CMqErrorLevel.Information, $"Removing {deadLetterSerialNumbers.Count:n0} dead-lettered messages from [{Configuration.QueueName}].");
-                    foreach (var deadLetterSerialNumber in deadLetterSerialNumbers)
-                    {
-                        persistenceDatabase.Remove(deadLetterSerialNumber);
-                    }
+                    Array.Reverse(lastSerialNumberBytes); // Convert back to little-endian.
                 }
+                var lastSerialNumber = BitConverter.ToUInt64(lastSerialNumberBytes);
+
+                Statistics.SetQueueDepth(messagesLoaded);
+                Statistics.SetLastSerialNumber(lastSerialNumber);
 
                 m.Database = persistenceDatabase;
             });
-
-            Statistics.SetLastSerialNumber(maxSerialNumber);
         }
 
         public void StartAsync()

@@ -18,11 +18,8 @@
         /// </summary>
         public ulong _lastSerialNumber = 0;
 
-        public string GetNextSerialNumber()
-        {
-            var value = Interlocked.Increment(ref _lastSerialNumber);
-            return (value).ToString().PadLeft(20, '0');
-        }
+        public ulong GetNextSerialNumber()
+            => Interlocked.Increment(ref _lastSerialNumber);
 
         public void SetLastSerialNumber(ulong value)
             => Interlocked.Exchange(ref _lastSerialNumber, value);

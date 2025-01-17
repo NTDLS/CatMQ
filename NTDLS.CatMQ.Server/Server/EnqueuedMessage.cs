@@ -5,7 +5,7 @@ namespace NTDLS.CatMQ.Server.Server
     /// <summary>
     /// A message that is in the queue and waiting to be delivered to all subscribers.
     /// </summary>
-    internal class EnqueuedMessage(string queueName, string assemblyQualifiedTypeName, string messageJson, string serialNumber)
+    internal class EnqueuedMessage(string queueName, string assemblyQualifiedTypeName, string messageJson, ulong serialNumber)
     {
         /// <summary>
         /// The name of the queue which contains this message.
@@ -13,9 +13,9 @@ namespace NTDLS.CatMQ.Server.Server
         public string QueueName { get; set; } = queueName;
 
         /// <summary>
-        /// The unique ID of the message.
+        /// The unique ID of the message per queue.
         /// </summary>
-        public string SerialNumber { get; set; } = serialNumber;
+        public ulong SerialNumber { get; set; } = serialNumber;
 
         /// <summary>
         /// The UTC date and time when the message was enqueued.
@@ -64,5 +64,14 @@ namespace NTDLS.CatMQ.Server.Server
         /// </summary>
         [JsonIgnore]
         public HashSet<Guid> FailedSubscriberIDs { get; set; } = new();
+
+        public EnqueuedMessage CloneForDeadLetter(string queueName, ulong serialNumber)
+        {
+            return new EnqueuedMessage(queueName, AssemblyQualifiedTypeName, MessageJson, serialNumber)
+            {
+                Timestamp = Timestamp,
+                DeferredCount = DeferredCount
+            };
+        }
     }
 }

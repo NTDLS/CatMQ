@@ -3,21 +3,12 @@
     /// <summary>
     /// Contains readonly information about messages.
     /// </summary>
-    public class CMqEnqueuedMessageDescriptor
+    public class CMqEnqueuedMessageDescriptor(ulong serialNumber)
     {
         /// <summary>
-        /// Creates a new instance of the CMqEnqueuedMessageDescriptor.
+        /// The unique ID of the message per queue.
         /// </summary>
-        /// <param name="serialNumber"></param>
-        public CMqEnqueuedMessageDescriptor(string serialNumber)
-        {
-            SerialNumber = serialNumber;
-        }
-
-        /// <summary>
-        /// The unique ID of the message.
-        /// </summary>
-        public string? SerialNumber { get; internal set; }
+        public ulong SerialNumber { get; internal set; } = serialNumber;
 
         /// <summary>
         /// The UTC date and time when the message was enqueued.

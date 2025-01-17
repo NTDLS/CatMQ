@@ -2,7 +2,7 @@
 
 namespace NTDLS.CatMQ.Shared.Payload.ServerToClient
 {
-    public class CMqMessageDeliveryQuery(string queueName, string serialNumber, string assemblyQualifiedTypeName, string messageJson)
+    public class CMqMessageDeliveryQuery(string queueName, ulong serialNumber, string assemblyQualifiedTypeName, string messageJson)
     : IRmQuery<CMqMessageDeliveryQueryReply>
     {
         /// <summary>
@@ -21,9 +21,9 @@ namespace NTDLS.CatMQ.Shared.Payload.ServerToClient
         public string MessageJson { get; set; } = messageJson;
 
         /// <summary>
-        /// The unique ID of the message.
+        /// The unique ID of the message per queue.
         /// </summary>
-        public string SerialNumber { get; set; } = serialNumber;
+        public ulong SerialNumber { get; set; } = serialNumber;
 
         /// <summary>
         /// The UTC date and time when the message was enqueued.
