@@ -81,7 +81,7 @@ namespace NTDLS.CatMQ.Server.Server
                     if (attemptBufferRehydration)
                     {
                         attemptBufferRehydration = false;
-                        RehydrateMessageQueueFromDatabase();
+                        HydrateMessageBuffer();
                     }
 
                     EnqueuedMessages.TryReadAll([Subscribers], CMqDefaults.DEFAULT_TRY_WAIT_MS, m =>
@@ -273,26 +273,6 @@ namespace NTDLS.CatMQ.Server.Server
 
                         #endregion
 
-                        #region Delivery Throttle.
-
-                        if (Configuration.DeliveryThrottle > TimeSpan.Zero)
-                        {
-                            if (Configuration.DeliveryThrottle.TotalSeconds >= 1)
-                            {
-                                int sleepSeconds = (int)Configuration.DeliveryThrottle.TotalSeconds;
-                                for (int sleep = 0; sleep < sleepSeconds && KeepRunning; sleep++)
-                                {
-                                    Thread.Sleep(1000);
-                                }
-                            }
-                            else
-                            {
-                                Thread.Sleep((int)Configuration.DeliveryThrottle.TotalMilliseconds);
-                            }
-                        }
-
-                        #endregion
-
                         #region Remove message from queue.
 
                         bool removeSuccess;
@@ -384,6 +364,26 @@ namespace NTDLS.CatMQ.Server.Server
 
                         #endregion
 
+                        #region Delivery Throttle.
+
+                        if (Configuration.DeliveryThrottle > TimeSpan.Zero)
+                        {
+                            if (Configuration.DeliveryThrottle.TotalSeconds >= 1)
+                            {
+                                int sleepSeconds = (int)Configuration.DeliveryThrottle.TotalSeconds;
+                                for (int sleep = 0; sleep < sleepSeconds && KeepRunning; sleep++)
+                                {
+                                    Thread.Sleep(1000);
+                                }
+                            }
+                            else
+                            {
+                                Thread.Sleep((int)Configuration.DeliveryThrottle.TotalMilliseconds);
+                            }
+                        }
+
+                        #endregion
+
                         if (KeepRunning == false)
                         {
                             break;
@@ -403,7 +403,10 @@ namespace NTDLS.CatMQ.Server.Server
             }
         }
 
-        private bool RehydrateMessageQueueFromDatabase()
+        /// <summary>
+        /// Load additional messages into the message buffer from the database.
+        /// </summary>
+        private bool HydrateMessageBuffer()
         {
             if (Configuration.PersistenceScheme != CMqPersistenceScheme.Persistent)
             {
