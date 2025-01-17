@@ -25,7 +25,7 @@ namespace NTDLS.CatMQ.Server.Management
         /// <summary>
         /// The maximum time that a message item can remain in the queue without being delivered before being removed. 0 = infinite.
         /// </summary>
-        public TimeSpan MaxMessageAge { get; internal set; } = TimeSpan.Zero;
+        public TimeSpan? MaxMessageAge { get; internal set; }
 
         /// <summary>
         /// Determines when to remove messages from the queue as they are distributed to subscribers.

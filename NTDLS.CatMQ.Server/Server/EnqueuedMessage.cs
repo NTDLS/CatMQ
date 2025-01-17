@@ -23,9 +23,19 @@ namespace NTDLS.CatMQ.Server.Server
         public DateTime Timestamp { get; set; } = DateTime.UtcNow;
 
         /// <summary>
+        /// The number of times this message has been delivered and the subscriber requested that delivery be deferred.
+        /// </summary>
+        public int DeferredCount { get; set; }
+
+        /// <summary>
         /// The UTC date and time, when if set, that the message will be delivered.
         /// </summary>
         public DateTime? DeferredUntil { get; set; }
+
+        /// <summary>
+        /// The amount of time to wait before delivering this message.
+        /// </summary>
+        public TimeSpan? DeferDuration { get; set; }
 
         /// <summary>
         /// The full assembly qualified name of the type of MessageJson.
@@ -47,12 +57,12 @@ namespace NTDLS.CatMQ.Server.Server
         /// List of subscribers which have been delivered to or for which the retry-attempts have been reached.
         /// </summary>
         [JsonIgnore]
-        public HashSet<Guid> SatisfiedSubscribersSubscriberIDs { get; set; } = new();
+        public HashSet<Guid> SatisfiedSubscriberIDs { get; set; } = new();
 
         /// <summary>
         /// List of subscribers which failed to be delivered to or for which the retry-attempts have been reached.
         /// </summary>
         [JsonIgnore]
-        public HashSet<Guid> FailedSubscribersSubscriberIDs { get; set; } = new();
+        public HashSet<Guid> FailedSubscriberIDs { get; set; } = new();
     }
 }

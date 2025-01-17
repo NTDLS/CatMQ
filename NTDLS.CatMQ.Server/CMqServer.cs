@@ -21,7 +21,6 @@ namespace NTDLS.CatMQ.Server
         private readonly JsonSerializerOptions _indentedJsonOptions = new() { WriteIndented = true };
         private readonly OptimisticCriticalResource<CaseInsensitiveMessageQueueDictionary> _messageQueues = new();
         private readonly RmServer _rmServer;
-
         internal CMqServerConfiguration Configuration => _configuration;
 
         /// <summary>
@@ -53,8 +52,10 @@ namespace NTDLS.CatMQ.Server
             };
 
             _rmServer = new RmServer(rmConfiguration);
-            _rmServer.AddHandler(new InternalServerQueryHandlers(this));
+            _rmServer.OnException += _rmServer_OnException;
             _rmServer.OnDisconnected += RmServer_OnDisconnected;
+
+            _rmServer.AddHandler(new InternalServerQueryHandlers(this));
         }
 
         /// <summary>
@@ -64,8 +65,15 @@ namespace NTDLS.CatMQ.Server
         {
             _configuration = new CMqServerConfiguration();
             _rmServer = new RmServer();
-            _rmServer.AddHandler(new InternalServerQueryHandlers(this));
+            _rmServer.OnException += _rmServer_OnException;
             _rmServer.OnDisconnected += RmServer_OnDisconnected;
+
+            _rmServer.AddHandler(new InternalServerQueryHandlers(this));
+        }
+
+        private void _rmServer_OnException(RmContext? context, Exception ex, IRmPayload? payload)
+        {
+            OnLog?.Invoke(this, CMqErrorLevel.Error, "Reliable messaging exception.", ex);
         }
 
         #region Management.
@@ -227,18 +235,55 @@ namespace NTDLS.CatMQ.Server
                         {
                             qKVP.Value.Subscribers.Read(sKVP =>
                             {
-                                foreach (var message in m.MessageBuffer.Skip(offset).Take(take))
+                                if (qKVP.Value.Configuration.PersistenceScheme == CMqPersistenceScheme.Ephemeral)
                                 {
-                                    result.Add(new CMqEnqueuedMessageDescriptor(message.SerialNumber)
+                                    foreach (var message in m.MessageBuffer.Skip(offset).Take(take))
                                     {
-                                        Timestamp = message.Timestamp,
-                                        SubscriberCount = sKVP.Count,
-                                        DeferredUntil = message.DeferredUntil,
-                                        SubscriberMessageDeliveries = message.SubscriberMessageDeliveries.Keys.ToHashSet(),
-                                        SatisfiedSubscribersSubscriberIDs = message.SatisfiedSubscribersSubscriberIDs,
-                                        AssemblyQualifiedTypeName = message.AssemblyQualifiedTypeName,
-                                        MessageJson = message.MessageJson,
-                                    });
+                                        result.Add(new CMqEnqueuedMessageDescriptor(message.SerialNumber)
+                                        {
+                                            Timestamp = message.Timestamp,
+                                            SubscriberCount = sKVP.Count,
+                                            DeferredUntil = message.DeferredUntil,
+                                            SubscriberMessageDeliveries = message.SubscriberMessageDeliveries.Keys.ToHashSet(),
+                                            SatisfiedSubscribersSubscriberIDs = message.SatisfiedSubscriberIDs,
+                                            AssemblyQualifiedTypeName = message.AssemblyQualifiedTypeName,
+                                            MessageJson = message.MessageJson,
+                                        });
+                                    }
+                                }
+                                else if (m.Database != null && qKVP.Value.Configuration.PersistenceScheme == CMqPersistenceScheme.Persistent)
+                                {
+                                    int currentIndex = 0;
+                                    int takenCount = 0;
+
+                                    using var iterator = m.Database.NewIterator();
+                                    iterator.SeekToFirst();
+
+                                    while (iterator.Valid() && currentIndex < offset)
+                                    {
+                                        iterator.Next();
+                                        currentIndex++;
+                                    }
+
+                                    while (iterator.Valid() && takenCount < take)
+                                    {
+                                        var persistedMessage = JsonSerializer.Deserialize<EnqueuedMessage>(iterator.StringValue());
+                                        if (persistedMessage != null)
+                                        {
+                                            result.Add(new CMqEnqueuedMessageDescriptor(persistedMessage.SerialNumber)
+                                            {
+                                                Timestamp = persistedMessage.Timestamp,
+                                                SubscriberCount = sKVP.Count,
+                                                DeferredUntil = persistedMessage.DeferredUntil,
+                                                SubscriberMessageDeliveries = persistedMessage.SubscriberMessageDeliveries.Keys.ToHashSet(),
+                                                SatisfiedSubscribersSubscriberIDs = persistedMessage.SatisfiedSubscriberIDs,
+                                                AssemblyQualifiedTypeName = persistedMessage.AssemblyQualifiedTypeName,
+                                                MessageJson = persistedMessage.MessageJson,
+                                            });
+                                        }
+                                        iterator.Next();
+                                        takenCount++;
+                                    }
                                 }
                             });
                         }) && success;
@@ -286,7 +331,7 @@ namespace NTDLS.CatMQ.Server
                                 {
                                     Timestamp = message.Timestamp,
                                     SubscriberMessageDeliveries = message.SubscriberMessageDeliveries.Keys.ToHashSet(),
-                                    SatisfiedSubscribersSubscriberIDs = message.SatisfiedSubscribersSubscriberIDs,
+                                    SatisfiedSubscribersSubscriberIDs = message.SatisfiedSubscriberIDs,
                                     AssemblyQualifiedTypeName = message.AssemblyQualifiedTypeName,
                                     MessageJson = message.MessageJson,
                                 };
@@ -510,8 +555,8 @@ namespace NTDLS.CatMQ.Server
                         {
                             message.QueueName = dlqName; //Be sure to change the queue name to the DLQ name.
                             message.SubscriberMessageDeliveries.Clear();
-                            message.SatisfiedSubscribersSubscriberIDs.Clear();
-                            message.FailedSubscribersSubscriberIDs.Clear();
+                            message.SatisfiedSubscriberIDs.Clear();
+                            message.FailedSubscriberIDs.Clear();
 
                             messageQueue.Statistics.IncrementReceivedMessageCount();
                             messageQueue.Statistics.IncrementQueueDepth();
@@ -558,7 +603,18 @@ namespace NTDLS.CatMQ.Server
         /// </summary>
         internal CMqConsumeResult DeliverMessage(Guid subscriberId, string queueName, EnqueuedMessage enqueuedMessage)
         {
-            var result = _rmServer.Query(subscriberId, new CMqMessageDeliveryQuery(queueName, enqueuedMessage.AssemblyQualifiedTypeName, enqueuedMessage.MessageJson)).Result;
+            var message = new CMqMessageDeliveryQuery(queueName, enqueuedMessage.SerialNumber,
+                enqueuedMessage.AssemblyQualifiedTypeName, enqueuedMessage.MessageJson)
+            {
+                Timestamp = enqueuedMessage.Timestamp,
+                DeferDuration = enqueuedMessage.DeferDuration,
+                DeferredCount = enqueuedMessage.DeferredCount,
+                SubscriberDeliveryCount = enqueuedMessage.SubscriberMessageDeliveries.Count,
+                SatisfiedSubscriberCount = enqueuedMessage.SatisfiedSubscriberIDs.Count,
+                FailedSubscriberCount = enqueuedMessage.FailedSubscriberIDs.Count
+            };
+
+            var result = _rmServer.Query(subscriberId, message).Result;
             if (string.IsNullOrEmpty(result.ErrorMessage) == false)
             {
                 throw new Exception(result.ErrorMessage);
@@ -785,6 +841,7 @@ namespace NTDLS.CatMQ.Server
 
                             var message = new EnqueuedMessage(queueKey, assemblyQualifiedTypeName, messageJson, serialNumber)
                             {
+                                DeferDuration = deferDeliveryDuration,
                                 DeferredUntil = deferDeliveryDuration == null ? null : DateTime.UtcNow + deferDeliveryDuration
                             };
 

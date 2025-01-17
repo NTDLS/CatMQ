@@ -29,7 +29,12 @@ namespace Test.QueueClient
             client.CreateQueue(new CMqQueueConfiguration("MyFirstQueue")
             {
                 PersistenceScheme = CMqPersistenceScheme.Persistent,
-                ConsumptionScheme = CMqConsumptionScheme.FirstConsumedSubscriber
+                ConsumptionScheme = CMqConsumptionScheme.FirstConsumedSubscriber,
+                DeadLetterConfiguration = new CMqDeadLetterQueueConfiguration()
+                {
+                    PersistenceScheme = CMqPersistenceScheme.Ephemeral,
+                    MaxMessageAge = TimeSpan.FromMinutes(10)
+                }
             });
 
             //Subscribe to the queue we just created.
@@ -48,9 +53,9 @@ namespace Test.QueueClient
             }
 
             //Enqueue a few messages, note that the message is just a class and it must inherit from ICMqMessage.
-            for (int i = 0; i < 10000; i++)
+            for (int i = 0; i < 1000; i++)
             {
-                //client.Enqueue("MyFirstQueue", new MyMessage($"Test message {i++:n0}"), TimeSpan.FromSeconds(10));
+                //client.Enqueue("MyFirstQueue", new MyMessage($"Test message {i:n0}"), TimeSpan.FromSeconds(60));
                 client.Enqueue("MyFirstQueue", new MyMessage($"Test message {i:n0}"));
             }
 
@@ -72,7 +77,15 @@ namespace Test.QueueClient
                 //Console.WriteLine($"Received: '{message.ObjectType}'->'{message.MessageJson}'");
             }
 
-            return new CMqConsumeResult(CMqConsumptionDisposition.Consumed);
+            if (rawMessage.DeferredCount > 2)
+            {
+                return new CMqConsumeResult(CMqConsumptionDisposition.DeadLetter);
+            }
+
+            return new CMqConsumeResult(CMqConsumptionDisposition.Defer)
+            {
+                DeferDuration = (rawMessage.DeferDuration ?? TimeSpan.Zero) + TimeSpan.FromSeconds(1)
+            };
         }
 
         private static void OnBatchReceived(CMqClient client, List<CMqReceivedMessage> rawMessages)

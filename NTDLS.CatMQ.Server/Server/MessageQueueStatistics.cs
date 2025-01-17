@@ -16,16 +16,16 @@
         /// <summary>
         /// Used to keep the messages in order inside the persistence database.
         /// </summary>
-        public ulong _nextSerialNumber = 0;
+        public ulong _lastSerialNumber = 0;
 
         public string GetNextSerialNumber()
         {
-            var value = Interlocked.Increment(ref _nextSerialNumber);
+            var value = Interlocked.Increment(ref _lastSerialNumber);
             return (value).ToString().PadLeft(20, '0');
         }
 
-        public void SetNextSerialNumber(ulong value)
-            => Interlocked.Exchange(ref _nextSerialNumber, value);
+        public void SetLastSerialNumber(ulong value)
+            => Interlocked.Exchange(ref _lastSerialNumber, value);
 
         private int _queueDepth = 0;
         public void IncrementQueueDepth()
