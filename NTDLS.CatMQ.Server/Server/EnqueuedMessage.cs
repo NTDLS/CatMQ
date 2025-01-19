@@ -1,4 +1,5 @@
-﻿using System.Text.Json.Serialization;
+﻿using NTDLS.CatMQ.Shared;
+using System.Text.Json.Serialization;
 
 namespace NTDLS.CatMQ.Server.Server
 {
@@ -7,6 +8,9 @@ namespace NTDLS.CatMQ.Server.Server
     /// </summary>
     internal class EnqueuedMessage(string queueName, string assemblyQualifiedTypeName, string messageJson, ulong serialNumber)
     {
+        [JsonIgnore]
+        public CMqMessageState State { get; set; } = CMqMessageState.Ready;
+
         /// <summary>
         /// The name of the queue which contains this message.
         /// </summary>
