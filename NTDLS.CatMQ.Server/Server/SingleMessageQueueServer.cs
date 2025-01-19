@@ -47,10 +47,11 @@ namespace NTDLS.CatMQ.Server.Server
             var lastCheckpoint = DateTime.UtcNow;
             bool attemptBufferRehydration = false;
 
+            int threadYieldBurndown = CMqDefaults.QUEUE_THREAD_DELIVERY_BURNDOWN; //Just used to omit waiting. We want to spin fast when we are delivering messages.
+
             while (KeepRunning)
             {
                 var now = DateTime.UtcNow;
-                bool yieldThread = true; //Just used to omit waiting. We want to spin fast when we are delivering messages.
 
                 if (DateTime.UtcNow - lastCheckpoint > TimeSpan.FromSeconds(30))
                 {
@@ -118,8 +119,7 @@ namespace NTDLS.CatMQ.Server.Server
                                 {
                                     //Get the first message in the list, if any.
                                     topMessage = m.MessageBuffer.FirstOrDefault(o =>
-                                        o.State == CMqMessageState.Ready
-                                        && (o.DeferredUntil == null || now >= o.DeferredUntil));
+                                        o.State == CMqMessageState.Ready && (o.DeferredUntil == null || now >= o.DeferredUntil));
 
                                     if (Configuration.PersistenceScheme == CMqPersistenceScheme.Persistent)
                                     {
@@ -127,7 +127,7 @@ namespace NTDLS.CatMQ.Server.Server
                                         //  get a top-message or we are under the minimum buffer size. We have to check for the NULL
                                         //  top-message because it could be that we do not have any qualified messages in the buffer
                                         //  (because all of them are deferred) even though we do have messages in the buffer.
-                                        if (Statistics.QueueDepth > 0 && (topMessage == null || m.MessageBuffer.Count < CMqDefaults.DEFAULT_PERSISTENT_MESSAGES_MIN_BUFFER))
+                                        if (Statistics.QueueDepth > m.MessageBuffer.Count && (topMessage == null || m.MessageBuffer.Count < CMqDefaults.DEFAULT_PERSISTENT_MESSAGES_MIN_BUFFER))
                                         {
                                             //If we have more items in the queue than we have in the buffer, then trigger a rehydrate.
                                             attemptBufferRehydration = (Statistics.QueueDepth > m.MessageBuffer.Count);
@@ -140,7 +140,7 @@ namespace NTDLS.CatMQ.Server.Server
 
                     if (topMessage != null)
                     {
-                        yieldThread = false;
+                        threadYieldBurndown = 0;
 
                         Statistics.IncrementOutstandingDeliveries();
                         topMessage.State = CMqMessageState.OutForDelivery;
@@ -150,13 +150,14 @@ namespace NTDLS.CatMQ.Server.Server
                             Statistics.DecrementOutstandingDeliveries();
                         });
                     }
-
-                    List<EnqueuedMessage>? messagesWithDispositions = null;
-
-                    EnqueuedMessages.Read(m =>
+                    else if (threadYieldBurndown < CMqDefaults.QUEUE_THREAD_DELIVERY_BURNDOWN)
                     {
-                        messagesWithDispositions = m.MessageBuffer
-                            .Where(o => o.State == CMqMessageState.DeadLetter || o.State == CMqMessageState.Drop).ToList();
+                        threadYieldBurndown++;
+                    }
+
+                    var messagesWithDispositions = EnqueuedMessages.Read(m =>
+                    {
+                        return m.MessageBuffer.Where(o => o.State == CMqMessageState.DeadLetter || o.State == CMqMessageState.Drop).ToList();
                     });
 
                     if (messagesWithDispositions?.Count > 0)
@@ -213,9 +214,9 @@ namespace NTDLS.CatMQ.Server.Server
                     _queueServer.InvokeOnLog(ex.GetBaseException());
                 }
 
-                if (yieldThread && KeepRunning)
+                if (threadYieldBurndown >= CMqDefaults.QUEUE_THREAD_DELIVERY_BURNDOWN && KeepRunning)
                 {
-                    //If nothing was successfully delivered, then delay for a period.
+                    threadYieldBurndown = CMqDefaults.QUEUE_THREAD_DELIVERY_BURNDOWN;
                     DeliveryThreadWaitEvent.WaitOne(10);
                 }
             }

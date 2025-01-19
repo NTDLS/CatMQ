@@ -15,7 +15,7 @@ namespace Test.Stress
         static void Main()
         {
             Thread.Sleep(5000);
-            int threadCount = 1;
+            int threadCount = 16;
 
             for (int i = 0; i < threadCount; i++)
             {
@@ -98,9 +98,8 @@ namespace Test.Stress
             int clientId = Math.Abs(Guid.NewGuid().GetHashCode());
 
             Console.WriteLine($"Queue Count: {myQueueNames.Count}");
-
            
-            for(int messageNumber = 0; messageNumber < 1000; messageNumber ++)
+            for(int messageNumber = 0; messageNumber < 100000; messageNumber ++)
             {
                 foreach (var queueName in myQueueNames)
                 {

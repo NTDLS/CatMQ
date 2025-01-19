@@ -3,14 +3,19 @@
     public static class CMqDefaults
     {
         /// <summary>
+        /// the number of delivery cycle attempts to perform before yielding a queues delivery thread.
+        /// </summary>
+        public const int QUEUE_THREAD_DELIVERY_BURNDOWN = 100;
+
+        /// <summary>
         /// The number of messages to load from a persistence database when hydrating the message buffer.
         /// </summary>
-        public const int DEFAULT_PERSISTENT_MESSAGES_BUFFER_SIZE = 1000;
+        public const int DEFAULT_PERSISTENT_MESSAGES_BUFFER_SIZE = 5000;
 
         /// <summary>
         /// The minimum number of messages to keep in memory for persistent queues.
         /// </summary>
-        public const int DEFAULT_PERSISTENT_MESSAGES_MIN_BUFFER = 500;
+        public const int DEFAULT_PERSISTENT_MESSAGES_MIN_BUFFER = 1000;
 
         /// <summary>
         /// The amount of time to wait when performing deadlock avoidance locks.
