@@ -15,7 +15,7 @@ namespace Test.Stress
         static void Main()
         {
             Thread.Sleep(5000);
-            int threadCount = 16;
+            int threadCount = 1;
 
             for (int i = 0; i < threadCount; i++)
             {
@@ -97,12 +97,14 @@ namespace Test.Stress
 
             int clientId = Math.Abs(Guid.NewGuid().GetHashCode());
 
-            int messageNumber = 0;
-            while (messageNumber < 1000000) //Send test messages as objects that inherit from IMqMessage
+            Console.WriteLine($"Queue Count: {myQueueNames.Count}");
+
+           
+            for(int messageNumber = 0; messageNumber < 1000; messageNumber ++)
             {
                 foreach (var queueName in myQueueNames)
                 {
-                    client.Enqueue(queueName, new MyMessage($"Test message {messageNumber++:n0} from {clientId}"));
+                    client.Enqueue(queueName, new MyMessage($"Test message {messageNumber:n0} from {clientId}"));
                 }
             }
 
@@ -140,7 +142,7 @@ namespace Test.Stress
 
         private static void OnBatchReceived(CMqClient client, List<CMqReceivedMessage> rawMessages)
         {
-            Console.WriteLine($"Received message batch: {rawMessages.Count}.");
+            //Console.WriteLine($"Received message batch: {rawMessages.Count}.");
         }
     }
 }
