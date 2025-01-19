@@ -47,7 +47,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\NTDLS.CatMQ.Shared\NTDLS.CatMQ.Shared.csproj" />
+    <PackageReference Include="NTDLS.CatMQ.Shared" Version="2.3.0" />
   </ItemGroup>
 
 </Project>
