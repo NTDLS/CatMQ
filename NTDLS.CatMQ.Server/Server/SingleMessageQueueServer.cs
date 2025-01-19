@@ -223,7 +223,15 @@ namespace NTDLS.CatMQ.Server.Server
 
         private async Task DistributeToSubscribers(EnqueuedMessage message)
         {
-            message.State = await DistributeToSubscribersWithResolution(message);
+            try
+            {
+                message.State = await DistributeToSubscribersWithResolution(message);
+            }
+            catch
+            {
+                _queueServer.InvokeOnLog(CMqErrorLevel.Fatal, $"Failure of DistributeToSubscribersWithResolution [{Configuration.QueueName}].");
+                message.State = CMqMessageState.Ready;
+            }
         }
 
         /// <summary>
@@ -266,16 +274,16 @@ namespace NTDLS.CatMQ.Server.Server
 
                 try
                 {
-                    subscriber.AttemptedDeliveryCount++;
+                    subscriber.IncrementAttemptedDeliveryCount();
 
                     var deliveryResult = await _queueServer.DeliverMessage(subscriber.SubscriberId, Configuration.QueueName, message);
 
-                    Statistics.DeliveredMessageCount++;
-                    subscriber.SuccessfulDeliveryCount++;
+                    Statistics.IncrementDeliveredMessageCount();
+                    subscriber.IncrementSuccessfulDeliveryCount();
 
                     if (deliveryResult.Disposition == CMqConsumptionDisposition.Consumed)
                     {
-                        subscriber.ConsumedDeliveryCount++;
+                        subscriber.IncrementConsumedDeliveryCount();
 
                         //The message was marked as consumed by the subscriber, so this subscriber is satisfied.
                         message.SatisfiedDeliverySubscriberIDs.Add(subscriber.SubscriberId);
@@ -300,8 +308,8 @@ namespace NTDLS.CatMQ.Server.Server
                         message.DeferredUntil = DateTime.UtcNow + deliveryResult.DeferDuration;
                         message.DeferDuration = deliveryResult.DeferDuration;
                         message.DeferredCount++;
-                        subscriber.DeferredDeliveryCount++;
-                        Statistics.DeferredDeliveryCount++;
+                        subscriber.IncrementDeferredDeliveryCount();
+                        Statistics.IncrementDeferredDeliveryCount();
 
                         EnqueuedMessages.Read(m => m.Database.Store(message));
                     }
@@ -309,21 +317,21 @@ namespace NTDLS.CatMQ.Server.Server
                     {
                         //When a subscriber responds with "DeadLetter" or "Drop", we short-circuit
                         //  the delivery flow logic and take the requested action on the message.
-                        Statistics.ExplicitDeadLetterCount++;
+                        Statistics.IncrementExplicitDeadLetterCount();
                         return CMqMessageState.DeadLetter;
                     }
                     else if (deliveryResult.Disposition == CMqConsumptionDisposition.Drop)
                     {
                         //When a subscriber responds with "DeadLetter" or "Drop", we short-circuit
                         //  the delivery flow logic and take the requested action on the message.
-                        Statistics.ExplicitDropCount++;
+                        Statistics.IncrementExplicitDropCount();
                         return CMqMessageState.Drop;
                     }
                 }
                 catch (Exception ex) //Delivery failure.
                 {
-                    Statistics.FailedDeliveryCount++;
-                    subscriber.FailedDeliveryCount++;
+                    Statistics.IncrementFailedDeliveryCount();
+                    subscriber.IncrementFailedDeliveryCount();
                     _queueServer.InvokeOnLog(ex.GetBaseException());
                 }
 
