@@ -52,14 +52,14 @@ namespace Test.Stress
                 myQueueNames.Add(queueName);
 
                 CMqDeadLetterQueueConfiguration? deadLetterConfig = null;
-                //if (_random.Next(1, 100) > 60) //We don't always create a dead-letter queue.
-                //{
-                deadLetterConfig = new CMqDeadLetterQueueConfiguration()
+                if (_random.Next(1, 100) > 60) //We don't always create a dead-letter queue.
                 {
-                    PersistenceScheme = CMqPersistenceScheme.Persistent,
-                    //MaxMessageAge = TimeSpan.FromMinutes(15)
-                };
-                //}
+                    deadLetterConfig = new CMqDeadLetterQueueConfiguration()
+                    {
+                        PersistenceScheme = CMqPersistenceScheme.Persistent,
+                        //MaxMessageAge = TimeSpan.FromMinutes(15)
+                    };
+                }
 
                 Console.WriteLine($"Creating queue: '{queueName}'.");
                 client.CreateQueue(new CMqQueueConfiguration(queueName)
