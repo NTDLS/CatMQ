@@ -73,7 +73,6 @@ namespace NTDLS.CatMQ.Server.Server
                 try
                 {
                     EnqueuedMessage? topMessage = null;
-                    var allSubscriberIDs = new HashSet<Guid>();
 
                     if (attemptBufferRehydration)
                     {
@@ -134,12 +133,6 @@ namespace NTDLS.CatMQ.Server.Server
                                             attemptBufferRehydration = (Statistics.QueueDepth > m.MessageBuffer.Count);
                                         }
                                     }
-
-                                    if (topMessage != null)
-                                    {
-                                        //Get list of subscribers that have yet to get a copy of the message.
-                                        allSubscriberIDs = s.Keys.ToHashSet();
-                                    }
                                 }
                             });
                         }
@@ -150,6 +143,7 @@ namespace NTDLS.CatMQ.Server.Server
                         yieldThread = false;
 
                         Statistics.IncrementOutstandingDeliveries();
+                        topMessage.State = CMqMessageState.OutForDelivery;
 
                         DistributeToSubscribers(topMessage).ContinueWith((t) =>
                         {
