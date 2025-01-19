@@ -128,7 +128,7 @@ namespace Test.Stress
             }
             */
 
-            if (_random.Next(0, 100) == 50)
+            if ((_random.Next(0, 100) % 70) == 0)
             {
                 return new CMqConsumeResult(CMqConsumptionDisposition.Defer)
                 {
