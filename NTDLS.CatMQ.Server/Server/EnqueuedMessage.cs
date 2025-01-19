@@ -52,22 +52,28 @@ namespace NTDLS.CatMQ.Server.Server
         public string MessageJson { get; set; } = messageJson;
 
         /// <summary>
-        /// The list of connection IDs that the message has been successfully delivered to.
+        /// Dictionary of subscriber IDs and any per-subscriber statistics.
         /// </summary>
         [JsonIgnore]
         public Dictionary<Guid, SubscriberMessageDelivery> SubscriberMessageDeliveries { get; set; } = new();
 
         /// <summary>
-        /// List of subscribers which have been delivered to or for which the retry-attempts have been reached.
+        /// Subscribers for which the delivery was successful and received a "consumed" or "non-consumed" response.
         /// </summary>
         [JsonIgnore]
-        public HashSet<Guid> SatisfiedSubscriberIDs { get; set; } = new();
+        public HashSet<Guid> SatisfiedDeliverySubscriberIDs { get; set; } = new();
 
         /// <summary>
-        /// List of subscribers which failed to be delivered to or for which the retry-attempts have been reached.
+        /// Subscribers which have been successfully delivered to and a response with a consumption result.
         /// </summary>
         [JsonIgnore]
-        public HashSet<Guid> FailedSubscriberIDs { get; set; } = new();
+        public HashSet<Guid> ConsumedDeliverySubscriberIDs { get; set; } = new();
+
+        /// <summary>
+        /// Subscribers where the failed delivery count has reached the retry-attempt limit.
+        /// </summary>
+        [JsonIgnore]
+        public HashSet<Guid> FailedDeliverySubscriberIDs { get; set; } = new();
 
         public EnqueuedMessage CloneForDeadLetter(string queueName, ulong serialNumber)
         {
