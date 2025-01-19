@@ -2,7 +2,6 @@ using CatMQ.Service.Models.Page;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NTDLS.CatMQ.Server;
-using System.Reflection;
 
 namespace CatMQ.Service.Pages
 {

@@ -35,6 +35,21 @@
             => Interlocked.Exchange(ref _queueDepth, value);
 
         /// <summary>
+        /// The number of asynchronous deliveries that are currently outstanding.
+        /// </summary>
+        public int OutstandingDeliveries
+        {
+            get => _outstandingDeliveries;
+        }
+
+        private int _outstandingDeliveries = 0;
+        public void IncrementOutstandingDeliveries()
+            => Interlocked.Increment(ref _outstandingDeliveries);
+
+        public void DecrementOutstandingDeliveries()
+            => Interlocked.Decrement(ref _outstandingDeliveries);
+
+        /// <summary>
         /// The total number of messages that have been enqueued into this queue.
         /// </summary>
         public ulong ReceivedMessageCount

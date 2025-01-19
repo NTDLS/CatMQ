@@ -55,7 +55,7 @@ namespace NTDLS.CatMQ.Server.Server
         /// Dictionary of subscriber IDs and any per-subscriber statistics.
         /// </summary>
         [JsonIgnore]
-        public Dictionary<Guid, SubscriberMessageDelivery> SubscriberMessageDeliveries { get; set; } = new();
+        public Dictionary<Guid, SubscriberMessageDeliveryStatistics> SubscriberMessageDeliveries { get; set; } = new();
 
         /// <summary>
         /// Subscribers for which the delivery was successful and received a "consumed" or "non-consumed" response.

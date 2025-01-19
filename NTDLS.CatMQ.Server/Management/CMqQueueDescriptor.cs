@@ -3,7 +3,7 @@
 namespace NTDLS.CatMQ.Server.Management
 {
     /// <summary>
-    /// Defines a queue configuration.
+    /// Defines a queue configuration and various statistics.
     /// </summary>
     public class CMqQueueDescriptor()
     {
@@ -15,12 +15,17 @@ namespace NTDLS.CatMQ.Server.Management
         /// <summary>
         /// The amount of time to wait between sending individual messages to subscribers.
         /// </summary>
-        public TimeSpan DeliveryThrottle { get; internal set; } = TimeSpan.Zero;
+        public TimeSpan DeliveryThrottle { get; internal set; }
+
+        /// <summary>
+        /// The maximum number of simultaneously outstanding asynchronous deliveries.
+        /// </summary>
+        public int MaxOutstandingDeliveries { get; set; }
 
         /// <summary>
         /// The maximum number of times the server will attempt to deliver any message to a subscriber before giving up. 0 = infinite.
         /// </summary>
-        public int MaxDeliveryAttempts { get; internal set; } = 10;
+        public int MaxDeliveryAttempts { get; internal set; }
 
         /// <summary>
         /// The maximum time that a message item can remain in the queue without being delivered before being removed. 0 = infinite.
@@ -30,12 +35,12 @@ namespace NTDLS.CatMQ.Server.Management
         /// <summary>
         /// Determines when to remove messages from the queue as they are distributed to subscribers.
         /// </summary>
-        public CMqConsumptionScheme ConsumptionScheme { get; internal set; } = CMqConsumptionScheme.Delivered;
+        public CMqConsumptionScheme ConsumptionScheme { get; internal set; }
 
         /// <summary>
         /// Determines how messages are distributed to subscribers.
         /// </summary>
-        public CMqDeliveryScheme DeliveryScheme { get; internal set; } = CMqDeliveryScheme.Balanced;
+        public CMqDeliveryScheme DeliveryScheme { get; internal set; }
 
         /// <summary>
         /// The current number of messages that are enqueued in this message queue.
@@ -46,6 +51,11 @@ namespace NTDLS.CatMQ.Server.Management
         /// The number of subscriber for this queue.
         /// </summary>
         public int CurrentSubscriberCount { get; set; }
+
+        /// <summary>
+        /// The number of asynchronous deliveries that are currently outstanding.
+        /// </summary>
+        public int CurrentOutstandingDeliveries { get; set; }
 
         /// <summary>
         /// The total number of messages that have been enqueued into this queue.
@@ -85,6 +95,6 @@ namespace NTDLS.CatMQ.Server.Management
         /// <summary>
         /// Whether the queue is persisted or ephemeral.
         /// </summary>
-        public CMqPersistenceScheme PersistenceScheme { get; set; } = CMqPersistenceScheme.Ephemeral;
+        public CMqPersistenceScheme PersistenceScheme { get; set; }
     }
 }

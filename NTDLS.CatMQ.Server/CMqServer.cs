@@ -2,7 +2,6 @@
 using NTDLS.CatMQ.Server.Server;
 using NTDLS.CatMQ.Server.Server.QueryHandlers;
 using NTDLS.CatMQ.Shared;
-using NTDLS.CatMQ.Shared.Payload.ClientToServer;
 using NTDLS.CatMQ.Shared.Payload.ServerToClient;
 using NTDLS.ReliableMessaging;
 using NTDLS.Semaphore;
@@ -192,6 +191,7 @@ namespace NTDLS.CatMQ.Server
                                 ConsumptionScheme = mqKVP.Value.Configuration.ConsumptionScheme,
                                 DeliveryScheme = mqKVP.Value.Configuration.DeliveryScheme,
                                 DeliveryThrottle = mqKVP.Value.Configuration.DeliveryThrottle,
+                                MaxOutstandingDeliveries = mqKVP.Value.Configuration.MaxOutstandingDeliveries,
                                 MaxDeliveryAttempts = mqKVP.Value.Configuration.MaxDeliveryAttempts,
                                 MaxMessageAge = mqKVP.Value.Configuration.MaxMessageAge,
                                 PersistenceScheme = mqKVP.Value.Configuration.PersistenceScheme,
@@ -200,6 +200,7 @@ namespace NTDLS.CatMQ.Server
                                 CurrentSubscriberCount = sKVP.Count,
                                 QueueDepth = mqKVP.Value.Statistics.QueueDepth,
 
+                                CurrentOutstandingDeliveries = mqKVP.Value.Statistics.OutstandingDeliveries,
                                 ReceivedMessageCount = mqKVP.Value.Statistics.ReceivedMessageCount,
                                 DeliveredMessageCount = mqKVP.Value.Statistics.DeliveredMessageCount,
                                 FailedDeliveryCount = mqKVP.Value.Statistics.FailedDeliveryCount,
@@ -302,7 +303,7 @@ namespace NTDLS.CatMQ.Server
                                             SubscriberCount = sKVP.Count,
                                             DeferredUntil = message.DeferredUntil,
                                             SubscriberMessageDeliveries = message.SubscriberMessageDeliveries.Keys.ToHashSet(),
-                                            SatisfiedSubscribersSubscriberIDs = message.SatisfiedSubscriberIDs,
+                                            SatisfiedSubscribersSubscriberIDs = message.SatisfiedDeliverySubscriberIDs,
                                             AssemblyQualifiedTypeName = message.AssemblyQualifiedTypeName,
                                             MessageJson = message.MessageJson,
                                         });
@@ -333,7 +334,7 @@ namespace NTDLS.CatMQ.Server
                                                 SubscriberCount = sKVP.Count,
                                                 DeferredUntil = persistedMessage.DeferredUntil,
                                                 SubscriberMessageDeliveries = persistedMessage.SubscriberMessageDeliveries.Keys.ToHashSet(),
-                                                SatisfiedSubscribersSubscriberIDs = persistedMessage.SatisfiedSubscriberIDs,
+                                                SatisfiedSubscribersSubscriberIDs = persistedMessage.SatisfiedDeliverySubscriberIDs,
                                                 AssemblyQualifiedTypeName = persistedMessage.AssemblyQualifiedTypeName,
                                                 MessageJson = persistedMessage.MessageJson,
                                             });
@@ -396,7 +397,7 @@ namespace NTDLS.CatMQ.Server
                                 {
                                     Timestamp = message.Timestamp,
                                     SubscriberMessageDeliveries = message.SubscriberMessageDeliveries.Keys.ToHashSet(),
-                                    SatisfiedSubscribersSubscriberIDs = message.SatisfiedSubscriberIDs,
+                                    SatisfiedSubscribersSubscriberIDs = message.SatisfiedDeliverySubscriberIDs,
                                     AssemblyQualifiedTypeName = message.AssemblyQualifiedTypeName,
                                     MessageJson = message.MessageJson,
                                 };
@@ -415,7 +416,7 @@ namespace NTDLS.CatMQ.Server
                                 {
                                     Timestamp = persistedMessage.Timestamp,
                                     SubscriberMessageDeliveries = persistedMessage.SubscriberMessageDeliveries.Keys.ToHashSet(),
-                                    SatisfiedSubscribersSubscriberIDs = persistedMessage.SatisfiedSubscriberIDs,
+                                    SatisfiedSubscribersSubscriberIDs = persistedMessage.SatisfiedDeliverySubscriberIDs,
                                     AssemblyQualifiedTypeName = persistedMessage.AssemblyQualifiedTypeName,
                                     MessageJson = persistedMessage.MessageJson,
                                 };
@@ -657,8 +658,8 @@ namespace NTDLS.CatMQ.Server
                 DeferDuration = enqueuedMessage.DeferDuration,
                 DeferredCount = enqueuedMessage.DeferredCount,
                 SubscriberDeliveryCount = enqueuedMessage.SubscriberMessageDeliveries.Count,
-                SatisfiedSubscriberCount = enqueuedMessage.SatisfiedSubscriberIDs.Count,
-                FailedSubscriberCount = enqueuedMessage.FailedSubscriberIDs.Count
+                SatisfiedSubscriberCount = enqueuedMessage.SatisfiedDeliverySubscriberIDs.Count,
+                FailedSubscriberCount = enqueuedMessage.FailedDeliverySubscriberIDs.Count
             };
 
             var result = await _rmServer.QueryAsync(subscriberId, message);

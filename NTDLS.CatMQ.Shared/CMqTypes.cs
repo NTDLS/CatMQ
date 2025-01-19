@@ -17,7 +17,11 @@
         /// <summary>
         /// Message should be dropped.
         /// </summary>
-        Drop
+        Drop,
+        /// <summary>
+        /// The message queue was shutting down and delivery was aborted.
+        /// </summary>
+        Shutdown
     }
 
     public enum CMqConsumptionDisposition
