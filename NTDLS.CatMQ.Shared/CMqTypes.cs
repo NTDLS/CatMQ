@@ -1,5 +1,29 @@
 ﻿namespace NTDLS.CatMQ.Shared
 {
+    public enum CMqMessageState
+    {
+        /// <summary>
+        /// Message is ready for delivery.
+        /// </summary>
+        Ready,
+        /// <summary>
+        /// Message is currently being delivered to subscribers.
+        /// </summary>
+        OutForDelivery,
+        /// <summary>
+        /// Message should be dead lettered.
+        /// </summary>
+        DeadLetter,
+        /// <summary>
+        /// Message should be dropped.
+        /// </summary>
+        Drop,
+        /// <summary>
+        /// The message queue was shutting down and delivery was aborted.
+        /// </summary>
+        Shutdown
+    }
+
     public enum CMqConsumptionDisposition
     {
         /// <summary>

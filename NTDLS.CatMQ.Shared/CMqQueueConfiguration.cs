@@ -19,6 +19,11 @@ namespace NTDLS.CatMQ.Shared
         }
 
         /// <summary>
+        /// The maximum number of simultaneously outstanding asynchronous deliveries.
+        /// </summary>
+        public int MaxOutstandingDeliveries { get; set; } = 10;
+
+        /// <summary>
         /// The amount of time to wait between sending individual messages to subscribers.
         /// </summary>
         public TimeSpan DeliveryThrottle { get; set; } = TimeSpan.Zero;

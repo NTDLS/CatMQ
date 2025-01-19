@@ -1,7 +1,7 @@
 ﻿namespace NTDLS.CatMQ.Server.Management
 {
     /// <summary>
-    /// Contains readonly information about messages.
+    /// Contains readonly information about messages and various statistics.
     /// </summary>
     public class CMqEnqueuedMessageDescriptor(ulong serialNumber)
     {

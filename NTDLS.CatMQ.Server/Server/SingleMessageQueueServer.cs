@@ -47,10 +47,11 @@ namespace NTDLS.CatMQ.Server.Server
             var lastCheckpoint = DateTime.UtcNow;
             bool attemptBufferRehydration = false;
 
+            int threadYieldBurndown = CMqDefaults.QUEUE_THREAD_DELIVERY_BURNDOWN; //Just used to omit waiting. We want to spin fast when we are delivering messages.
+
             while (KeepRunning)
             {
                 var now = DateTime.UtcNow;
-                bool yieldThread = true; //Just used to omit waiting. We want to spin fast when we are delivering messages.
 
                 if (DateTime.UtcNow - lastCheckpoint > TimeSpan.FromSeconds(30))
                 {
@@ -73,9 +74,6 @@ namespace NTDLS.CatMQ.Server.Server
                 try
                 {
                     EnqueuedMessage? topMessage = null;
-                    List<CMqSubscriberDescriptor>? yetToBeDeliveredSubscribers = null;
-
-                    #region Get top message and its subscribers.
 
                     if (attemptBufferRehydration)
                     {
@@ -85,314 +83,300 @@ namespace NTDLS.CatMQ.Server.Server
 
                     EnqueuedMessages.TryReadAll([Subscribers], CMqDefaults.DEFAULT_TRY_WAIT_MS, m =>
                     {
-                        Subscribers.Read(s =>
-                        {
-                            //We only process a queue if it has subscribers.
-                            //This is so we do not discard messages as delivered for queues with no subscribers.
-                            if (s.Count > 0)
-                            {
-                                //Get the first message in the list, if any.
-                                topMessage = m.MessageBuffer.FirstOrDefault(o => o.DeferredUntil == null || now >= o.DeferredUntil);
-
-                                if (Configuration.PersistenceScheme == CMqPersistenceScheme.Persistent)
-                                {
-                                    //We rehydrate the queue from the database when we have a queue-depth and either we didn't
-                                    //  get a top-message or we are under the minimum buffer size. We have to check for the NULL
-                                    //  top-message because it could be that we do not have any qualified messages in the buffer
-                                    //  (because all of them are deferred) even though we do have messages in the buffer.
-                                    if (Statistics.QueueDepth > 0 && (topMessage == null || m.MessageBuffer.Count < CMqDefaults.DEFAULT_PERSISTENT_MESSAGES_MIN_BUFFER))
-                                    {
-                                        //If we have more items in the queue than we have in the buffer, then trigger a rehydrate.
-                                        attemptBufferRehydration = (Statistics.QueueDepth > m.MessageBuffer.Count);
-                                    }
-                                }
-
-                                if (topMessage != null)
-                                {
-                                    //Get list of subscribers that have yet to get a copy of the message.
-
-                                    var yetToBeDeliveredSubscriberIds = s.Keys.Except(topMessage.SatisfiedSubscriberIDs).ToList();
-
-                                    yetToBeDeliveredSubscribers = s.Where(o => yetToBeDeliveredSubscriberIds.Contains(o.Key)).Select(o => o.Value).ToList();
-
-                                    if (Configuration.DeliveryScheme == CMqDeliveryScheme.Balanced)
-                                    {
-                                        yetToBeDeliveredSubscribers = yetToBeDeliveredSubscribers.OrderBy(_ => Guid.NewGuid()).ToList();
-                                    }
-                                }
-                            }
-                        });
-
                         if (Configuration.MaxMessageAge != null)
                         {
-                            //Get the first message in the list, if any.
-                            //We do this so that we can test for expired messages even when no subscribers are present.
-                            var testExpired = topMessage ?? m.MessageBuffer.FirstOrDefault();
+                            //Look for and flag expired messages.
+                            //We do this here so that we can process expired messages even when there are no subscribers.
+                            var expiredMessages = m.MessageBuffer.Where(o =>
+                                o.State == CMqMessageState.Ready
+                                && (now - o.Timestamp) > Configuration.MaxMessageAge);
 
-                            if (testExpired != null)
+                            foreach (var message in expiredMessages)
                             {
-                                if ((DateTime.UtcNow - testExpired.Timestamp) > Configuration.MaxMessageAge)
+                                //If MaxMessageAge is defined, then remove the stale messages.
+                                if (Configuration.DeadLetterConfiguration != null)
                                 {
-                                    //If MaxMessageAge is defined, then remove the stale messages.
-                                    if (Configuration.DeadLetterConfiguration != null)
+                                    if ((now - message.Timestamp) > Configuration.DeadLetterConfiguration.MaxMessageAge)
                                     {
-                                        if ((DateTime.UtcNow - testExpired.Timestamp) > Configuration.DeadLetterConfiguration.MaxMessageAge)
-                                        {
-                                            //Even too old for the dead-letter queue, discard expired message.
-                                        }
-                                        else
-                                        {
-                                            _queueServer.ShovelToDeadLetter(Configuration.QueueName, testExpired);
-                                        }
+                                        //Even too old for the dead-letter queue, discard expired message.
+                                        message.State = CMqMessageState.Drop;
                                     }
-
-                                    m.RemoveFromBufferAndDatabase(testExpired);
-                                    Statistics.DecrementQueueDepth();
-                                    Statistics.ExpiredMessageCount++;
-
-                                    topMessage = null; //Make sure we do not process the topMessage (if any).
+                                    else
+                                    {
+                                        message.State = CMqMessageState.DeadLetter;
+                                    }
                                 }
                             }
+                        }
+
+                        if (Statistics.OutstandingDeliveries < Configuration.MaxOutstandingDeliveries)
+                        {
+                            Subscribers.Read(s => //This lock is already held.
+                            {
+                                //We only process a queue if it has subscribers so that we do not
+                                //  discard messages as delivered for queues with no subscribers.
+                                if (s.Count > 0)
+                                {
+                                    //Get the first message in the list, if any.
+                                    topMessage = m.MessageBuffer.FirstOrDefault(o =>
+                                        o.State == CMqMessageState.Ready && (o.DeferredUntil == null || now >= o.DeferredUntil));
+
+                                    if (Configuration.PersistenceScheme == CMqPersistenceScheme.Persistent)
+                                    {
+                                        //We rehydrate the queue from the database when we have a queue-depth and either we didn't
+                                        //  get a top-message or we are under the minimum buffer size. We have to check for the NULL
+                                        //  top-message because it could be that we do not have any qualified messages in the buffer
+                                        //  (because all of them are deferred) even though we do have messages in the buffer.
+                                        if (Statistics.QueueDepth > m.MessageBuffer.Count && (topMessage == null || m.MessageBuffer.Count < CMqDefaults.DEFAULT_PERSISTENT_MESSAGES_MIN_BUFFER))
+                                        {
+                                            //If we have more items in the queue than we have in the buffer, then trigger a rehydrate.
+                                            attemptBufferRehydration = (Statistics.QueueDepth > m.MessageBuffer.Count);
+                                        }
+                                    }
+                                }
+                            });
                         }
                     });
 
-                    #endregion
-
-                    //We we have a message, deliver it to the queue subscribers.
-                    if (topMessage != null && yetToBeDeliveredSubscribers != null)
+                    if (topMessage != null)
                     {
-                        yieldThread = false;
+                        threadYieldBurndown = 0;
 
-                        bool deliveredAndConsumed = false;
-                        bool deadLetterRequested = false;
-                        bool dropMessageRequested = false;
+                        Statistics.IncrementOutstandingDeliveries();
+                        topMessage.State = CMqMessageState.OutForDelivery;
 
-                        #region Deliver message to subscibers.
-
-                        foreach (var subscriber in yetToBeDeliveredSubscribers)
+                        DistributeToSubscribers(topMessage).ContinueWith((t) =>
                         {
-                            if (KeepRunning == false)
-                            {
-                                break;
-                            }
+                            Statistics.DecrementOutstandingDeliveries();
+                        });
+                    }
+                    else if (threadYieldBurndown < CMqDefaults.QUEUE_THREAD_DELIVERY_BURNDOWN)
+                    {
+                        threadYieldBurndown++;
+                    }
 
-                            //Keep track of per-message-subscriber delivery metrics.
-                            if (topMessage.SubscriberMessageDeliveries.TryGetValue(subscriber.SubscriberId, out var subscriberMessageDelivery))
-                            {
-                                subscriberMessageDelivery.DeliveryAttemptCount++;
-                            }
-                            else
-                            {
-                                subscriberMessageDelivery = new SubscriberMessageDelivery() { DeliveryAttemptCount = 1 };
-                                topMessage.SubscriberMessageDeliveries.Add(subscriber.SubscriberId, subscriberMessageDelivery);
-                            }
+                    var messagesWithDispositions = EnqueuedMessages.Read(m =>
+                    {
+                        return m.MessageBuffer.Where(o => o.State == CMqMessageState.DeadLetter || o.State == CMqMessageState.Drop).ToList();
+                    });
 
-                            try
-                            {
-                                subscriber.AttemptedDeliveryCount++;
-
-                                var consumeResult = _queueServer.DeliverMessage(subscriber.SubscriberId, Configuration.QueueName, topMessage);
-
-                                Statistics.DeliveredMessageCount++;
-                                subscriber.SuccessfulDeliveryCount++;
-
-                                if (consumeResult.Disposition == CMqConsumptionDisposition.Consumed)
-                                {
-                                    subscriber.ConsumedDeliveryCount++;
-                                    deliveredAndConsumed = true;
-
-                                    //The message was marked as consumed by the subscriber, so we are done with this subscriber.
-
-                                    //This thread is the only place we manage [SatisfiedSubscribersConnectionIDs], so we can use it without additional locking.
-                                    topMessage.SatisfiedSubscriberIDs.Add(subscriber.SubscriberId);
-
-                                    if (Configuration.ConsumptionScheme == CMqConsumptionScheme.FirstConsumedSubscriber)
-                                    {
-                                        //Message was delivered and consumed, break the delivery loop so the message can be removed from the queue.
-                                        break;
-                                    }
-                                }
-                                else if (consumeResult.Disposition == CMqConsumptionDisposition.Defer)
-                                {
-                                    //the message was marked as deferred by the subscriber, we will retry this subscriber at a later time.
-                                    topMessage.DeferredUntil = now + consumeResult.DeferDuration;
-                                    topMessage.DeferDuration = consumeResult.DeferDuration;
-                                    topMessage.DeferredCount++;
-                                    subscriber.DeferredDeliveryCount++;
-                                    Statistics.DeferredDeliveryCount++;
-
-                                    EnqueuedMessages.Read(m => m.Database.Store(topMessage));
-
-                                    if (Configuration.ConsumptionScheme == CMqConsumptionScheme.FirstConsumedSubscriber)
-                                    {
-                                        //Message was delivered and consumed, break the delivery loop so the message can be removed from the queue.
-                                        break;
-                                    }
-                                }
-                                else if (consumeResult.Disposition == CMqConsumptionDisposition.NotConsumed)
-                                {
-                                    //The message was marked as not-consumed by the subscriber, so we are done with this subscriber.
-                                    topMessage.SatisfiedSubscriberIDs.Add(subscriber.SubscriberId);
-                                }
-                                else if (consumeResult.Disposition == CMqConsumptionDisposition.DeadLetter)
-                                {
-                                    Statistics.ExplicitDeadLetterCount++;
-                                    deadLetterRequested = true;
-                                    break;
-                                }
-                                else if (consumeResult.Disposition == CMqConsumptionDisposition.Drop)
-                                {
-                                    Statistics.ExplicitDropCount++;
-                                    dropMessageRequested = true;
-                                    break;
-                                }
-
-                                if (KeepRunning == false)
-                                {
-                                    break;
-                                }
-                            }
-                            catch (Exception ex) //Delivery failure.
-                            {
-                                Statistics.ExpiredMessageCount++;
-                                subscriber.FailedDeliveryCount++;
-                                _queueServer.InvokeOnLog(ex.GetBaseException());
-                            }
-
-                            //If we have tried to deliver this message to this subscriber too many times, then mark this subscriber-message as satisfied.
-                            if (Configuration.MaxDeliveryAttempts > 0
-                                && subscriberMessageDelivery.DeliveryAttemptCount >= Configuration.MaxDeliveryAttempts)
-                            {
-                                topMessage.FailedSubscriberIDs.Add(subscriber.SubscriberId);
-                                topMessage.SatisfiedSubscriberIDs.Add(subscriber.SubscriberId);
-                            }
-                        }
-
-                        #endregion
-
-                        #region Remove message from queue.
-
-                        bool removeSuccess;
-
-                        do
+                    if (messagesWithDispositions?.Count > 0)
+                    {
+                        EnqueuedMessages.TryWrite(m =>
                         {
-                            removeSuccess = true;
-
-                            EnqueuedMessages.Write(m =>
+                            foreach (var message in messagesWithDispositions)
                             {
-                                removeSuccess = Subscribers.TryRead(CMqDefaults.DEFAULT_TRY_WAIT_MS, s =>
+                                switch (message.State)
                                 {
-                                    if (dropMessageRequested)
-                                    {
-                                        //A subscriber requested that the message be dropped, so remove the message from the queue and cache.
-                                        m.RemoveFromBufferAndDatabase(topMessage);
-                                        Statistics.DecrementQueueDepth();
-                                    }
-                                    else if (deadLetterRequested)
-                                    {
-                                        //A subscriber requested that we dead-letter this message.
-
-                                        if (Configuration.DeadLetterConfiguration != null)
-                                        {
-                                            if (Configuration.DeadLetterConfiguration.MaxMessageAge != null
-                                                && (DateTime.UtcNow - topMessage.Timestamp) > Configuration.DeadLetterConfiguration.MaxMessageAge)
-                                            {
-                                                //Message is even too old for the dead-letter queue, discard expired message.
-                                            }
-                                            else
-                                            {
-                                                _queueServer.ShovelToDeadLetter(Configuration.QueueName, topMessage);
-                                            }
-                                        }
-
-                                        //Remove the message from the queue and cache.
-                                        m.RemoveFromBufferAndDatabase(topMessage);
-                                        Statistics.DecrementQueueDepth();
-                                    }
-                                    else if (Configuration.ConsumptionScheme == CMqConsumptionScheme.FirstConsumedSubscriber)
-                                    {
-                                        //If the queue uses the FirstConsumedSubscriber schema and the message was successfully consumed
-                                        //  by a subscriber, then remove the message from the queue.
-                                        if (deliveredAndConsumed)
-                                        {
-                                            //The message was consumed by a subscriber, remove it from the queue and cache.
-                                            m.RemoveFromBufferAndDatabase(topMessage);
-                                            Statistics.DecrementQueueDepth();
-                                        }
-                                    }
-                                    else if (s.Keys.Except(topMessage.SatisfiedSubscriberIDs).Any() == false)
-                                    {
-                                        //All subscribers have received a copy of the message or have received their maximum number
-                                        //  of retries, so we can now remove the message from the queue.
-
-                                        //If there were any failed deliveries, then we want to retain a copy of the message in the DLQ.
-                                        if (topMessage.FailedSubscriberIDs.Count != 0)
+                                    case CMqMessageState.DeadLetter:
                                         {
                                             if (Configuration.DeadLetterConfiguration != null)
                                             {
-                                                if (Configuration.DeadLetterConfiguration.MaxMessageAge != null
-                                                    && (DateTime.UtcNow - topMessage.Timestamp) > Configuration.DeadLetterConfiguration.MaxMessageAge)
-                                                {
-                                                    //Message is even too old for the dead-letter queue, discard expired message.
-                                                }
-                                                else
-                                                {
-                                                    _queueServer.ShovelToDeadLetter(Configuration.QueueName, topMessage);
-                                                }
+                                                _queueServer.ShovelToDeadLetter(Configuration.QueueName, message);
                                             }
+
+                                            //Remove the message from the queue and cache.
+                                            m.RemoveFromBufferAndDatabase(message);
+                                            Statistics.DecrementQueueDepth();
                                         }
-
-                                        //Remove the message from the queue and cache.
-                                        m.RemoveFromBufferAndDatabase(topMessage);
+                                        break;
+                                    case CMqMessageState.Drop:
+                                        m.RemoveFromBufferAndDatabase(message);
                                         Statistics.DecrementQueueDepth();
-                                    }
-                                }) && removeSuccess;
-                            });
-
-                            if (!removeSuccess)
-                            {
-                                Thread.Sleep(CMqDefaults.DEFAULT_DEADLOCK_AVOIDANCE_WAIT_MS);
-                            }
-                        } while (KeepRunning && removeSuccess == false);
-
-                        #endregion
-
-                        #region Delivery Throttle.
-
-                        if (Configuration.DeliveryThrottle > TimeSpan.Zero)
-                        {
-                            if (Configuration.DeliveryThrottle.TotalSeconds >= 1)
-                            {
-                                int sleepSeconds = (int)Configuration.DeliveryThrottle.TotalSeconds;
-                                for (int sleep = 0; sleep < sleepSeconds && KeepRunning; sleep++)
-                                {
-                                    Thread.Sleep(1000);
+                                        break;
                                 }
                             }
-                            else
+                        });
+                    }
+
+                    #region Delivery Throttle.
+
+                    if (Configuration.DeliveryThrottle > TimeSpan.Zero)
+                    {
+                        if (Configuration.DeliveryThrottle.TotalSeconds >= 1)
+                        {
+                            int sleepSeconds = (int)Configuration.DeliveryThrottle.TotalSeconds;
+                            for (int sleep = 0; sleep < sleepSeconds && KeepRunning; sleep++)
                             {
-                                Thread.Sleep((int)Configuration.DeliveryThrottle.TotalMilliseconds);
+                                Thread.Sleep(1000);
                             }
                         }
-
-                        #endregion
-
-                        if (KeepRunning == false)
+                        else
                         {
-                            break;
+                            Thread.Sleep((int)Configuration.DeliveryThrottle.TotalMilliseconds);
                         }
                     }
+
+                    #endregion
                 }
                 catch (Exception ex)
                 {
                     _queueServer.InvokeOnLog(ex.GetBaseException());
                 }
 
-                if (yieldThread && KeepRunning)
+                if (threadYieldBurndown >= CMqDefaults.QUEUE_THREAD_DELIVERY_BURNDOWN && KeepRunning)
                 {
-                    //If nothing was successfully delivered, then delay for a period.
+                    threadYieldBurndown = CMqDefaults.QUEUE_THREAD_DELIVERY_BURNDOWN;
                     DeliveryThreadWaitEvent.WaitOne(10);
                 }
+            }
+        }
+
+        private async Task DistributeToSubscribers(EnqueuedMessage message)
+        {
+            try
+            {
+                message.State = await DistributeToSubscribersWithResolution(message);
+            }
+            catch
+            {
+                _queueServer.InvokeOnLog(CMqErrorLevel.Fatal, $"Failure of DistributeToSubscribersWithResolution [{Configuration.QueueName}].");
+                message.State = CMqMessageState.Ready;
+            }
+        }
+
+        /// <summary>
+        /// Delivers the message to any remaining subscribers resulting in a defined state for the message
+        /// </summary>
+        private async Task<CMqMessageState> DistributeToSubscribersWithResolution(EnqueuedMessage message)
+        {
+            var subscriberDispositions = new SubscriberDispositions(this, message);
+
+            if (subscriberDispositions.Remaining.Count == 0)
+            {
+                //The flow control below should not allow us to ever get here, but logically I feel we need to test for it.
+                //Given that this is an "exception" to the proper flow, I think the only appropriate action to to give a
+                //warning and dead-letter the message, unless at least one subscriber has been recorded as consuming the message.
+
+                if (subscriberDispositions.ConsumedIDs.Count > 0)
+                {
+                    message.State = CMqMessageState.Drop;
+                }
+                return CMqMessageState.DeadLetter;
+            }
+
+            foreach (var subscriber in subscriberDispositions.Remaining)
+            {
+                if (KeepRunning == false)
+                {
+                    return CMqMessageState.Shutdown;
+                }
+
+                //Keep track of per-message-subscriber delivery metrics.
+                if (message.SubscriberMessageDeliveries.TryGetValue(subscriber.SubscriberId, out var subscriberDeliveryStatistics))
+                {
+                    subscriberDeliveryStatistics.DeliveryAttemptCount++;
+                }
+                else
+                {
+                    subscriberDeliveryStatistics = new SubscriberMessageDeliveryStatistics() { DeliveryAttemptCount = 1 };
+                    message.SubscriberMessageDeliveries.Add(subscriber.SubscriberId, subscriberDeliveryStatistics);
+                }
+
+                try
+                {
+                    subscriber.IncrementAttemptedDeliveryCount();
+
+                    var deliveryResult = await _queueServer.DeliverMessage(subscriber.SubscriberId, Configuration.QueueName, message);
+
+                    Statistics.IncrementDeliveredMessageCount();
+                    subscriber.IncrementSuccessfulDeliveryCount();
+
+                    if (deliveryResult.Disposition == CMqConsumptionDisposition.Consumed)
+                    {
+                        subscriber.IncrementConsumedDeliveryCount();
+
+                        //The message was marked as consumed by the subscriber, so this subscriber is satisfied.
+                        message.SatisfiedDeliverySubscriberIDs.Add(subscriber.SubscriberId);
+                        message.ConsumedDeliverySubscriberIDs.Add(subscriber.SubscriberId);
+
+                        if (Configuration.ConsumptionScheme == CMqConsumptionScheme.FirstConsumedSubscriber)
+                        {
+                            //Message was delivered and consumed. Given the queue consumption scheme, we just
+                            //  need to break the delivery loop so the message can be removed from the queue.
+                            return CMqMessageState.Drop;
+                        }
+                    }
+                    else if (deliveryResult.Disposition == CMqConsumptionDisposition.NotConsumed)
+                    {
+                        //The message was marked as not-consumed by the subscriber, so this subscriber is satisfied.
+                        message.SatisfiedDeliverySubscriberIDs.Add(subscriber.SubscriberId);
+                    }
+                    else if (deliveryResult.Disposition == CMqConsumptionDisposition.Defer)
+                    {
+                        //The message was marked as deferred by the subscriber, we will retry this subscriber at a later time.
+                        //For all intents and purposes, we treat this subscriber as "not-yet-delivered".
+                        message.DeferredUntil = DateTime.UtcNow + deliveryResult.DeferDuration;
+                        message.DeferDuration = deliveryResult.DeferDuration;
+                        message.DeferredCount++;
+                        subscriber.IncrementDeferredDeliveryCount();
+                        Statistics.IncrementDeferredDeliveryCount();
+
+                        EnqueuedMessages.Read(m => m.Database.Store(message));
+                    }
+                    else if (deliveryResult.Disposition == CMqConsumptionDisposition.DeadLetter)
+                    {
+                        //When a subscriber responds with "DeadLetter" or "Drop", we short-circuit
+                        //  the delivery flow logic and take the requested action on the message.
+                        Statistics.IncrementExplicitDeadLetterCount();
+                        return CMqMessageState.DeadLetter;
+                    }
+                    else if (deliveryResult.Disposition == CMqConsumptionDisposition.Drop)
+                    {
+                        //When a subscriber responds with "DeadLetter" or "Drop", we short-circuit
+                        //  the delivery flow logic and take the requested action on the message.
+                        Statistics.IncrementExplicitDropCount();
+                        return CMqMessageState.Drop;
+                    }
+                }
+                catch (Exception ex) //Delivery failure.
+                {
+                    Statistics.IncrementFailedDeliveryCount();
+                    subscriber.IncrementFailedDeliveryCount();
+                    _queueServer.InvokeOnLog(ex.GetBaseException());
+                }
+
+                //If we have tried to deliver this message to this subscriber too many times, then mark this subscriber-message as satisfied.
+                if (Configuration.MaxDeliveryAttempts >= 0 && subscriberDeliveryStatistics.DeliveryAttemptCount >= Configuration.MaxDeliveryAttempts)
+                {
+                    //Even if we reached the max delivery count, there is not need to mark this as a
+                    // failure if the subscriber is satisfied, as this would indicate that the latest
+                    //  delivery attempt was finally successful.
+                    if (message.SatisfiedDeliverySubscriberIDs.Contains(subscriber.SubscriberId) == false)
+                    {
+                        message.FailedDeliverySubscriberIDs.Add(subscriber.SubscriberId);
+                    }
+                }
+            }
+
+            if (KeepRunning == false)
+            {
+                return CMqMessageState.Shutdown;
+            }
+
+            //Get fresh subscriber dispositions.
+            subscriberDispositions = new SubscriberDispositions(this, message);
+
+            if (subscriberDispositions.Remaining.Count == 0)
+            {
+                //All subscribers have received a copy of the message or have received their maximum number
+                //  of retries, so we can now remove the message from the queue.
+
+                //If there were any failed deliveries, then we want to retain a copy of the message in the dead-letter queue.
+                //This is because we handle FirstConsumedSubscriber consumption schemes in the logic above, meaning that this
+                //  message was intended for successful delivery to all subscribers (which was obviously not achieved).
+                if (message.FailedDeliverySubscriberIDs.Count != 0 && Configuration.DeadLetterConfiguration != null)
+                {
+                    return CMqMessageState.DeadLetter;
+                }
+
+                //Message was successfully delivered to all subscribers.
+                return CMqMessageState.Drop;
+            }
+            else
+            {
+                //There are remaining un-satisfied subscribers. Mark the message as ready-for-delivery.
+                return CMqMessageState.Ready;
             }
         }
 

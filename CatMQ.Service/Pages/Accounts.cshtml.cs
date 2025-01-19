@@ -1,7 +1,6 @@
 using CatMQ.Service.Models.Data;
 using CatMQ.Service.Models.Page;
 using Microsoft.AspNetCore.Authorization;
-using System.Reflection;
 
 namespace CatMQ.Service.Pages
 {

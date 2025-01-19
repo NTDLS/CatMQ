@@ -52,14 +52,14 @@ namespace Test.Stress
                 myQueueNames.Add(queueName);
 
                 CMqDeadLetterQueueConfiguration? deadLetterConfig = null;
-                //if (_random.Next(1, 100) > 60) //We don't always create a dead-letter queue.
-                //{
-                deadLetterConfig = new CMqDeadLetterQueueConfiguration()
+                if (_random.Next(1, 100) > 60) //We don't always create a dead-letter queue.
                 {
-                    PersistenceScheme = CMqPersistenceScheme.Persistent,
-                    //MaxMessageAge = TimeSpan.FromMinutes(15)
-                };
-                //}
+                    deadLetterConfig = new CMqDeadLetterQueueConfiguration()
+                    {
+                        PersistenceScheme = CMqPersistenceScheme.Persistent,
+                        //MaxMessageAge = TimeSpan.FromMinutes(15)
+                    };
+                }
 
                 Console.WriteLine($"Creating queue: '{queueName}'.");
                 client.CreateQueue(new CMqQueueConfiguration(queueName)
@@ -97,12 +97,13 @@ namespace Test.Stress
 
             int clientId = Math.Abs(Guid.NewGuid().GetHashCode());
 
-            int messageNumber = 0;
-            while (messageNumber < 1000000) //Send test messages as objects that inherit from IMqMessage
+            Console.WriteLine($"Queue Count: {myQueueNames.Count}");
+           
+            for(int messageNumber = 0; messageNumber < 100000; messageNumber ++)
             {
                 foreach (var queueName in myQueueNames)
                 {
-                    client.Enqueue(queueName, new MyMessage($"Test message {messageNumber++:n0} from {clientId}"));
+                    client.Enqueue(queueName, new MyMessage($"Test message {messageNumber:n0} from {clientId}"));
                 }
             }
 
@@ -128,7 +129,7 @@ namespace Test.Stress
             }
             */
 
-            if (_random.Next(0, 100) == 50)
+            if ((_random.Next(0, 100) % 70) == 0)
             {
                 return new CMqConsumeResult(CMqConsumptionDisposition.Defer)
                 {
@@ -140,7 +141,7 @@ namespace Test.Stress
 
         private static void OnBatchReceived(CMqClient client, List<CMqReceivedMessage> rawMessages)
         {
-            Console.WriteLine($"Received message batch: {rawMessages.Count}.");
+            //Console.WriteLine($"Received message batch: {rawMessages.Count}.");
         }
     }
 }

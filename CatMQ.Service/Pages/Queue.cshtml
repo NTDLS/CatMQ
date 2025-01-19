@@ -11,7 +11,7 @@
         <table class="table table-striped table-bordered">
             <thead class="table-light">
                 <tr>
-                    <th colspan="7">Configuration</th>
+                    <th colspan="8">Configuration</th>
                 </tr>
             </thead>
             <thead class="table-light">
@@ -19,6 +19,7 @@
                     <th>Persistence</th>
                     <th>Consumption</th>
                     <th>Delivery</th>
+                    <th>Max. Outstanding</th>
                     <th>Throttle</th>
                     <th>Retries</th>
                     <th>Expiration</th>
@@ -30,6 +31,7 @@
                     <td>@Model.Queue.PersistenceScheme</td>
                     <td>@Model.Queue.ConsumptionScheme</td>
                     <td>@Model.Queue.DeliveryScheme</td>
+                    <td>@Model.Queue.MaxOutstandingDeliveries</td>
                     <td>@Model.Queue.DeliveryThrottle</td>
                     <td>@Model.Queue.MaxDeliveryAttempts</td>
                     <td>@Model.Queue.MaxMessageAge</td>
@@ -44,13 +46,14 @@
         <table class="table table-striped table-bordered">
             <thead class="table-light">
                 <tr>
-                    <th colspan="8">Statistics</th>
+                    <th colspan="9">Statistics</th>
                 </tr>
             </thead>
             <thead class="table-light">
                 <tr>
                     <th>Subscribers</th>
                     <th>Depth</th>
+                    <th>Outstanding</th>
                     <th>Received</th>
                     <th>Delivered</th>
                     <th>Deferred</th>
@@ -63,6 +66,7 @@
                 <tr>
                     <td>@Model.Queue.CurrentSubscriberCount.ToString("n0")</td>
                     <td><a href="/messages/@Model.Queue.QueueName">@Model.Queue.QueueDepth.ToString("n0")</a></td>
+                    <td>@Model.Queue.CurrentOutstandingDeliveries.ToString("n0")</td>
                     <td>@Model.Queue.ReceivedMessageCount.ToString("n0")</td>
                     <td>@Model.Queue.DeliveredMessageCount.ToString("n0")</td>
                     <td>@Model.Queue.DeferredDeliveryCount.ToString("n0")</td>
@@ -79,7 +83,7 @@
         <table class="table table-striped table-bordered">
             <thead class="table-light">
                 <tr>
-                    <th colspan="7">Subscribers</th>
+                    <th colspan="8">Subscribers</th>
                 </tr>
             </thead>
             <thead class="table-light">

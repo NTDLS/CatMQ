@@ -48,6 +48,7 @@ namespace Test.QueueClient
             {
                 PersistenceScheme = CMqPersistenceScheme.Persistent,
                 ConsumptionScheme = CMqConsumptionScheme.FirstConsumedSubscriber,
+                MaxOutstandingDeliveries = 100,
                 DeadLetterConfiguration = new CMqDeadLetterQueueConfiguration()
                 {
                     PersistenceScheme = CMqPersistenceScheme.Persistent,
@@ -70,14 +71,20 @@ namespace Test.QueueClient
                 Console.WriteLine(ex.Message);
             }
 
-            //Enqueue a few messages, note that the message is just a class and it must inherit from ICMqMessage.
-            for (int i = 0; i < 100000; i++)
+            for (int t = 0; t < 10; t++)
             {
-                //var message = CreateLargeString(_random.Next(1, 32));
-                //client.Enqueue("MyFirstQueue", new MyMessage(message));
+                new Thread(() =>
+                {
+                    //Enqueue a few messages, note that the message is just a class and it must inherit from ICMqMessage.
+                    for (int i = 0; i < 10000; i++)
+                    {
+                        //var message = CreateLargeString(_random.Next(1, 32));
+                        //client.Enqueue("MyFirstQueue", new MyMessage(message));
 
-                //client.Enqueue("MyFirstQueue", new MyMessage($"Test message {i:n0}"), TimeSpan.FromSeconds(60));
-                client.Enqueue("MyFirstQueue", new MyMessage($"Test message {i:n0}"));
+                        //client.Enqueue("MyFirstQueue", new MyMessage($"Test message {i:n0}"), TimeSpan.FromSeconds(60));
+                        client.Enqueue("MyFirstQueue", new MyMessage($"Test message {i:n0}"));
+                    }
+                }).Start();
             }
 
             Console.WriteLine("Press [enter] to shutdown.");
@@ -100,7 +107,7 @@ namespace Test.QueueClient
 
             if (rawMessage.DeferredCount > 2)
             {
-                return new CMqConsumeResult(CMqConsumptionDisposition.DeadLetter);
+                return new CMqConsumeResult(CMqConsumptionDisposition.Consumed);
             }
 
             return new CMqConsumeResult(CMqConsumptionDisposition.Defer)

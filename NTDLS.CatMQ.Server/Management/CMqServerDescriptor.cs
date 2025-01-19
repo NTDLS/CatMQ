@@ -1,9 +1,7 @@
-﻿using NTDLS.CatMQ.Shared;
-
-namespace NTDLS.CatMQ.Server.Management
+﻿namespace NTDLS.CatMQ.Server.Management
 {
     /// <summary>
-    /// Queue client configuration parameters.
+    /// Queue server configuration parameters and various statistics.
     /// </summary>
     public class CMqServerDescriptor
     {
@@ -15,23 +13,23 @@ namespace NTDLS.CatMQ.Server.Management
         /// <summary>
         /// The default amount of time to wait for a query to reply before throwing a timeout exception.
         /// </summary>
-        public int AcknowledgmentTimeoutSeconds { get; internal set; } = CMqDefaults.DEFAULT_ACK_TIMEOUT_SECONDS;
+        public int AcknowledgmentTimeoutSeconds { get; internal set; }
         /// <summary>
         /// The initial size in bytes of the receive buffer.
         /// If the buffer ever gets full while receiving data it will be automatically resized up to MaxReceiveBufferSize.
         /// </summary>
-        public int InitialReceiveBufferSize { get; internal set; } = CMqDefaults.DEFAULT_INITIAL_BUFFER_SIZE;
+        public int InitialReceiveBufferSize { get; internal set; }
 
         /// <summary>
         ///The maximum size in bytes of the receive buffer.
         ///If the buffer ever gets full while receiving data it will be automatically resized up to MaxReceiveBufferSize.
         /// </summary>
-        public int MaxReceiveBufferSize { get; internal set; } = CMqDefaults.DEFAULT_MAX_BUFFER_SIZE;
+        public int MaxReceiveBufferSize { get; internal set; }
 
         /// <summary>
         ///The growth rate of the auto-resizing for the receive buffer.
         /// </summary>
-        public double ReceiveBufferGrowthRate { get; internal set; } = CMqDefaults.DEFAULT_BUFFER_GROWTH_RATE;
+        public double ReceiveBufferGrowthRate { get; internal set; }
 
         /// <summary>
         /// The TCP/IP port that the message queue server is listening on.
