@@ -18,7 +18,7 @@
         /// <summary>
         /// The number of messages that have been attempted to the subscriber.
         /// </summary>
-        public ulong AttemptedDeliveryCount { get => _attemptedDeliveryCount;  }
+        public ulong AttemptedDeliveryCount { get => _attemptedDeliveryCount; }
         private ulong _attemptedDeliveryCount = 0;
         internal void IncrementAttemptedDeliveryCount()
             => Interlocked.Increment(ref _attemptedDeliveryCount);

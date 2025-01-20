@@ -1,5 +1,7 @@
 ﻿using Serilog;
+#if WINDOWS
 using Topshelf;
+#endif
 
 namespace CatMQ.Service
 {
@@ -17,6 +19,7 @@ namespace CatMQ.Service
                 .ReadFrom.Configuration(configuration)
                 .CreateLogger();
 
+#if WINDOWS
             HostFactory.Run(x =>
             {
                 x.StartAutomatically();
@@ -38,6 +41,26 @@ namespace CatMQ.Service
                 x.SetDisplayName("CatMQ Message Queuing");
                 x.SetServiceName("CatMQService");
             });
+#else
+            var _shutdownEvent = new ManualResetEvent(false);
+
+            var service = new QueuingService();
+            service.Start();
+
+            Console.WriteLine("Service started. Press Ctrl+C to exit.");
+
+            // Capture Ctrl+C (SIGINT) or other shutdown signals
+            Console.CancelKeyPress += (sender, eventArgs) =>
+            {
+                Console.WriteLine("Shutdown signal received.");
+                _shutdownEvent.Set();
+                eventArgs.Cancel = true; // Prevent the process from terminating immediately
+            };
+
+
+            _shutdownEvent.WaitOne();
+            service.Stop();
+#endif
         }
     }
 }

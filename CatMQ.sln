@@ -15,7 +15,9 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CatMQ.Service", "CatMQ.Serv
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Installers", "Installers", "{70EB204A-C50C-4834-8466-40DC2BD642AC}"
 	ProjectSection(SolutionItems) = preProject
-		Installers\Installer.iss = Installers\Installer.iss
+		Installers\Build and Compile Installers.bat = Installers\Build and Compile Installers.bat
+		Installers\Linux installation instructions.md = Installers\Linux installation instructions.md
+		Installers\Windows.Installer.iss = Installers\Windows.Installer.iss
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Test.QueueClient", "Test.QueueClient\Test.QueueClient.csproj", "{A832060A-46C0-4D6C-90AB-757A4DD738A0}"

@@ -53,7 +53,7 @@ namespace CatMQ.Service
         public int QueuePort { get; set; } = CMqDefaults.DEFAULT_LISTEN_PORT;
 
         [Required(ErrorMessage = "Web UI URL is required.")]
-        public string? WebListenURL { get; set; } = "http://localhost:45783";
+        public string? WebListenURL { get; set; } = "http://*:45783";
 
         /// <summary>
         /// When true, query replies are queued in a thread pool. Otherwise, queries block other activities.

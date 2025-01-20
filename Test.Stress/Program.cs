@@ -98,8 +98,8 @@ namespace Test.Stress
             int clientId = Math.Abs(Guid.NewGuid().GetHashCode());
 
             Console.WriteLine($"Queue Count: {myQueueNames.Count}");
-           
-            for(int messageNumber = 0; messageNumber < 100000; messageNumber ++)
+
+            for (int messageNumber = 0; messageNumber < 100000; messageNumber++)
             {
                 foreach (var queueName in myQueueNames)
                 {

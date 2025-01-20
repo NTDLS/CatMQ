@@ -15,18 +15,17 @@
  MinVersion                       = 0.0,7.0
  Compression                      = bZIP/9
  ChangesAssociations              = Yes
- OutputBaseFilename               = CatMQ {#AppVersion}
+ OutputBaseFilename               = CatMQ.windows.x64
  ArchitecturesInstallIn64BitMode  = x64compatible
  AppPublisher                     = NetworkDLS
  AppPublisherURL                  = http://www.NetworkDLS.com/
  AppUpdatesURL                    = http://www.NetworkDLS.com/
 
 [Files]
- Source: "publish\runtimes\*.*"; DestDir: "{app}\runtimes"; Flags: IgnoreVersion recursesubdirs;
- Source: "publish\wwwroot\*.*"; DestDir: "{app}\wwwroot"; Flags: IgnoreVersion recursesubdirs;
- Source: "publish\*.exe"; DestDir: "{app}"; Flags: IgnoreVersion;
- Source: "publish\*.dll"; DestDir: "{app}"; Flags: IgnoreVersion;
- Source: "publish\*.json"; DestDir: "{app}"; Flags: IgnoreVersion;
+  Source: "publish\win-x64\wwwroot\*.*"; DestDir: "{app}\wwwroot"; Flags: IgnoreVersion recursesubdirs;
+ Source: "publish\win-x64\*.exe"; DestDir: "{app}"; Flags: IgnoreVersion;
+ Source: "publish\win-x64\*.dll"; DestDir: "{app}"; Flags: IgnoreVersion;
+ Source: "publish\win-x64\*.json"; DestDir: "{app}"; Flags: IgnoreVersion;
  Source: "..\Images\Logo.ico"; DestDir: "{app}"; Flags: IgnoreVersion;
 
 [Icons]

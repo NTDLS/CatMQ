@@ -30,7 +30,12 @@ namespace CatMQ.Service
 
             if (serviceConfiguration.WebListenURL != null && (serviceConfiguration.EnableWebApi || serviceConfiguration.EnableWebUI))
             {
-                var builder = WebApplication.CreateBuilder();
+                var options = new WebApplicationOptions
+                {
+                    ContentRootPath = AppContext.BaseDirectory
+                };
+
+                var builder = WebApplication.CreateBuilder(options);
 
                 builder.Services.AddAuthentication("CookieAuth")
                     .AddCookie("CookieAuth", options =>
@@ -58,6 +63,7 @@ namespace CatMQ.Service
 
                 builder.WebHost.UseUrls(serviceConfiguration.WebListenURL);
 
+
                 var app = builder.Build();
 
                 app.UseRouting();
@@ -80,6 +86,7 @@ namespace CatMQ.Service
                 app.UseAuthentication();
                 app.UseAuthorization();
                 app.MapStaticAssets();
+                app.UseStaticFiles();
 
                 if (serviceConfiguration.EnableWebUI)
                 {

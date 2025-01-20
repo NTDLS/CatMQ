@@ -8,6 +8,10 @@
     <ApplicationIcon>Logo.ico</ApplicationIcon>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'win-x64'">
+    <DefineConstants>WINDOWS</DefineConstants>
+  </PropertyGroup>
+
   <ItemGroup>
     <Content Include="Logo.ico" />
   </ItemGroup>
