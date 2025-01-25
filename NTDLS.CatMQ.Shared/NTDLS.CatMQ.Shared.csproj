@@ -15,13 +15,13 @@
     <RepositoryUrl>https://github.com/NTDLS/NTDLS.CatMQ</RepositoryUrl>
     <PackageTags>ipc;message-queue;inter-process-communication;tcp-ip;message-broker;mq;</PackageTags>
     <PackageReleaseNotes>
-      Asynchronous delivery.
+      Dependency updates.
     </PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <Authors>NetworkDLS</Authors>
     <Company>NetworkDLS</Company>
-    <version>2.3.0</version> <!-- NTDLS.CatMQ.Shared is versioned seperately from NTDLS.CatMQ.Client and NTDLS.CatMQ.Server -->
+    <version>2.3.1</version> <!-- NTDLS.CatMQ.Shared is versioned seperately from NTDLS.CatMQ.Client and NTDLS.CatMQ.Server -->
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>Logo.png</PackageIcon>
     <ApplicationIcon>Logo.ico</ApplicationIcon>
@@ -47,7 +47,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="NTDLS.ReliableMessaging" Version="2.1.0" />
+    <PackageReference Include="NTDLS.ReliableMessaging" Version="2.1.1" />
   </ItemGroup>
 
 </Project>

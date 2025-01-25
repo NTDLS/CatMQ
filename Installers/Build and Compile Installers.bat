@@ -1,6 +1,6 @@
 @echo off
-set path=%PATH%;C:\Program Files\Vroom Performance Technologies\SQL Script Generator;C:\Program Files\7-Zip;
-set path=C:\Program Files (x86)\Inno Setup 6\;%path%
+set path=%PATH%;C:\Program Files\7-Zip;
+set path=%path%;C:\Program Files (x86)\Inno Setup 6\;
 
 rd publish /q /s
 rd output /q /s
