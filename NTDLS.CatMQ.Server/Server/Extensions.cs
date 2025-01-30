@@ -25,6 +25,32 @@ namespace NTDLS.CatMQ.Server.Server
         }
 
         /// <summary>
+        /// Removes all items from a database.
+        /// </summary>
+        public static void Purge(this RocksDb? db)
+        {
+            if (db != null)
+            {
+                var keysToDelete = new List<byte[]>();
+
+                // Collect all keys
+                using (var iterator = db.NewIterator())
+                {
+                    for (iterator.SeekToFirst(); iterator.Valid(); iterator.Next())
+                    {
+                        keysToDelete.Add(iterator.Key());
+                    }
+                }
+
+                // Delete all keys
+                foreach (var key in keysToDelete)
+                {
+                    db.Remove(key);
+                }
+            }
+        }
+
+        /// <summary>
         /// Removes an item from a database and the message buffer.
         /// </summary>
         public static void RemoveFromBufferAndDatabase(this EnqueuedMessageContainer container, EnqueuedMessage message)

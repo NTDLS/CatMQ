@@ -958,10 +958,7 @@ namespace NTDLS.CatMQ.Server
                                     throw new Exception($"Persistence database has not been initialized for [{queueName}].");
                                 }
 
-                                foreach (var message in m.MessageBuffer)
-                                {
-                                    m.Database?.Remove(message);
-                                }
+                                m.Database.Purge();
                             }
                             m.MessageBuffer.Clear();
                             messageQueue.Statistics.SetQueueDepth(0);
