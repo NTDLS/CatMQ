@@ -4,7 +4,7 @@
     <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <version>2.3.1</version>
+    <version>2.3.3</version>
     <ApplicationIcon>Logo.ico</ApplicationIcon>
   </PropertyGroup>
 
@@ -17,6 +17,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="NTDLS.ReliableMessaging" Version="2.1.2" />
+    <PackageReference Include="RocksDB" Version="9.10.0.55496" />
     <PackageReference Include="Serilog.Settings.Configuration" Version="9.0.0" />
     <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
     <PackageReference Include="Topshelf" Version="4.3.0" />

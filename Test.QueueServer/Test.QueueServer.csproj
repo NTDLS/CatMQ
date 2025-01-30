@@ -13,6 +13,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="NTDLS.ReliableMessaging" Version="2.1.2" />
+    <PackageReference Include="RocksDB" Version="9.10.0.55496" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\NTDLS.CatMQ.Server\NTDLS.CatMQ.Server.csproj" />
   </ItemGroup>
 
