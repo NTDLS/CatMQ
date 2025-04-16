@@ -17,3 +17,5 @@ del publish\linux-x64\*.pdb /q
 
 iscc Windows.Installer.iss
 rd publish /q /s
+
+pause
