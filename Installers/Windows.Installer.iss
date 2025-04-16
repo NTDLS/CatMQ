@@ -22,7 +22,7 @@
  AppUpdatesURL                    = http://www.NetworkDLS.com/
 
 [Files]
-  Source: "publish\win-x64\wwwroot\*.*"; DestDir: "{app}\wwwroot"; Flags: IgnoreVersion recursesubdirs;
+ Source: "publish\win-x64\wwwroot\*.*"; DestDir: "{app}\wwwroot"; Flags: IgnoreVersion recursesubdirs;
  Source: "publish\win-x64\*.exe"; DestDir: "{app}"; Flags: IgnoreVersion;
  Source: "publish\win-x64\*.dll"; DestDir: "{app}"; Flags: IgnoreVersion;
  Source: "publish\win-x64\*.json"; DestDir: "{app}"; Flags: IgnoreVersion;
