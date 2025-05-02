@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="NTDLS.ReliableMessaging" Version="2.1.5" />
+    <PackageReference Include="NTDLS.ReliableMessaging" Version="2.1.6" />
     <PackageReference Include="RocksDB" Version="9.10.0.55496" />
   </ItemGroup>
 
