@@ -6,14 +6,10 @@
     public class CMqServerDescriptor
     {
         /// <summary>
-        /// When true, query replies are queued in a thread pool. Otherwise, queries block other activities.
-        /// </summary>
-        public bool AsynchronousAcknowledgment { get; internal set; } = true;
-
-        /// <summary>
         /// The default amount of time to wait for a query to reply before throwing a timeout exception.
         /// </summary>
         public int AcknowledgmentTimeoutSeconds { get; internal set; }
+
         /// <summary>
         /// The initial size in bytes of the receive buffer.
         /// If the buffer ever gets full while receiving data it will be automatically resized up to MaxReceiveBufferSize.

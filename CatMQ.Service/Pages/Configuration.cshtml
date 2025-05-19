@@ -66,15 +66,6 @@
                 <div class="card-body">
 
                     <div class="mb-3">
-                        <label for="AsynchronousAcknowledgment" class="form-label fw-bold">Asynchronous Ack</label>
-                        <span asp-validation-for="ServerConfig.AsynchronousAcknowledgment" class="text-danger"></span>
-                        <select id="AsynchronousAcknowledgment" asp-for="ServerConfig.AsynchronousAcknowledgment" class="form-select">
-                            <option value="true">True</option>
-                            <option value="false">False</option>
-                        </select>
-                    </div>
-
-                    <div class="mb-3">
                         <label for="acknowledgmentTimeoutSeconds" class="form-label fw-bold">Query Timeout (s)</label>
                         <span asp-validation-for="ServerConfig.AcknowledgmentTimeoutSeconds" class="text-danger"></span>
                         <input type="number" id="acknowledgmentTimeoutSeconds" class="form-control" asp-for="ServerConfig.AcknowledgmentTimeoutSeconds" min="1">

@@ -21,7 +21,7 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <Authors>NetworkDLS</Authors>
     <Company>NetworkDLS</Company>
-    <version>2.3.6</version>
+    <version>2.4.0</version>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>Logo.png</PackageIcon>
     <ApplicationIcon>Logo.ico</ApplicationIcon>
@@ -47,9 +47,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="NTDLS.CatMQ.Shared" Version="2.3.6" />
-    <PackageReference Include="NTDLS.ReliableMessaging" Version="2.1.6" />
     <PackageReference Include="RocksDB" Version="9.10.0.55496" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NTDLS.CatMQ.Shared\NTDLS.CatMQ.Shared.csproj" />
   </ItemGroup>
 
 </Project>

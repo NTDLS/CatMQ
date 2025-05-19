@@ -73,7 +73,6 @@ namespace NTDLS.CatMQ.Client
 
             var rmConfiguration = new RmConfiguration()
             {
-                AsynchronousQueryWaiting = configuration.AsynchronousAcknowledgment,
                 InitialReceiveBufferSize = configuration.InitialReceiveBufferSize,
                 MaxReceiveBufferSize = configuration.MaxReceiveBufferSize,
                 QueryTimeout = configuration.QueryTimeout,

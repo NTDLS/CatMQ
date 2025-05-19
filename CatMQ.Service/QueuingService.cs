@@ -16,7 +16,6 @@ namespace CatMQ.Service
             _mqServer = new CMqServer(new CMqServerConfiguration
             {
                 PersistencePath = serviceConfiguration.DataPath,
-                AsynchronousAcknowledgment = serviceConfiguration.AsynchronousAcknowledgment,
                 InitialReceiveBufferSize = serviceConfiguration.InitialReceiveBufferSize,
                 MaxReceiveBufferSize = serviceConfiguration.MaxReceiveBufferSize,
                 AcknowledgmentTimeoutSeconds = serviceConfiguration.AcknowledgmentTimeoutSeconds,

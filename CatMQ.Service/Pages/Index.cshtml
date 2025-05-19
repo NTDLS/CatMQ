@@ -18,7 +18,6 @@
             <thead class="table-light">
                 <tr>
                     <th>Listen Port</th>
-                    <th>Async. Ack.</th>
                     <th>Ack. Timeout</th>
                     <th>Initial Buffer</th>
                     <th>Max. Buffer</th>
@@ -28,7 +27,6 @@
             <tbody>
                 <tr>
                     <td>@Model.ServerConfig.ListenPort</td>
-                    <td>@Model.ServerConfig.AsynchronousAcknowledgment</td>
                     <td>@Model.ServerConfig.AcknowledgmentTimeoutSeconds.ToString("n0")</td>
                     <td>@Formatters.FileSize(Model.ServerConfig.InitialReceiveBufferSize, 2)</td>
                     <td>@Formatters.FileSize(Model.ServerConfig.MaxReceiveBufferSize, 1)</td>

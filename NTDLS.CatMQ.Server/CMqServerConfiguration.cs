@@ -8,11 +8,6 @@ namespace NTDLS.CatMQ.Server
     public class CMqServerConfiguration
     {
         /// <summary>
-        /// When true, query replies are queued in a thread pool. Otherwise, queries block other activities.
-        /// </summary>
-        public bool AsynchronousAcknowledgment { get; set; } = true;
-
-        /// <summary>
         /// The default amount of time to wait for a query to reply before throwing a timeout exception.
         /// </summary>
         public int AcknowledgmentTimeoutSeconds { get; set; } = CMqDefaults.DEFAULT_ACK_TIMEOUT_SECONDS;

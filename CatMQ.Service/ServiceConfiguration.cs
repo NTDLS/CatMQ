@@ -56,12 +56,6 @@ namespace CatMQ.Service
         public string? WebListenURL { get; set; } = "http://*:45783";
 
         /// <summary>
-        /// When true, query replies are queued in a thread pool. Otherwise, queries block other activities.
-        /// </summary>
-        [Required(ErrorMessage = "Asynchronous Query Waiting is required.")]
-        public bool AsynchronousAcknowledgment { get; set; } = true;
-
-        /// <summary>
         /// The default amount of time to wait for a query to reply before throwing a timeout exception.
         /// </summary>
         [Required(ErrorMessage = "Query Timeout Seconds is required.")]
