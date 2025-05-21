@@ -80,6 +80,7 @@ namespace NTDLS.CatMQ.Client
             };
 
             _rmClient = new RmClient(rmConfiguration);
+            _rmClient.SetCompressionProvider(new RmDeflateCompressionProvider());
 
             _rmClient.AddHandler(new InternalClientQueryHandlers(this));
         }
@@ -92,6 +93,7 @@ namespace NTDLS.CatMQ.Client
             _configuration = new CMqClientConfiguration();
             _subscriptions = new(() => new Dictionary<string, CMqSubscription>(StringComparer.OrdinalIgnoreCase));
             _rmClient = new RmClient();
+            _rmClient.SetCompressionProvider(new RmDeflateCompressionProvider());
 
             _rmClient.OnConnected += RmClient_OnConnected;
             _rmClient.OnDisconnected += RmClient_OnDisconnected;

@@ -51,6 +51,7 @@ namespace NTDLS.CatMQ.Server
             };
 
             _rmServer = new RmServer(rmConfiguration);
+            _rmServer.SetCompressionProvider(new RmDeflateCompressionProvider());
             _rmServer.OnException += _rmServer_OnException;
             _rmServer.OnDisconnected += RmServer_OnDisconnected;
 
@@ -64,6 +65,7 @@ namespace NTDLS.CatMQ.Server
         {
             _configuration = new CMqServerConfiguration();
             _rmServer = new RmServer();
+            _rmServer.SetCompressionProvider(new RmDeflateCompressionProvider());
             _rmServer.OnException += _rmServer_OnException;
             _rmServer.OnDisconnected += RmServer_OnDisconnected;
 
