@@ -21,7 +21,7 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <Authors>NetworkDLS</Authors>
     <Company>NetworkDLS</Company>
-    <version>2.4.1</version> <!-- NTDLS.CatMQ.Shared is versioned seperately from NTDLS.CatMQ.Client and NTDLS.CatMQ.Server -->
+    <version>2.4.2</version> <!-- NTDLS.CatMQ.Shared is versioned seperately from NTDLS.CatMQ.Client and NTDLS.CatMQ.Server -->
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>Logo.png</PackageIcon>
     <ApplicationIcon>Logo.ico</ApplicationIcon>
@@ -47,7 +47,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="NTDLS.ReliableMessaging" Version="3.1.0" />
+    <PackageReference Include="NTDLS.ReliableMessaging" Version="3.2.3" />
   </ItemGroup>
 
 </Project>
