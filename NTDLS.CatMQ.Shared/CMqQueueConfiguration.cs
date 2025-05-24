@@ -34,7 +34,7 @@ namespace NTDLS.CatMQ.Shared
         public bool IsDeadLetter { get; set; } = false;
 
         /// <summary>
-        /// The maximum number of times the server will attempt to deliver any message to a subscriber before giving up. 0 = infinite.
+        /// The maximum number of times the server will attempt to deliver any message to a subscriber before giving up, this includes deferred deliveries. 0 = infinite.
         /// </summary>
         public int MaxDeliveryAttempts { get; set; } = 10;
 

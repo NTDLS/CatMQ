@@ -21,11 +21,33 @@ namespace NTDLS.CatMQ.Shared
         }
 
         /// <summary>
-        /// Shortcut function that returns a CMqConsumeResult with the specified disposition.
+        /// Shortcut function that returns a CMqConsumeResult with the Consumed disposition.
         /// </summary>
-        public static CMqConsumeResult FromDisposition(CMqConsumptionDisposition disposition)
-        {
-            return new CMqConsumeResult(disposition);
-        }
+        public static CMqConsumeResult Consumed()
+            => new(CMqConsumptionDisposition.Consumed);
+
+        /// <summary>
+        /// Shortcut function that returns a CMqConsumeResult with the NotConsumed disposition.
+        /// </summary>
+        public static CMqConsumeResult NotConsumed()
+            => new(CMqConsumptionDisposition.NotConsumed);
+
+        /// <summary>
+        /// Shortcut function that returns a CMqConsumeResult with the DeadLetter disposition.
+        /// </summary>
+        public static CMqConsumeResult DeadLetter()
+            => new(CMqConsumptionDisposition.DeadLetter);
+
+        /// <summary>
+        /// Shortcut function that returns a CMqConsumeResult with the Drop disposition.
+        /// </summary>
+        public static CMqConsumeResult Drop()
+            => new(CMqConsumptionDisposition.Drop);
+
+        /// <summary>
+        /// Shortcut function that returns a CMqConsumeResult with the Defer disposition.
+        /// </summary>
+        public static CMqConsumeResult Defer(TimeSpan deferDuration)
+            => new(CMqConsumptionDisposition.Defer) { DeferDuration = deferDuration };
     }
 }
