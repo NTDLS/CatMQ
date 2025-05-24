@@ -17,17 +17,17 @@ namespace CatMQ.Tests
             return client;
         }
 
-        private static void Client_OnDisconnected(NTDLS.CatMQ.Client.CMqClient client)
+        private static void Client_OnDisconnected(CMqClient client)
         {
             Console.WriteLine("Client disconnected.");
         }
 
-        private static void Client_OnConnected(NTDLS.CatMQ.Client.CMqClient client)
+        private static void Client_OnConnected(CMqClient client)
         {
             Console.WriteLine("Client connected.");
         }
 
-        private static void Client_OnException(NTDLS.CatMQ.Client.CMqClient client, string? storeKey, Exception ex)
+        private static void Client_OnException(CMqClient client, string? storeKey, Exception ex)
         {
             Console.WriteLine(ex.Message);
         }

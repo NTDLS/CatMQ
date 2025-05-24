@@ -1,4 +1,5 @@
 ﻿using NTDLS.CatMQ.Server;
+using NTDLS.CatMQ.Shared;
 
 namespace CatMQ.Tests
 {
@@ -49,7 +50,7 @@ namespace CatMQ.Tests
             return server;
         }
 
-        private static void Server_OnLog(CMqServer server, NTDLS.CatMQ.Shared.CMqErrorLevel errorLevel, string message, Exception? ex = null)
+        private static void Server_OnLog(CMqServer server, CMqErrorLevel errorLevel, string message, Exception? ex = null)
         {
             Console.WriteLine($"{errorLevel}: {message}");
         }

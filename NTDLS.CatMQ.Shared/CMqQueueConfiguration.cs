@@ -76,7 +76,6 @@ namespace NTDLS.CatMQ.Shared
         /// <summary>
         /// Instantiates a new instance of CMqQueueConfiguration.
         /// </summary>
-        /// <param name="queueName"></param>
         public CMqQueueConfiguration(string queueName)
         {
             QueueName = queueName;

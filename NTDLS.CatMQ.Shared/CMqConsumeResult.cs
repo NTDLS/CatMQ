@@ -19,5 +19,13 @@ namespace NTDLS.CatMQ.Shared
         {
             Disposition = disposition;
         }
+
+        /// <summary>
+        /// Shortcut function that returns a CMqConsumeResult with the specified disposition.
+        /// </summary>
+        public static CMqConsumeResult FromDisposition(CMqConsumptionDisposition disposition)
+        {
+            return new CMqConsumeResult(disposition);
+        }
     }
 }
