@@ -108,6 +108,13 @@ namespace NTDLS.CatMQ.Server.Server
                                         message.State = CMqMessageState.DeadLetter;
                                     }
                                 }
+                                else
+                                {
+                                    //No dead-letter queue, just drop the message.
+                                    message.State = CMqMessageState.Drop;
+                                }
+
+                                Statistics.IncrementExpiredMessageCount();
                             }
                         }
 

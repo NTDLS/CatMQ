@@ -303,5 +303,45 @@ namespace CatMQ.Tests.Unit
 
             client.Disconnect();
         }
+
+        [Fact(DisplayName = "Enqueue and expire.")]
+        public void TestEnqueueAndExpire()
+        {
+            int enqueuedCount = 0;
+
+            TimeSpan maxMessageAge = TimeSpan.FromSeconds(2);
+
+            var client = ClientFactory.CreateAndConnect();
+
+            string queueName = Guid.NewGuid().ToString("N");
+
+            client.CreateQueue(new CMqQueueConfiguration(queueName)
+            {
+                MaxMessageAge = maxMessageAge,
+                PersistenceScheme = CMqPersistenceScheme.Ephemeral,
+                ConsumptionScheme = CMqConsumptionScheme.Delivered,
+            });
+
+            //Enqueue messages.
+            for (int i = 0; i < 100; i++)
+            {
+                client.Enqueue(queueName, new KeyValueMessage(i, $"Value:{i}"));
+                enqueuedCount++;
+            }
+
+            Thread.Sleep((int)(maxMessageAge + TimeSpan.FromSeconds(1)).TotalMilliseconds);
+
+            //Make sure the queue is empty.
+            var messages = fixture.Server.GetQueueMessages(queueName, 0, int.MaxValue);
+            Assert.NotNull(messages);
+            Assert.Equal(0, messages.Count);
+
+            //Make sure the expired message count is equal to the enqueued count.
+            var queue = fixture.Server.GetQueues()?.FirstOrDefault(q => q.QueueName == queueName);
+            Assert.NotNull(queue);
+            Assert.Equal(enqueuedCount, (int?)queue?.ExpiredMessageCount);
+
+            client.Disconnect();
+        }
     }
 }
