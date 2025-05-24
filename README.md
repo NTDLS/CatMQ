@@ -1,13 +1,15 @@
 # CatMQ
 CatMQ is a high-performance and reliable persistent message queue designed for efficient inter-process communication, task queuing, load balancing, and data buffering over TCP/IP.
 
+## Testing Status
+[![Regression Tests](https://github.com/NTDLS/CatMQ/actions/workflows/Regression%20Tests.yml/badge.svg)](https://github.com/NTDLS/CatMQ/actions/workflows/Regression%20Tests.yml)
+
 ## Another Message Queue?! Why?
 CatMQ is not “fully featured”, as in it does not natively support clustering, it is not multi-protocol (no AMQP nor MQTT), and it is not friendly to non-dot-net subscribers.
 Ok, then what’s the deal?
 Well, we needed a MQ that was slim, straight forward and free of fat-runtimes such as java or additional dependencies such as erlang. We went on an internet fishing expedition and came up empty.
 
 So, we built one. __Welcome to CatMQ: a reliable yet slim message queue.__
-
 
 ## Packages 📦
 - Server Nuget package: https://www.nuget.org/packages/NTDLS.CatMQ.Server
