@@ -269,7 +269,10 @@ namespace NTDLS.CatMQ.Client
 
             _explicitDisconnect = false;
 
-            _bufferThread = new Thread(BufferThreadProc);
+            _bufferThread = new Thread(BufferThreadProc)
+            {
+                IsBackground = true
+            };
             _bufferThread.Start();
 
             _rmClient.Connect(hostName, port);
@@ -286,7 +289,10 @@ namespace NTDLS.CatMQ.Client
 
             _explicitDisconnect = false;
 
-            _bufferThread = new Thread(BufferThreadProc);
+            _bufferThread = new Thread(BufferThreadProc)
+            {
+                IsBackground = true
+            };
             _bufferThread.Start();
 
             _rmClient.Connect(ipAddress, port);
@@ -297,7 +303,7 @@ namespace NTDLS.CatMQ.Client
         /// </summary>
         public void ConnectAsync(string hostName, int port)
         {
-            new Thread(() =>
+            var thread = new Thread(() =>
             {
                 while (!_explicitDisconnect)
                 {
@@ -315,7 +321,12 @@ namespace NTDLS.CatMQ.Client
                     }
                     Thread.Sleep(500);
                 }
-            }).Start();
+            })
+            {
+                IsBackground = true
+            };
+
+            thread.Start();
         }
 
         /// <summary>
@@ -341,7 +352,10 @@ namespace NTDLS.CatMQ.Client
                     }
                     Thread.Sleep(500);
                 }
-            }).Start();
+            })
+            {
+                IsBackground = true
+            }.Start();
         }
 
         /// <summary>

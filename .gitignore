@@ -84,3 +84,7 @@ Test.QueueServer/bin/
 Test.Stress/bin/
 
 Test.Stress/obj/
+
+CatMQ.Tests/bin/
+
+CatMQ.Tests/obj/

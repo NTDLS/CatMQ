@@ -26,6 +26,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Test.QueueServer", "Test.Qu
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Test.Stress", "Test.Stress\Test.Stress.csproj", "{523820B7-4EFF-48C1-B3D7-E88831C2ECBB}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CatMQ.Tests", "CatMQ.Tests\CatMQ.Tests.csproj", "{68C8C618-952B-B60D-7BF9-71F73447564A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -120,6 +122,18 @@ Global
 		{523820B7-4EFF-48C1-B3D7-E88831C2ECBB}.Release|x64.Build.0 = Release|Any CPU
 		{523820B7-4EFF-48C1-B3D7-E88831C2ECBB}.Release|x86.ActiveCfg = Release|Any CPU
 		{523820B7-4EFF-48C1-B3D7-E88831C2ECBB}.Release|x86.Build.0 = Release|Any CPU
+		{68C8C618-952B-B60D-7BF9-71F73447564A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{68C8C618-952B-B60D-7BF9-71F73447564A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{68C8C618-952B-B60D-7BF9-71F73447564A}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{68C8C618-952B-B60D-7BF9-71F73447564A}.Debug|x64.Build.0 = Debug|Any CPU
+		{68C8C618-952B-B60D-7BF9-71F73447564A}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{68C8C618-952B-B60D-7BF9-71F73447564A}.Debug|x86.Build.0 = Debug|Any CPU
+		{68C8C618-952B-B60D-7BF9-71F73447564A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{68C8C618-952B-B60D-7BF9-71F73447564A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{68C8C618-952B-B60D-7BF9-71F73447564A}.Release|x64.ActiveCfg = Release|Any CPU
+		{68C8C618-952B-B60D-7BF9-71F73447564A}.Release|x64.Build.0 = Release|Any CPU
+		{68C8C618-952B-B60D-7BF9-71F73447564A}.Release|x86.ActiveCfg = Release|Any CPU
+		{68C8C618-952B-B60D-7BF9-71F73447564A}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

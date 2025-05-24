@@ -20,6 +20,8 @@ namespace NTDLS.CatMQ.Server.Server
 
         /// <summary>
         /// List of subscriber connection IDs.
+        /// We use OptimisticCriticalResource instead of ConcurrentDictionary to avoid
+        ///     lock interleaving thereby eliminating the possibility of deadlocks.
         /// </summary>
         internal OptimisticCriticalResource<Dictionary<Guid, CMqSubscriberDescriptor>> Subscribers { get; set; } = new();
 

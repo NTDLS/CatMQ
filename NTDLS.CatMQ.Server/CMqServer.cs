@@ -531,7 +531,10 @@ namespace NTDLS.CatMQ.Server
 
             _rmServer.Start(listenPort);
 
-            new Thread(() => HeartbeatThread()).Start();
+            new Thread(() => HeartbeatThread())
+            {
+                IsBackground = true
+            }.Start();
         }
 
         private void HeartbeatThread()
