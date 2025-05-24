@@ -232,6 +232,71 @@ namespace NTDLS.CatMQ.Server
         }
 
         /// <summary>
+        /// Returns a single queue with the given name.
+        /// </summary>
+        public CMqQueueDescriptor? GetQueue(string queueName)
+        {
+            while (_keepRunning)
+            {
+                bool success = true;
+                CMqQueueDescriptor? result = new();
+
+                _messageQueues.Read(mqd =>
+                {
+                    var queue = mqd.FirstOrDefault(o => o.Key.Equals(queueName, StringComparison.InvariantCultureIgnoreCase)).Value;
+                    if (queue != null)
+                    {
+                        success = queue.Subscribers.TryRead(sKVP =>
+                        {
+                            result = new CMqQueueDescriptor
+                            {
+                                ConsumptionScheme = queue.Configuration.ConsumptionScheme,
+                                DeliveryScheme = queue.Configuration.DeliveryScheme,
+                                DeliveryThrottle = queue.Configuration.DeliveryThrottle,
+                                MaxOutstandingDeliveries = queue.Configuration.MaxOutstandingDeliveries,
+                                MaxDeliveryAttempts = queue.Configuration.MaxDeliveryAttempts,
+                                MaxMessageAge = queue.Configuration.MaxMessageAge,
+                                PersistenceScheme = queue.Configuration.PersistenceScheme,
+                                QueueName = queue.Configuration.QueueName,
+
+                                CurrentSubscriberCount = sKVP.Count,
+                                QueueDepth = queue.Statistics.QueueDepth,
+
+                                CurrentOutstandingDeliveries = queue.Statistics.OutstandingDeliveries,
+                                ReceivedMessageCount = queue.Statistics.ReceivedMessageCount,
+                                DeliveredMessageCount = queue.Statistics.DeliveredMessageCount,
+                                FailedDeliveryCount = queue.Statistics.FailedDeliveryCount,
+                                ExpiredMessageCount = queue.Statistics.ExpiredMessageCount,
+                                DeferredDeliveryCount = queue.Statistics.DeferredDeliveryCount,
+                                ExplicitDeadLetterCount = queue.Statistics.ExplicitDeadLetterCount,
+                                ExplicitDropCount = queue.Statistics.ExplicitDropCount,
+                            };
+                        }) && success;
+                    }
+                    else
+                    {
+                        //Success is true, but we didn't find the queue - so we will return null.
+                    }
+
+                    if (!success)
+                    {
+                        //Failed to lock, try again.
+                        result = null;
+                    }
+                });
+
+                if (success)
+                {
+                    return result;
+                }
+
+                Thread.Sleep(CMqDefaults.DEFAULT_DEADLOCK_AVOIDANCE_WAIT_MS); //Failed to lock, sleep then try again.
+            }
+
+            return null;
+        }
+
+        /// <summary>
         /// Returns a read-only copy of the queue subscribers.
         /// </summary>
         public ReadOnlyCollection<CMqSubscriberDescriptor>? GetSubscribers(string queueName)

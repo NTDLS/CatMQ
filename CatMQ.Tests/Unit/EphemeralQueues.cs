@@ -308,8 +308,7 @@ namespace CatMQ.Tests.Unit
         public void TestEnqueueAndExpire()
         {
             int enqueuedCount = 0;
-
-            TimeSpan maxMessageAge = TimeSpan.FromSeconds(2);
+            var maxMessageAge = TimeSpan.FromSeconds(2);
 
             var client = ClientFactory.CreateAndConnect();
 
@@ -338,7 +337,7 @@ namespace CatMQ.Tests.Unit
             Assert.Equal(0, messages.Count);
 
             //Make sure the expired message count is equal to the enqueued count.
-            var queue = fixture.Server.GetQueues()?.FirstOrDefault(q => q.QueueName == queueName);
+            var queue = fixture.Server.GetQueue(queueName);
             Assert.NotNull(queue);
             Assert.Equal(enqueuedCount, (int?)queue?.ExpiredMessageCount);
 
