@@ -329,6 +329,7 @@ namespace CatMQ.Tests.Unit
                 enqueuedCount++;
             }
 
+            //Give the messages time to expire.
             Thread.Sleep((int)(maxMessageAge + TimeSpan.FromSeconds(1)).TotalMilliseconds);
 
             //Make sure the queue is empty.
