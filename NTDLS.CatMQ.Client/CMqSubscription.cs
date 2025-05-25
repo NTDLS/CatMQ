@@ -18,15 +18,15 @@
         /// <summary>
         /// Function that is called when a message is received for this subscription.
         /// </summary>
-        public OnMessageReceived? MessageFunction { get; internal set; }
+        public OnMessageReceived? DeliveryEvent { get; internal set; }
 
         /// <summary>
         /// For buffered subscriptions, this is the number of messages that the client will attempt to honor.
         /// </summary>
-        public int? BufferSize { get; private set; }
+        public int? BatchSize { get; private set; }
 
         /// <summary>
-        /// The interval in which the message buffer will be flushed even if the buffer size is not met. 0 = never.
+        /// The interval in which the message buffer will be flushed even if the batch size is not met. 0 = never.
         /// </summary>
         public TimeSpan AutoFlushInterval { get; set; } = TimeSpan.Zero;
 
@@ -35,19 +35,19 @@
         /// <summary>
         /// Function that is called when a buffered batch is received for this subscription.
         /// </summary>
-        public OnBatchReceived? BufferedFunction { get; internal set; }
+        public OnBatchReceived? BatchDeliveryEvent { get; internal set; }
 
-        internal CMqSubscription(string queueName, OnMessageReceived messageFunction)
+        internal CMqSubscription(string queueName, OnMessageReceived deliveryEvent)
         {
             QueueName = queueName;
-            MessageFunction = messageFunction;
+            DeliveryEvent = deliveryEvent;
         }
 
-        internal CMqSubscription(string queueName, int bufferSize, TimeSpan autoFlushInterval, OnBatchReceived bufferedFunction)
+        internal CMqSubscription(string queueName, int bufferSize, TimeSpan autoFlushInterval, OnBatchReceived batchDeliveryEvent)
         {
             QueueName = queueName;
-            BufferedFunction = bufferedFunction;
-            BufferSize = bufferSize;
+            BatchDeliveryEvent = batchDeliveryEvent;
+            BatchSize = bufferSize;
             AutoFlushInterval = autoFlushInterval;
         }
     }

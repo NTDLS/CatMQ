@@ -343,5 +343,68 @@ namespace CatMQ.Tests.Unit
 
             client.Disconnect();
         }
+
+
+        [Fact(DisplayName = "ddddddddddd.")]
+        public void ddddddddddd()
+        {
+            ConcurrentDictionary<int, string> messages = new();
+
+            var client = ClientFactory.CreateAndConnect();
+
+            string queueName = Guid.NewGuid().ToString("N");
+
+            client.CreateQueue(new CMqQueueConfiguration(queueName)
+            {
+                PersistenceScheme = CMqPersistenceScheme.Ephemeral,
+                ConsumptionScheme = CMqConsumptionScheme.Delivered,
+            });
+
+            client.SubscribeBuffered(queueName, 10, TimeSpan.FromSeconds(1), OnBatchReceived);
+
+            var subscribers = fixture.Server.GetSubscribers(queueName);
+            Assert.NotNull(subscribers);
+            Assert.Equal(1, subscribers?.Count);
+
+            void OnBatchReceived(CMqClient client, List<CMqReceivedMessage> rawMessages)
+            {
+                /*
+                var message = rawMessage.Deserialize();
+                if (message is KeyValueMessage keyValue)
+                {
+                    if (!messages.TryRemove(keyValue.Key, out var originalMessage))
+                    {
+                        Assert.Fail($"Failed to remove message with key {keyValue.Key} from the dictionary.");
+                    }
+
+                    Assert.Equal(originalMessage, keyValue.Value);
+                }
+                else
+                {
+                    Assert.Fail($"Unexpected message type: {message.GetType()}");
+                }
+                */
+
+            }
+
+            //Enqueue messages.
+            for (int i = 0; i < 100; i++)
+            {
+                var message = $"Value:{i}";
+                messages.TryAdd(i, message);
+                client.Enqueue(queueName, new KeyValueMessage(i, message));
+            }
+
+            //Wait for messages to be consumed.
+            var startTime = DateTime.UtcNow;
+            while (!messages.IsEmpty && DateTime.UtcNow - startTime < TimeSpan.FromSeconds(5))
+            {
+                Thread.Sleep(10);
+            }
+
+            Assert.Empty(messages);
+
+            client.Disconnect();
+        }
     }
 }

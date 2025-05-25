@@ -174,7 +174,7 @@ namespace NTDLS.CatMQ.Client
                 //If a custom serialization provider is configured, enrich the message with it so that it can be used for unboxing.
                 message.SerializationProvider = SerializationProvider;
 
-                if (subscriptionHandler.BufferSize != null && subscriptionHandler.BufferedFunction != null)
+                if (subscriptionHandler.BatchSize != null && subscriptionHandler.BatchDeliveryEvent != null)
                 {
                     _messageBuffer.Write(mb =>
                     {
@@ -190,9 +190,9 @@ namespace NTDLS.CatMQ.Client
 
                     return new CMqConsumeResult(CMqConsumptionDisposition.Consumed);
                 }
-                else if (subscriptionHandler.MessageFunction != null)
+                else if (subscriptionHandler.DeliveryEvent != null)
                 {
-                    return subscriptionHandler.MessageFunction.Invoke(client, message);
+                    return subscriptionHandler.DeliveryEvent.Invoke(client, message);
                 }
             }
 
@@ -238,14 +238,14 @@ namespace NTDLS.CatMQ.Client
                                 {
                                     subscription.LastBufferFlushed = DateTime.UtcNow;
                                 }
-                                else if (messageBuffer.Value.Count >= subscription.BufferSize
+                                else if (messageBuffer.Value.Count >= subscription.BatchSize
                                     || (subscription.AutoFlushInterval != TimeSpan.Zero
                                     && (DateTime.UtcNow - subscription.LastBufferFlushed) >= subscription.AutoFlushInterval))
                                 {
                                     if (messageBuffer.Key == subscription.Id)
                                     {
                                         var bufferedValueClone = messageBuffer.Value.ToList();
-                                        Task.Run(() => subscription.BufferedFunction?.Invoke(this, bufferedValueClone));
+                                        Task.Run(() => subscription.BatchDeliveryEvent?.Invoke(this, bufferedValueClone));
                                         messageBuffer.Value.Clear();
                                     }
 
@@ -419,9 +419,11 @@ namespace NTDLS.CatMQ.Client
         /// <summary>
         /// Instructs the server to notify the client of messages sent to the given queue.
         /// </summary>
-        public CMqSubscription Subscribe(string queueName, OnMessageReceived messageFunction)
+        /// <param name="queueName">Queue name to subscribe to.</param>
+        /// <param name="deliveryEvent">Delegate function to call for each message.</param>
+        public CMqSubscription Subscribe(string queueName, OnMessageReceived deliveryEvent)
         {
-            var subscription = new CMqSubscription(queueName, messageFunction);
+            var subscription = new CMqSubscription(queueName, deliveryEvent);
 
             _subscriptions.Write(s =>
             {
@@ -440,9 +442,13 @@ namespace NTDLS.CatMQ.Client
         /// <summary>
         /// Instructs the server to notify the client of messages sent to the given queue.
         /// </summary>
-        public CMqSubscription SubscribeBuffered(string queueName, int bufferSize, TimeSpan autoFlushInterval, OnBatchReceived batchFunction)
+        /// <param name="queueName">Queue name to subscribe to.</param>
+        /// <param name="batchSize">The number of messages to present to the subscriber event in each batch.</param>
+        /// <param name="autoFlushInterval">The amount of time to wait before presenting the messages to the subscriber even when the batchSize is not met. (0 = never)</param>
+        /// <param name="batchDeliveryEvent">Delegate function to call for each batch.</param>
+        public CMqSubscription SubscribeBuffered(string queueName, int batchSize, TimeSpan autoFlushInterval, OnBatchReceived batchDeliveryEvent)
         {
-            var subscription = new CMqSubscription(queueName, bufferSize, autoFlushInterval, batchFunction);
+            var subscription = new CMqSubscription(queueName, batchSize, autoFlushInterval, batchDeliveryEvent);
 
             _subscriptions.Write(s =>
             {
