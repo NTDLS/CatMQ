@@ -52,7 +52,7 @@ namespace NTDLS.CatMQ.Server.Server.QueryHandlers
         {
             try
             {
-                _mqServer.SubscribeToQueue(context.ConnectionId,
+                _mqServer.Subscribe(context.ConnectionId,
                     context.TcpClient.Client.LocalEndPoint as IPEndPoint,
                     context.TcpClient.Client.RemoteEndPoint as IPEndPoint,
                     param.QueueName);
@@ -69,7 +69,7 @@ namespace NTDLS.CatMQ.Server.Server.QueryHandlers
         {
             try
             {
-                _mqServer.UnsubscribeFromQueue(context.ConnectionId, param.QueueName);
+                _mqServer.Unsubscribe(context.ConnectionId, param.QueueName);
                 return new CMqUnsubscribeFromQueueQueryReply(true);
             }
             catch (Exception ex)
@@ -82,7 +82,7 @@ namespace NTDLS.CatMQ.Server.Server.QueryHandlers
         {
             try
             {
-                _mqServer.EnqueueMessage(param.QueueName, param.DeferDeliveryDuration, param.ObjectType, param.MessageJson);
+                _mqServer.Enqueue(param.QueueName, param.DeferDeliveryDuration, param.ObjectType, param.MessageJson);
                 return new CMqEnqueueMessageToQueueReply(true);
             }
             catch (Exception ex)

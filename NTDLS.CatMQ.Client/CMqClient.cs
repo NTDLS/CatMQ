@@ -20,8 +20,8 @@ namespace NTDLS.CatMQ.Client
         /// <summary>
         /// Contains the queue name and the handler delegate function for that queue.
         /// </summary>
-        private readonly OptimisticCriticalResource<Dictionary<string, CMqSubscription>> _subscriptions;
-        private readonly OptimisticCriticalResource<Dictionary<Guid, List<CMqReceivedMessage>>> _messageBuffer = new();
+        private readonly OptimisticCriticalResource<QueueSubscriptionDictionary> _subscriptions;
+        private readonly OptimisticCriticalResource<MessageBufferDictionary> _messageBuffer = new();
         private Thread? _bufferThread;
 
         /// <summary>
@@ -69,7 +69,7 @@ namespace NTDLS.CatMQ.Client
         public CMqClient(CMqClientConfiguration configuration)
         {
             _configuration = configuration;
-            _subscriptions = new(() => new Dictionary<string, CMqSubscription>(StringComparer.OrdinalIgnoreCase));
+            _subscriptions = new(() => new QueueSubscriptionDictionary());
 
             var rmConfiguration = new RmConfiguration()
             {
@@ -91,7 +91,7 @@ namespace NTDLS.CatMQ.Client
         public CMqClient()
         {
             _configuration = new CMqClientConfiguration();
-            _subscriptions = new(() => new Dictionary<string, CMqSubscription>(StringComparer.OrdinalIgnoreCase));
+            _subscriptions = new(() => new QueueSubscriptionDictionary());
             _rmClient = new RmClient();
             _rmClient.SetCompressionProvider(new RmDeflateCompressionProvider());
 

@@ -29,7 +29,7 @@ namespace CatMQ.Service.Pages
             {
                 if (UserSelection?.Equals("true") == true)
                 {
-                    mqServer.UnsubscribeFromQueue(SubscriberId, QueueName);
+                    mqServer.Unsubscribe(SubscriberId, QueueName);
                 }
                 else
                 {

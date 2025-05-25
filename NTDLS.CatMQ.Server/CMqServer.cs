@@ -19,8 +19,9 @@ namespace NTDLS.CatMQ.Server
         private bool _keepRunning = false;
         private readonly CMqServerConfiguration _configuration;
         private readonly JsonSerializerOptions _indentedJsonOptions = new() { WriteIndented = true };
-        private readonly OptimisticCriticalResource<CaseInsensitiveMessageQueueDictionary> _messageQueues = new();
+        private readonly OptimisticCriticalResource<MessageQueueDictionary> _messageQueues = new();
         private readonly RmServer _rmServer;
+
         internal CMqServerConfiguration Configuration => _configuration;
 
         /// <summary>
@@ -52,7 +53,7 @@ namespace NTDLS.CatMQ.Server
 
             _rmServer = new RmServer(rmConfiguration);
             _rmServer.SetCompressionProvider(new RmDeflateCompressionProvider());
-            _rmServer.OnException += _rmServer_OnException;
+            _rmServer.OnException += RmServer_OnException;
             _rmServer.OnDisconnected += RmServer_OnDisconnected;
 
             _rmServer.AddHandler(new InternalServerQueryHandlers(this));
@@ -66,13 +67,13 @@ namespace NTDLS.CatMQ.Server
             _configuration = new CMqServerConfiguration();
             _rmServer = new RmServer();
             _rmServer.SetCompressionProvider(new RmDeflateCompressionProvider());
-            _rmServer.OnException += _rmServer_OnException;
+            _rmServer.OnException += RmServer_OnException;
             _rmServer.OnDisconnected += RmServer_OnDisconnected;
 
             _rmServer.AddHandler(new InternalServerQueryHandlers(this));
         }
 
-        private void _rmServer_OnException(RmContext? context, Exception ex, IRmPayload? payload)
+        private void RmServer_OnException(RmContext? context, Exception ex, IRmPayload? payload)
         {
             OnLog?.Invoke(this, CMqErrorLevel.Error, "Reliable messaging exception.", ex);
         }
@@ -139,7 +140,7 @@ namespace NTDLS.CatMQ.Server
             _messageQueues.Read(mqd => CheckpointPersistentMessageQueues(mqd));
         }
 
-        private void CheckpointPersistentMessageQueues(CaseInsensitiveMessageQueueDictionary mqd)
+        private void CheckpointPersistentMessageQueues(MessageQueueDictionary mqd)
         {
             if (string.IsNullOrEmpty(_configuration.PersistencePath) == false)
             {
@@ -438,7 +439,7 @@ namespace NTDLS.CatMQ.Server
         }
 
         /// <summary>
-        /// Returns a read-only copy messages in the queue.
+        /// Returns a read-only copy of a message in the queue.
         /// </summary>
         public CMqEnqueuedMessageDescriptor? GetQueueMessage(string queueName, ulong serialNumber, int? truncateToBytes = null)
         {
@@ -541,7 +542,6 @@ namespace NTDLS.CatMQ.Server
                     OnLog?.Invoke(this, CMqErrorLevel.Information, "Loading persistent queues.");
 
                     var persistedQueuesJson = File.ReadAllText(persistedQueuesFile);
-                    //Deserialize using System.Text.Json as opposed to Newtonsoft for efficiency.
                     var queueMetas = JsonSerializer.Deserialize<List<MessageQueueMetadata>>(persistedQueuesJson);
 
                     if (queueMetas != null)
@@ -866,7 +866,7 @@ namespace NTDLS.CatMQ.Server
         /// <summary>
         /// Creates a subscription to a queue for a given connection id.
         /// </summary>
-        internal void SubscribeToQueue(Guid subscriberId, IPEndPoint? localEndpoint, IPEndPoint? remoteEndpoint, string queueName)
+        internal void Subscribe(Guid subscriberId, IPEndPoint? localEndpoint, IPEndPoint? remoteEndpoint, string queueName)
         {
             OnLog?.Invoke(this, CMqErrorLevel.Verbose, $"Subscribing connection [{subscriberId}] to queue: [{queueName}].");
 
@@ -911,7 +911,7 @@ namespace NTDLS.CatMQ.Server
         /// <summary>
         /// Removes a subscription from a queue for a given connection id.
         /// </summary>
-        public void UnsubscribeFromQueue(Guid subscriberId, string queueName)
+        public void Unsubscribe(Guid subscriberId, string queueName)
         {
             OnLog?.Invoke(this, CMqErrorLevel.Verbose, $"Unsubscribing connection [{subscriberId}] from queue: [{queueName}].");
 
@@ -943,7 +943,7 @@ namespace NTDLS.CatMQ.Server
         /// <summary>
         /// Removes a subscription from a queue for a given connection id.
         /// </summary>
-        public void EnqueueMessage(string queueName, TimeSpan? deferDeliveryDuration, string assemblyQualifiedTypeName, string messageJson)
+        public void Enqueue(string queueName, TimeSpan? deferDeliveryDuration, string assemblyQualifiedTypeName, string messageJson)
         {
             OnLog?.Invoke(this, CMqErrorLevel.Verbose, $"Enqueuing message to queue: [{queueName}].");
 
