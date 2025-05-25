@@ -1,12 +1,11 @@
-﻿using NTDLS.Semaphore;
-using System.Reflection;
+﻿using System.Collections.Concurrent;
 using System.Text.Json;
 
 namespace NTDLS.CatMQ.Shared
 {
     public static class CMqUnboxing
     {
-        private static readonly PessimisticCriticalResource<Dictionary<string, MethodInfo>> _reflectionCache = new();
+        private static readonly ConcurrentDictionary<string, Func<string, ICMqSerializationProvider?, ICMqMessage>> _deserializationCache = new();
 
         /// <summary>
         /// Deserialization function called from MessageDeliveryQuery via reflection.
@@ -62,97 +61,46 @@ namespace NTDLS.CatMQ.Shared
         }
 
         /// <summary>
-        /// Deserializes json to an object of the given type string.
+        /// Deserializes the received message to its original type.
         /// </summary>
-        public static T? DynamicDeserialize<T>(string assemblyQualifiedTypeName, string objectJson) where T : class
-            => DynamicDeserialize(assemblyQualifiedTypeName, objectJson) as T;
+        internal static ICMqMessage Deserialize(CMqReceivedMessage message)
+            => DeserializeAs(message.AssemblyQualifiedTypeName, message.MessageJson, message.SerializationProvider);
 
         /// <summary>
-        /// Deserializes json to an object of the given type string.
+        /// Deserializes JSON to an object of type T using its assembly-qualified name.
         /// </summary>
-        public static object DynamicDeserialize(string assemblyQualifiedTypeName, string objectJson, ICMqSerializationProvider? serializationProvider = null)
+        public static T? DeserializeAs<T>(string objectJson, ICMqSerializationProvider? serializationProvider = null) where T : class
         {
-            string cacheKey = $"{assemblyQualifiedTypeName}";
+            var typeName = GetAssemblyQualifiedTypeName(typeof(T))
+                ?? throw new Exception($"Cannot resolve AssemblyQualifiedName for type {typeof(T).FullName}.");
 
-            var genericToObjectMethod = _reflectionCache.Use((o) =>
-            {
-                if (o.TryGetValue(cacheKey, out var method))
-                {
-                    return method;
-                }
-                return null;
-            });
-
-            object? deserializedMessage = null;
-
-            if (genericToObjectMethod != null) //Reflection cache hit.
-            {
-                //Call the generic deserialization:
-                deserializedMessage = genericToObjectMethod.Invoke(null, [objectJson, serializationProvider])
-                    ?? throw new Exception($"Extraction message can not be null.");
-            }
-            else
-            {
-                var genericType = Type.GetType(assemblyQualifiedTypeName)
-                    ?? throw new Exception($"Unknown extraction message type {assemblyQualifiedTypeName}.");
-
-                var toObjectMethod = typeof(CMqUnboxing).GetMethod("MqDeserializeToObject")
-                    ?? throw new Exception("Could not resolve MqDeserializeToObject.");
-
-                genericToObjectMethod = toObjectMethod.MakeGenericMethod(genericType);
-
-                _reflectionCache.Use((o) => o.TryAdd(cacheKey, genericToObjectMethod));
-
-                //Call the generic deserialization:
-                deserializedMessage = genericToObjectMethod.Invoke(null, [objectJson, serializationProvider])
-                    ?? throw new Exception($"Extraction message can not be null.");
-            }
-
-            return deserializedMessage;
+            return DeserializeAs(typeName, objectJson, serializationProvider) as T;
         }
 
         /// <summary>
-        /// Deserializes the received message to its original type.
+        /// Deserializes JSON to an object of the given type string.
         /// </summary>
-        internal static ICMqMessage Unbox(CMqReceivedMessage message)
+        public static ICMqMessage DeserializeAs(string assemblyQualifiedTypeName, string objectJson, ICMqSerializationProvider? serializationProvider = null)
         {
-            string cacheKey = $"{message.AssemblyQualifiedTypeName}";
-
-            var genericToObjectMethod = _reflectionCache.Use((o) =>
+            var deserializeMethod = _deserializationCache.GetOrAdd(assemblyQualifiedTypeName, typeName =>
             {
-                if (o.TryGetValue(cacheKey, out var method))
-                {
-                    return method;
-                }
-                return null;
+                var genericType = Type.GetType(typeName)
+                    ?? throw new Exception($"Unknown extraction payload type [{typeName}].");
+
+                if (!typeof(ICMqMessage).IsAssignableFrom(genericType))
+                    throw new Exception($"Type [{genericType.FullName}] does not implement ICMqMessage.");
+
+                var methodInfo = typeof(CMqUnboxing).GetMethod(nameof(MqDeserializeToObject), new[] { typeof(string), typeof(ICMqSerializationProvider) })
+                    ?? throw new Exception("Could not resolve MqDeserializeToObject().");
+
+                var genericMethod = methodInfo.MakeGenericMethod(genericType);
+
+                return (Func<string, ICMqSerializationProvider?, ICMqMessage>)
+                    Delegate.CreateDelegate(typeof(Func<string, ICMqSerializationProvider?, ICMqMessage>), genericMethod);
             });
 
-            ICMqMessage? deserializedMessage = null;
-
-            if (genericToObjectMethod != null) //Reflection cache hit.
-            {
-                //Call the generic deserialization:
-                deserializedMessage = genericToObjectMethod.Invoke(null, [message.MessageJson, message.SerializationProvider]) as ICMqMessage
-                    ?? throw new Exception($"Extraction message can not be null.");
-            }
-            else
-            {
-                var genericType = Type.GetType(message.AssemblyQualifiedTypeName)
-                    ?? throw new Exception($"Unknown extraction message type {message.AssemblyQualifiedTypeName}.");
-
-                var toObjectMethod = typeof(CMqUnboxing).GetMethod("MqDeserializeToObject")
-                        ?? throw new Exception($"Could not resolve MqDeserializeToObject().");
-
-                genericToObjectMethod = toObjectMethod.MakeGenericMethod(genericType);
-
-                _reflectionCache.Use((o) => o.TryAdd(cacheKey, genericToObjectMethod));
-
-                //Call the generic deserialization:
-                deserializedMessage = genericToObjectMethod.Invoke(null, [message.MessageJson, message.SerializationProvider]) as ICMqMessage
-                    ?? throw new Exception($"Extraction message can not be null.");
-            }
-
-            return deserializedMessage;
+            return deserializeMethod(objectJson, serializationProvider)
+                ?? throw new Exception("Extraction payload cannot be null.");
         }
     }
 }

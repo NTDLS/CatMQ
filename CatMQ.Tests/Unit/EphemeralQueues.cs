@@ -344,7 +344,7 @@ namespace CatMQ.Tests.Unit
             client.Disconnect();
         }
 
-
+        /*
         [Fact(DisplayName = "ddddddddddd.")]
         public void ddddddddddd()
         {
@@ -368,7 +368,7 @@ namespace CatMQ.Tests.Unit
 
             void OnBatchReceived(CMqClient client, List<CMqReceivedMessage> rawMessages)
             {
-                /*
+
                 var message = rawMessage.Deserialize();
                 if (message is KeyValueMessage keyValue)
                 {
@@ -383,8 +383,6 @@ namespace CatMQ.Tests.Unit
                 {
                     Assert.Fail($"Unexpected message type: {message.GetType()}");
                 }
-                */
-
             }
 
             //Enqueue messages.
@@ -406,5 +404,6 @@ namespace CatMQ.Tests.Unit
 
             client.Disconnect();
         }
+*/
     }
 }

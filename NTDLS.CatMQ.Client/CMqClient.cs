@@ -426,6 +426,11 @@ namespace NTDLS.CatMQ.Client
 
             _subscriptions.Write(s =>
             {
+                if (s.ContainsKey(queueName))
+                {
+                    throw new Exception($"Client is already subscribed to queue [{queueName}].");
+                }
+
                 s[queueName] = subscription;
             });
 
@@ -451,6 +456,11 @@ namespace NTDLS.CatMQ.Client
 
             _subscriptions.Write(s =>
             {
+                if (s.ContainsKey(queueName))
+                {
+                    throw new Exception($"Client is already subscribed to queue [{queueName}].");
+                }
+
                 s[queueName] = subscription;
             });
 
@@ -464,31 +474,23 @@ namespace NTDLS.CatMQ.Client
         }
 
         /// <summary>
-        /// Removes the subscription for the specified subscription descriptor.
-        /// </summary>
-        public void Unsubscribe(CMqSubscription subscription)
-        {
-            _subscriptions.Write(s =>
-            {
-                s.Remove(subscription.QueueName);
-            });
-
-            var result = _rmClient.Query(new CMqUnsubscribeFromQueueQuery(subscription.QueueName)).Result;
-            if (result.IsSuccess == false)
-            {
-                throw new Exception(result.ErrorMessage);
-            }
-        }
-
-        /// <summary>
         /// Instructs the server to stop notifying the client of messages sent to the given queue.
         /// </summary>
-        public void UnsubscribeAll(string queueName)
+        public void Unsubscribe(string queueName)
         {
-            var result = _rmClient.Query(new CMqUnsubscribeFromQueueQuery(queueName)).Result;
-            if (result.IsSuccess == false)
+            var existingSubscription = _subscriptions.Write(s =>
             {
-                throw new Exception(result.ErrorMessage);
+                s.Remove(queueName, out var existingSubscription);
+                return existingSubscription;
+            }) ?? throw new Exception($"Client is not subscribed to queue [{queueName}].");
+
+            if (existingSubscription != null)
+            {
+                var result = _rmClient.Query(new CMqUnsubscribeFromQueueQuery(queueName)).Result;
+                if (result.IsSuccess == false)
+                {
+                    throw new Exception(result.ErrorMessage);
+                }
             }
         }
 

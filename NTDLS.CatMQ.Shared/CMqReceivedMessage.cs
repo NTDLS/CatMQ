@@ -64,12 +64,12 @@
         /// Deserializes the received message to its original type.
         /// </summary>
         public ICMqMessage Deserialize()
-            => CMqUnboxing.Unbox(this);
+            => CMqUnboxing.Deserialize(this);
 
         /// <summary>
         /// Deserializes the received message to its original type, casted to the given type.
         /// </summary>
         public T? Deserialize<T>() where T : class
-            => CMqUnboxing.Unbox(this) as T;
+            => CMqUnboxing.Deserialize(this) as T;
     }
 }
