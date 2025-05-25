@@ -514,7 +514,7 @@ namespace NTDLS.CatMQ.Client
                 messageJson = JsonSerializer.Serialize((object)message);
             }
 
-            var objectType = CMqUnboxing.GetAssemblyQualifiedTypeName(message);
+            var objectType = CMqSerialization.GetAssemblyQualifiedTypeName(message);
 
             var result = _rmClient.Query(new CMqEnqueueMessageToQueue(queueName, deferDeliveryDuration, objectType, messageJson)).Result;
             if (result.IsSuccess == false)

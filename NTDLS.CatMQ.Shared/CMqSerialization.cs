@@ -3,7 +3,7 @@ using System.Text.Json;
 
 namespace NTDLS.CatMQ.Shared
 {
-    public static class CMqUnboxing
+    public static class CMqSerialization
     {
         private static readonly ConcurrentDictionary<string, Func<string, ICMqSerializationProvider?, ICMqMessage>> _deserializationCache = new();
 
@@ -23,9 +23,7 @@ namespace NTDLS.CatMQ.Shared
         }
 
         public static string GetAssemblyQualifiedTypeName(object obj)
-        {
-            return GetAssemblyQualifiedTypeName(obj.GetType());
-        }
+            => GetAssemblyQualifiedTypeName(obj.GetType());
 
         public static string GetAssemblyQualifiedTypeName(Type type)
         {
@@ -85,12 +83,12 @@ namespace NTDLS.CatMQ.Shared
             var deserializeMethod = _deserializationCache.GetOrAdd(assemblyQualifiedTypeName, typeName =>
             {
                 var genericType = Type.GetType(typeName)
-                    ?? throw new Exception($"Unknown extraction payload type [{typeName}].");
+                    ?? throw new Exception($"Unknown extraction message type [{typeName}].");
 
                 if (!typeof(ICMqMessage).IsAssignableFrom(genericType))
                     throw new Exception($"Type [{genericType.FullName}] does not implement ICMqMessage.");
 
-                var methodInfo = typeof(CMqUnboxing).GetMethod(nameof(MqDeserializeToObject), new[] { typeof(string), typeof(ICMqSerializationProvider) })
+                var methodInfo = typeof(CMqSerialization).GetMethod(nameof(MqDeserializeToObject), new[] { typeof(string), typeof(ICMqSerializationProvider) })
                     ?? throw new Exception("Could not resolve MqDeserializeToObject().");
 
                 var genericMethod = methodInfo.MakeGenericMethod(genericType);
@@ -100,7 +98,7 @@ namespace NTDLS.CatMQ.Shared
             });
 
             return deserializeMethod(objectJson, serializationProvider)
-                ?? throw new Exception("Extraction payload cannot be null.");
+                ?? throw new Exception("Extraction message cannot be null.");
         }
     }
 }
