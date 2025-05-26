@@ -591,7 +591,7 @@ namespace NTDLS.CatMQ.Server
             OnLog?.Invoke(this, CMqErrorLevel.Information, "Starting queues.");
             foreach (var mq in queuesToStart)
             {
-                mq.StartAsync();
+                mq.Start();
             }
 
             _rmServer.Start(listenPort);
@@ -637,7 +637,7 @@ namespace NTDLS.CatMQ.Server
                 foreach (var mqKVP in mqd)
                 {
                     OnLog?.Invoke(this, CMqErrorLevel.Information, $"Stopping queue [{mqKVP.Value.Configuration.QueueName}].");
-                    mqKVP.Value.StopAsync();
+                    mqKVP.Value.SignalShutdown();
                     messageQueues.Add(mqKVP.Value);
                 }
 
@@ -649,7 +649,7 @@ namespace NTDLS.CatMQ.Server
 
             foreach (var messageQueue in messageQueues)
             {
-                messageQueue.WaitOnStop(); //We cant wait on the stop from within a lock. That'll deadlock.
+                messageQueue.WaitForShutdown(); //We cant wait on the stop from within a lock. That'll deadlock.
             }
         }
 
@@ -798,7 +798,7 @@ namespace NTDLS.CatMQ.Server
                     }
 
                     messageQueue.InitializePersistentDatabase();
-                    messageQueue.StartAsync();
+                    messageQueue.Start();
                 }
             });
         }
@@ -825,7 +825,7 @@ namespace NTDLS.CatMQ.Server
                         success = messageQueue.EnqueuedMessages.TryWrite(CMqDefaults.DEFAULT_TRY_WAIT_MS, m =>
                         {
                             waitOnStopMessageQueue = messageQueue;
-                            messageQueue.StopAsync();
+                            messageQueue.SignalShutdown();
                             mqd.Remove(queueKey);
                         }) && success;
 
@@ -843,7 +843,7 @@ namespace NTDLS.CatMQ.Server
                 {
                     if (waitOnStopMessageQueue != null)
                     {
-                        waitOnStopMessageQueue.WaitOnStop(); //We cant wait on the stop from within a lock. That'll deadlock.
+                        waitOnStopMessageQueue.WaitForShutdown(); //We cant wait on the stop from within a lock. That'll deadlock.
                         var databasePath = Path.Join(Configuration.PersistencePath, "messages", waitOnStopMessageQueue.Configuration.QueueName);
 
                         try

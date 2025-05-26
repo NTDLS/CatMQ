@@ -12,11 +12,11 @@ namespace NTDLS.CatMQ.Server.Server
     /// </summary>
     internal class SingleMessageQueueServer
     {
-        private readonly Thread _deliveryThread;
         private readonly CMqServer _queueServer;
+        private Task? _deliveryTask;
+        private bool _KeepRunning;
 
         internal AutoResetEvent DeliveryThreadWaitEvent = new(false);
-        internal bool KeepRunning { get; set; } = false;
 
         /// <summary>
         /// List of subscriber connection IDs.
@@ -38,10 +38,9 @@ namespace NTDLS.CatMQ.Server.Server
         {
             _queueServer = mqServer;
             Configuration = queueConfiguration;
-            _deliveryThread = new(DeliveryThreadProc);
         }
 
-        private void DeliveryThreadProc(object? p)
+        private async Task DeliveryThreadProc()
         {
 #if DEBUG
             Thread.CurrentThread.Name = $"DeliveryThreadProc_{Environment.CurrentManagedThreadId}";
@@ -51,7 +50,7 @@ namespace NTDLS.CatMQ.Server.Server
 
             int threadYieldBurndown = CMqDefaults.QUEUE_THREAD_DELIVERY_BURNDOWN; //Just used to omit waiting. We want to spin fast when we are delivering messages.
 
-            while (KeepRunning)
+            while (_KeepRunning)
             {
                 var now = DateTime.UtcNow;
 
@@ -154,7 +153,7 @@ namespace NTDLS.CatMQ.Server.Server
                         Statistics.IncrementOutstandingDeliveries();
                         topMessage.State = CMqMessageState.OutForDelivery;
 
-                        DistributeToSubscribers(topMessage).ContinueWith((t) =>
+                        await DistributeToSubscribers(topMessage).ContinueWith((t) =>
                         {
                             Statistics.DecrementOutstandingDeliveries();
                         });
@@ -205,7 +204,7 @@ namespace NTDLS.CatMQ.Server.Server
                         if (Configuration.DeliveryThrottle.TotalSeconds >= 1)
                         {
                             int sleepSeconds = (int)Configuration.DeliveryThrottle.TotalSeconds;
-                            for (int sleep = 0; sleep < sleepSeconds && KeepRunning; sleep++)
+                            for (int sleep = 0; sleep < sleepSeconds && _KeepRunning; sleep++)
                             {
                                 Thread.Sleep(1000);
                             }
@@ -223,7 +222,7 @@ namespace NTDLS.CatMQ.Server.Server
                     _queueServer.InvokeOnLog(ex.GetBaseException());
                 }
 
-                if (threadYieldBurndown >= CMqDefaults.QUEUE_THREAD_DELIVERY_BURNDOWN && KeepRunning)
+                if (threadYieldBurndown >= CMqDefaults.QUEUE_THREAD_DELIVERY_BURNDOWN && _KeepRunning)
                 {
                     threadYieldBurndown = CMqDefaults.QUEUE_THREAD_DELIVERY_BURNDOWN;
                     DeliveryThreadWaitEvent.WaitOne(10);
@@ -239,8 +238,8 @@ namespace NTDLS.CatMQ.Server.Server
             }
             catch
             {
-                _queueServer.InvokeOnLog(CMqErrorLevel.Fatal, $"Failure of DistributeToSubscribersWithResolution [{Configuration.QueueName}].");
                 message.State = CMqMessageState.Ready;
+                _queueServer.InvokeOnLog(CMqErrorLevel.Fatal, $"Failure of DistributeToSubscribersWithResolution [{Configuration.QueueName}].");
             }
         }
 
@@ -266,7 +265,7 @@ namespace NTDLS.CatMQ.Server.Server
 
             foreach (var subscriber in subscriberDispositions.Remaining)
             {
-                if (KeepRunning == false)
+                if (_KeepRunning == false)
                 {
                     return CMqMessageState.Shutdown;
                 }
@@ -358,7 +357,7 @@ namespace NTDLS.CatMQ.Server.Server
                 }
             }
 
-            if (KeepRunning == false)
+            if (_KeepRunning == false)
             {
                 return CMqMessageState.Shutdown;
             }
@@ -482,23 +481,23 @@ namespace NTDLS.CatMQ.Server.Server
             });
         }
 
-        public void StartAsync()
+        public void Start()
         {
             _queueServer.InvokeOnLog(CMqErrorLevel.Information, $"Starting delivery thread for [{Configuration.QueueName}].");
-            KeepRunning = true;
-            _deliveryThread.Start();
+            _KeepRunning = true;
+            _deliveryTask = Task.Run(() => DeliveryThreadProc());
         }
 
-        public void StopAsync()
+        public void SignalShutdown()
         {
             _queueServer.InvokeOnLog(CMqErrorLevel.Information, $"Signaling shutdown for [{Configuration.QueueName}].");
-            KeepRunning = false;
+            _KeepRunning = false;
         }
 
-        public void WaitOnStop()
+        public void WaitForShutdown()
         {
             _queueServer.InvokeOnLog(CMqErrorLevel.Information, $"Waiting on delivery thread to quit for [{Configuration.QueueName}].");
-            _deliveryThread.Join();
+            _deliveryTask?.Wait();
 
             _queueServer.InvokeOnLog(CMqErrorLevel.Information, $"Shutting down database connection for [{Configuration.QueueName}].");
             EnqueuedMessages.Write(m =>
