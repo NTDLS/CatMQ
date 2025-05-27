@@ -153,10 +153,14 @@ namespace NTDLS.CatMQ.Server.Server
                         Statistics.IncrementOutstandingDeliveries();
                         topMessage.State = CMqMessageState.OutForDelivery;
 
-                        await DistributeToSubscribers(topMessage).ContinueWith((t) =>
+                        try
+                        {
+                            await DistributeToSubscribers(topMessage);
+                        }
+                        finally
                         {
                             Statistics.DecrementOutstandingDeliveries();
-                        });
+                        }
                     }
                     else if (threadYieldBurndown < CMqDefaults.QUEUE_THREAD_DELIVERY_BURNDOWN)
                     {
@@ -203,10 +207,11 @@ namespace NTDLS.CatMQ.Server.Server
                     {
                         if (Configuration.DeliveryThrottle.TotalSeconds >= 1)
                         {
-                            int sleepSeconds = (int)Configuration.DeliveryThrottle.TotalSeconds;
-                            for (int sleep = 0; sleep < sleepSeconds && _KeepRunning; sleep++)
+                            int sleeps = (int)(Configuration.DeliveryThrottle.TotalMilliseconds / 100);
+
+                            for (int sleep = 0; sleep < sleeps && _KeepRunning; sleep++)
                             {
-                                Thread.Sleep(1000);
+                                Thread.Sleep(100);
                             }
                         }
                         else
@@ -252,11 +257,11 @@ namespace NTDLS.CatMQ.Server.Server
 
             if (subscriberDispositions.Remaining.Count == 0)
             {
-                //The flow control below should not allow us to ever get here, but logically I feel we need to test for it.
-                //Given that this is an "exception" to the proper flow, I think the only appropriate action to to give a
-                //warning and dead-letter the message, unless at least one subscriber has been recorded as consuming the message.
+                // The flow control below should not allow us to ever get here, but logically I feel we need to test for it.
+                // Given that this is an "exception" to the proper flow, I think the only appropriate action to to give a
+                //  warning and dead-letter the message, unless at least one subscriber has been recorded as consuming the message.
 
-                if (subscriberDispositions.ConsumedIDs.Count > 0)
+                if (subscriberDispositions.ConsumedSubscriberIDs.Count > 0)
                 {
                     message.State = CMqMessageState.Drop;
                 }
@@ -304,6 +309,17 @@ namespace NTDLS.CatMQ.Server.Server
                             //  need to break the delivery loop so the message can be removed from the queue.
                             return CMqMessageState.Drop;
                         }
+                        else if (Configuration.ConsumptionScheme == CMqConsumptionScheme.Delivered)
+                        {
+                            //Message was delivered and consumed, but we still need to deliver it to the remaining subscribers.
+                            //We do not break the loop here, as we want to ensure that all subscribers receive a copy of the message.
+                        }
+                        else
+                        {
+                            //This is an unexpected consumption scheme, we should not be here.
+                            _queueServer.InvokeOnLog(CMqErrorLevel.Fatal, $"Unexpected consumption scheme [{Configuration.ConsumptionScheme}] for queue [{Configuration.QueueName}].");
+                            return CMqMessageState.DeadLetter;
+                        }
                     }
                     else if (deliveryResult.Disposition == CMqConsumptionDisposition.NotConsumed)
                     {
@@ -324,14 +340,14 @@ namespace NTDLS.CatMQ.Server.Server
                     }
                     else if (deliveryResult.Disposition == CMqConsumptionDisposition.DeadLetter)
                     {
-                        //When a subscriber responds with "DeadLetter" or "Drop", we short-circuit
+                        //When a subscriber responds with "DeadLetter" we short-circuit
                         //  the delivery flow logic and take the requested action on the message.
                         Statistics.IncrementExplicitDeadLetterCount();
                         return CMqMessageState.DeadLetter;
                     }
                     else if (deliveryResult.Disposition == CMqConsumptionDisposition.Drop)
                     {
-                        //When a subscriber responds with "DeadLetter" or "Drop", we short-circuit
+                        //When a subscriber responds with "Drop", we short-circuit
                         //  the delivery flow logic and take the requested action on the message.
                         Statistics.IncrementExplicitDropCount();
                         return CMqMessageState.Drop;
@@ -347,9 +363,8 @@ namespace NTDLS.CatMQ.Server.Server
                 //If we have tried to deliver this message to this subscriber too many times, then mark this subscriber-message as satisfied.
                 if (Configuration.MaxDeliveryAttempts >= 0 && subscriberDeliveryStatistics.DeliveryAttemptCount >= Configuration.MaxDeliveryAttempts)
                 {
-                    //Even if we reached the max delivery count, there is not need to mark this as a
-                    // failure if the subscriber is satisfied, as this would indicate that the latest
-                    //  delivery attempt was finally successful.
+                    //Even if we reached the max delivery count, there is no need to mark this as a failure if the
+                    //  subscriber is satisfied (as that indicates that the latest delivery attempt was finally successful).
                     if (message.SatisfiedDeliverySubscriberIDs.Contains(subscriber.SubscriberId) == false)
                     {
                         message.FailedDeliverySubscriberIDs.Add(subscriber.SubscriberId);

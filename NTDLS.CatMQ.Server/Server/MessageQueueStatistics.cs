@@ -25,7 +25,7 @@
         /// <summary>
         /// The number of messages in the queue.
         /// </summary>
-        public int QueueDepth  => _queueDepth;
+        public int QueueDepth => _queueDepth;
 
         private int _queueDepth = 0;
 

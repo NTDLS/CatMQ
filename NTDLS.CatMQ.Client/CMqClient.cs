@@ -22,7 +22,7 @@ namespace NTDLS.CatMQ.Client
         /// </summary>
         private readonly OptimisticCriticalResource<QueueSubscriptionDictionary> _subscriptions = new();
         private readonly OptimisticCriticalResource<MessageBufferDictionary> _messageBuffer = new();
-        private Thread? _bufferThread;
+        private Task? _bufferedDeliveryTask;
 
         /// <summary>
         /// Provides access to the custom serialization provider, if configured.
@@ -104,7 +104,6 @@ namespace NTDLS.CatMQ.Client
         /// Sets the custom serialization provider.
         /// Can be cleared by passing null or calling ClearCryptographyProvider().
         /// </summary>
-        /// <param name="provider"></param>
         public void SetSerializationProvider(ICMqSerializationProvider? provider)
         {
             SerializationProvider = provider;
@@ -173,6 +172,7 @@ namespace NTDLS.CatMQ.Client
                 //If a custom serialization provider is configured, enrich the message with it so that it can be used for unboxing.
                 message.SerializationProvider = SerializationProvider;
 
+                //If the message is buffered, add it to the buffer and return consumed.
                 if (subscriptionHandler.BatchSize != null && subscriptionHandler.BatchDeliveryEvent != null)
                 {
                     _messageBuffer.Write(mb =>
@@ -189,6 +189,7 @@ namespace NTDLS.CatMQ.Client
 
                     return new CMqConsumeResult(CMqConsumptionDisposition.Consumed);
                 }
+                //If the message is not buffered, invoke the delivery event and return the result to the server.
                 else if (subscriptionHandler.DeliveryEvent != null)
                 {
                     return subscriptionHandler.DeliveryEvent.Invoke(client, message);
@@ -201,61 +202,6 @@ namespace NTDLS.CatMQ.Client
         internal void InvokeOnException(CMqClient client, string? queueName, Exception ex)
             => OnException?.Invoke(client, queueName, ex);
 
-        private void BufferThreadProc(object? p)
-        {
-            while (!_explicitDisconnect)
-            {
-                FlushBufferedMessages(false);
-                Thread.Sleep(1);
-            }
-
-            FlushBufferedMessages(true);
-        }
-
-        private void FlushBufferedMessages(bool ensureEmpty)
-        {
-            bool success;
-
-            do
-            {
-                success = true;
-
-                success = _messageBuffer.TryWrite(mb =>
-                {
-                    if (mb.Count == 0)
-                    {
-                        return;
-                    }
-
-                    success = _subscriptions.TryRead(s =>
-                    {
-                        foreach (var subscription in s.Values)
-                        {
-                            foreach (var messageBuffer in mb)
-                            {
-                                if (messageBuffer.Value.Count == 0)
-                                {
-                                    subscription.LastBufferFlushed = DateTime.UtcNow;
-                                }
-                                else if (messageBuffer.Value.Count >= subscription.BatchSize
-                                    || (subscription.AutoFlushInterval != TimeSpan.Zero
-                                    && (DateTime.UtcNow - subscription.LastBufferFlushed) >= subscription.AutoFlushInterval))
-                                {
-                                    if (messageBuffer.Key == subscription.Id)
-                                    {
-                                        var bufferedValueClone = messageBuffer.Value.ToList();
-                                        Task.Run(() => subscription.BatchDeliveryEvent?.Invoke(this, bufferedValueClone));
-                                        messageBuffer.Value.Clear();
-                                    }
-
-                                    subscription.LastBufferFlushed = DateTime.UtcNow;
-                                }
-                            }
-                        }
-                    }) && success;
-                }) && success;
-            } while (!success && ensureEmpty);
-        }
 
         /// <summary>
         /// Connects the client to a queue server.
@@ -267,12 +213,6 @@ namespace NTDLS.CatMQ.Client
             _lastReconnectPort = port;
 
             _explicitDisconnect = false;
-
-            _bufferThread = new Thread(BufferThreadProc)
-            {
-                IsBackground = true
-            };
-            _bufferThread.Start();
 
             _rmClient.Connect(hostName, port);
         }
@@ -287,12 +227,6 @@ namespace NTDLS.CatMQ.Client
             _lastReconnectPort = port;
 
             _explicitDisconnect = false;
-
-            _bufferThread = new Thread(BufferThreadProc)
-            {
-                IsBackground = true
-            };
-            _bufferThread.Start();
 
             _rmClient.Connect(ipAddress, port);
         }
@@ -364,8 +298,9 @@ namespace NTDLS.CatMQ.Client
         {
             _explicitDisconnect = true;
             _rmClient.Disconnect(wait);
-            _bufferThread?.Join();
+            _bufferedDeliveryTask?.Wait();
         }
+
 
         /// <summary>
         /// Instructs the server to create a queue with the given name.
@@ -443,8 +378,12 @@ namespace NTDLS.CatMQ.Client
             return subscription;
         }
 
+        #region Client-side message buffering.
+
         /// <summary>
         /// Instructs the server to notify the client of messages sent to the given queue.
+        /// The messages are buffered at the client until the batch size is met or the auto flush interval is reached.
+        /// Note that buffered subscriptions fo not allow for delivery dispositions to be returned to the server and all delivered messages to this subscription will be considered consumed.
         /// </summary>
         /// <param name="queueName">Queue name to subscribe to.</param>
         /// <param name="batchSize">The number of messages to present to the subscriber event in each batch.</param>
@@ -470,8 +409,84 @@ namespace NTDLS.CatMQ.Client
                 throw new Exception(result.ErrorMessage);
             }
 
+            StartBufferedDeliveryTask();
+
             return subscription;
         }
+
+        private void StartBufferedDeliveryTask()
+        {
+            if (_bufferedDeliveryTask == null)
+            {
+                lock (this)
+                {
+                    _bufferedDeliveryTask ??= Task.Run(BufferedDeliveryTaskProc);
+                }
+            }
+        }
+
+        private void BufferedDeliveryTaskProc()
+        {
+            while (!_explicitDisconnect)
+            {
+                FlushBufferedMessages(false);
+                Thread.Sleep(1);
+            }
+
+            FlushBufferedMessages(true);
+        }
+
+        /// <summary>
+        /// Flush the entire message buffer to the subscribed event.
+        /// </summary>
+        /// <param name="ensureEmpty">Whether or not to continue until the message buffer is empty.
+        /// We do this because we *typically* allow failure-to-lock to defer the event.</param>
+        private void FlushBufferedMessages(bool ensureEmpty)
+        {
+            bool success;
+
+            do
+            {
+                success = true;
+
+                success = _messageBuffer.TryWrite(mb =>
+                {
+                    if (mb.Count == 0)
+                    {
+                        return;
+                    }
+
+                    success = _subscriptions.TryRead(s =>
+                    {
+                        foreach (var subscription in s.Values)
+                        {
+                            foreach (var messageBuffer in mb)
+                            {
+                                if (messageBuffer.Value.Count == 0)
+                                {
+                                    subscription.LastBufferFlushed = DateTime.UtcNow;
+                                }
+                                else if (messageBuffer.Value.Count >= subscription.BatchSize
+                                    || (subscription.AutoFlushInterval != TimeSpan.Zero
+                                    && (DateTime.UtcNow - subscription.LastBufferFlushed) >= subscription.AutoFlushInterval))
+                                {
+                                    if (messageBuffer.Key == subscription.Id)
+                                    {
+                                        var bufferedValueClone = messageBuffer.Value.ToList();
+                                        Task.Run(() => subscription.BatchDeliveryEvent?.Invoke(this, bufferedValueClone));
+                                        messageBuffer.Value.Clear();
+                                    }
+
+                                    subscription.LastBufferFlushed = DateTime.UtcNow;
+                                }
+                            }
+                        }
+                    }) && success;
+                }) && success;
+            } while (!success && ensureEmpty);
+        }
+
+        #endregion
 
         /// <summary>
         /// Instructs the server to stop notifying the client of messages sent to the given queue.
