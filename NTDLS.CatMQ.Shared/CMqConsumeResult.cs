@@ -15,6 +15,10 @@ namespace NTDLS.CatMQ.Shared
         /// </summary>
         public TimeSpan? DeferDuration { get; set; }
 
+        /// <summary>
+        /// Represents the result of a message consumption operation, including its disposition.
+        /// </summary>
+        /// <param name="disposition">The disposition of the consumed message, indicating the outcome of the consumption process.</param>
         public CMqConsumeResult(CMqConsumptionDisposition disposition)
         {
             Disposition = disposition;

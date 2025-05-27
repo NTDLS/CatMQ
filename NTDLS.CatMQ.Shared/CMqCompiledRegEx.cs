@@ -2,7 +2,7 @@
 
 namespace NTDLS.CatMQ.Shared
 {
-    internal partial class CompiledRegEx
+    internal partial class CMqCompiledRegEx
     {
         [GeneratedRegex(@"(,?\s*Version\s*=\s*[\d.]+)|(,?\s*Culture\s*=\s*[^,]+)|(,?\s*PublicKeyToken\s*=\s*[^,\]]+)")]
         internal static partial Regex TypeTagsRegex();

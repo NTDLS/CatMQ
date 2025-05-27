@@ -1,5 +1,11 @@
 ﻿namespace NTDLS.CatMQ.Shared
 {
+    /// <summary>
+    /// Represents the state of a message in the message queue.
+    /// </summary>
+    /// <remarks>This enumeration defines the various states a message can be in during its lifecycle within
+    /// the message queue. The state indicates whether the message is ready for delivery, actively being delivered, or
+    /// requires special handling.</remarks>
     public enum CMqMessageState
     {
         /// <summary>
@@ -24,6 +30,11 @@
         Shutdown
     }
 
+    /// <summary>
+    /// Represents the possible dispositions for a message after being processed by a subscriber.
+    /// </summary>
+    /// <remarks>This enumeration defines how a subscriber can indicate the outcome of processing a message.
+    /// The disposition affects whether the message is re-delivered, deferred, or removed from the queue.</remarks>
     public enum CMqConsumptionDisposition
     {
         /// <summary>
