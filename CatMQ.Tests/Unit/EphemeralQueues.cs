@@ -525,7 +525,7 @@ namespace CatMQ.Tests.Unit
             Assert.Equal(3, deliveryCount);
         }
 
-        [Fact(DisplayName = "MaxDeliveryAttempts shovel to dead-letter.")]
+        [Fact(DisplayName = "MaxDeliveryAttempts with dead-letter.")]
         public void TestMaxDeliveryAttemptsWithDeadLetter()
         {
             var deliveryCount = 0;
