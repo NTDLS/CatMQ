@@ -312,7 +312,7 @@ namespace NTDLS.CatMQ.Server.Server
                             //  need to break the delivery loop so the message can be removed from the queue.
                             return CMqMessageState.Drop;
                         }
-                        else if (Configuration.ConsumptionScheme == CMqConsumptionScheme.DeliveredToAllSubscribers)
+                        else if (Configuration.ConsumptionScheme == CMqConsumptionScheme.AllSubscribersSatisfied)
                         {
                             //Message was delivered and consumed, but we still need to deliver it to the remaining subscribers.
                             //We do not break the loop here, as we want to ensure that all subscribers receive a copy of the message.
@@ -344,6 +344,9 @@ namespace NTDLS.CatMQ.Server.Server
                         Statistics.IncrementDeferredDeliveryCount();
 
                         EnqueuedMessages.Read(m => m.Database.Store(message));
+
+                        //We return "Ready" so that the message can be re-delivered later and we do not deliver it to any other subscribers.
+                        return CMqMessageState.Ready;
                     }
                     else if (deliveryResult.Disposition == CMqConsumptionDisposition.DeadLetter)
                     {

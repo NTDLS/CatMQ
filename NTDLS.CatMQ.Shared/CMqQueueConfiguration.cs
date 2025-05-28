@@ -47,7 +47,7 @@ namespace NTDLS.CatMQ.Shared
         /// Determines when to remove messages from the queue as they are distributed to subscribers.
         /// </summary>
         [JsonConverter(typeof(JsonStringEnumConverter))]
-        public CMqConsumptionScheme ConsumptionScheme { get; set; } = CMqConsumptionScheme.DeliveredToAllSubscribers;
+        public CMqConsumptionScheme ConsumptionScheme { get; set; } = CMqConsumptionScheme.AllSubscribersSatisfied;
 
         /// <summary>
         /// Determines how messages are distributed to subscribers.

@@ -20,7 +20,7 @@ namespace CatMQ.Tests.Unit
             client.CreateQueue(new CMqQueueConfiguration(queueName)
             {
                 PersistenceScheme = CMqPersistenceScheme.Ephemeral,
-                ConsumptionScheme = CMqConsumptionScheme.DeliveredToAllSubscribers,
+                ConsumptionScheme = CMqConsumptionScheme.AllSubscribersSatisfied,
             });
 
             client.Subscribe(queueName, OnMessageReceived);
@@ -79,7 +79,7 @@ namespace CatMQ.Tests.Unit
             client.CreateQueue(new CMqQueueConfiguration(queueName)
             {
                 PersistenceScheme = CMqPersistenceScheme.Ephemeral,
-                ConsumptionScheme = CMqConsumptionScheme.DeliveredToAllSubscribers,
+                ConsumptionScheme = CMqConsumptionScheme.AllSubscribersSatisfied,
                 DeadLetterConfiguration = new()
                 {
                     PersistenceScheme = CMqPersistenceScheme.Ephemeral
@@ -172,7 +172,7 @@ namespace CatMQ.Tests.Unit
             client.CreateQueue(new CMqQueueConfiguration(queueName)
             {
                 PersistenceScheme = CMqPersistenceScheme.Ephemeral,
-                ConsumptionScheme = CMqConsumptionScheme.DeliveredToAllSubscribers,
+                ConsumptionScheme = CMqConsumptionScheme.AllSubscribersSatisfied,
                 DeadLetterConfiguration = new()
                 {
                     PersistenceScheme = CMqPersistenceScheme.Ephemeral
@@ -242,7 +242,7 @@ namespace CatMQ.Tests.Unit
             {
                 MaxDeliveryAttempts = 100, //This must be greater than the deferred count.
                 PersistenceScheme = CMqPersistenceScheme.Ephemeral,
-                ConsumptionScheme = CMqConsumptionScheme.DeliveredToAllSubscribers,
+                ConsumptionScheme = CMqConsumptionScheme.AllSubscribersSatisfied,
             });
 
             client.Subscribe(queueName, OnMessageReceived);
@@ -310,7 +310,7 @@ namespace CatMQ.Tests.Unit
             {
                 MaxMessageAge = maxMessageAge,
                 PersistenceScheme = CMqPersistenceScheme.Ephemeral,
-                ConsumptionScheme = CMqConsumptionScheme.DeliveredToAllSubscribers,
+                ConsumptionScheme = CMqConsumptionScheme.AllSubscribersSatisfied,
             });
 
             //Enqueue messages.
@@ -345,7 +345,7 @@ namespace CatMQ.Tests.Unit
             client.CreateQueue(new CMqQueueConfiguration(queueName)
             {
                 PersistenceScheme = CMqPersistenceScheme.Ephemeral,
-                ConsumptionScheme = CMqConsumptionScheme.DeliveredToAllSubscribers,
+                ConsumptionScheme = CMqConsumptionScheme.AllSubscribersSatisfied,
             });
 
             // Enqueue before subscribing
