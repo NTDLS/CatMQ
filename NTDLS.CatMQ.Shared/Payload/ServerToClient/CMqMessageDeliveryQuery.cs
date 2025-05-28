@@ -93,7 +93,7 @@ namespace NTDLS.CatMQ.Shared.Payload.ServerToClient
         /// the <see cref="ErrorMessage"/> property.</param>
         public CMqMessageDeliveryQueryReply(Exception exception)
         {
-            ConsumeResult = new CMqConsumeResult(CMqConsumptionDisposition.NotConsumed);
+            ConsumeResult = new CMqConsumeResult(CMqConsumptionDisposition.Exception);
             ErrorMessage = exception.Message;
         }
 
@@ -113,7 +113,7 @@ namespace NTDLS.CatMQ.Shared.Payload.ServerToClient
         /// indicating that the message has not been consumed.</remarks>
         public CMqMessageDeliveryQueryReply()
         {
-            ConsumeResult = new CMqConsumeResult(CMqConsumptionDisposition.NotConsumed);
+            ConsumeResult = new CMqConsumeResult(CMqConsumptionDisposition.NotInterested);
         }
     }
 }

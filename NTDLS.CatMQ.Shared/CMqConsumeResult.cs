@@ -37,6 +37,12 @@ namespace NTDLS.CatMQ.Shared
             => new(CMqConsumptionDisposition.NotConsumed);
 
         /// <summary>
+        /// Shortcut function that returns a CMqConsumeResult with the NotConsumed disposition.
+        /// </summary>
+        public static CMqConsumeResult NotInterested()
+            => new(CMqConsumptionDisposition.NotInterested);
+
+        /// <summary>
         /// Shortcut function that returns a CMqConsumeResult with the DeadLetter disposition.
         /// </summary>
         public static CMqConsumeResult DeadLetter()

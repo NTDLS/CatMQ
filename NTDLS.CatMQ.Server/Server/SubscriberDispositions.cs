@@ -21,7 +21,7 @@ namespace NTDLS.CatMQ.Server.Server
 
         public SubscriberDispositions(SingleMessageQueueServer messageQueue, EnqueuedMessage message)
         {
-            var completedIDs = message.FailedDeliverySubscriberIDs.Union(message.SatisfiedDeliverySubscriberIDs).ToHashSet();
+            var completedIDs = message.DeliveryLimitReachedSubscriberIDs.Union(message.SatisfiedDeliverySubscriberIDs).ToHashSet();
 
             ConsumedSubscriberIDs = message.ConsumedDeliverySubscriberIDs.ToHashSet();
 
@@ -36,9 +36,13 @@ namespace NTDLS.CatMQ.Server.Server
             RemainingSubscriberIDs ??= new();
             Remaining ??= new();
 
-            if (messageQueue.Configuration.DeliveryScheme == CMqDeliveryScheme.Balanced)
+            if (messageQueue.Configuration.DeliveryScheme == CMqDeliveryScheme.Random)
             {
                 Remaining = Remaining.OrderBy(_ => Guid.NewGuid()).ToList();
+            }
+            else if (messageQueue.Configuration.DeliveryScheme == CMqDeliveryScheme.Balanced)
+            {
+                Remaining = Remaining.OrderBy(o => o.AttemptedDeliveryCount).ToList();
             }
         }
     }

@@ -268,6 +268,9 @@ namespace NTDLS.CatMQ.Server.Server
                 return CMqMessageState.DeadLetter;
             }
 
+            var failureToDeliverSubscriberIDs = new HashSet<Guid>();
+
+
             foreach (var subscriber in subscriberDispositions.Remaining)
             {
                 if (_KeepRunning == false)
@@ -309,7 +312,7 @@ namespace NTDLS.CatMQ.Server.Server
                             //  need to break the delivery loop so the message can be removed from the queue.
                             return CMqMessageState.Drop;
                         }
-                        else if (Configuration.ConsumptionScheme == CMqConsumptionScheme.Delivered)
+                        else if (Configuration.ConsumptionScheme == CMqConsumptionScheme.DeliveredToAllSubscribers)
                         {
                             //Message was delivered and consumed, but we still need to deliver it to the remaining subscribers.
                             //We do not break the loop here, as we want to ensure that all subscribers receive a copy of the message.
@@ -321,10 +324,14 @@ namespace NTDLS.CatMQ.Server.Server
                             return CMqMessageState.DeadLetter;
                         }
                     }
+                    else if (deliveryResult.Disposition == CMqConsumptionDisposition.NotInterested)
+                    {
+                        //The message was marked as not-interested by the subscriber, so this subscriber is satisfied.
+                        message.SatisfiedDeliverySubscriberIDs.Add(subscriber.SubscriberId);
+                    }
                     else if (deliveryResult.Disposition == CMqConsumptionDisposition.NotConsumed)
                     {
-                        //The message was marked as not-consumed by the subscriber, so this subscriber is satisfied.
-                        message.SatisfiedDeliverySubscriberIDs.Add(subscriber.SubscriberId);
+                        //The message was marked as not-consumed by the subscriber, so this subscriber is NOT satisfied.
                     }
                     else if (deliveryResult.Disposition == CMqConsumptionDisposition.Defer)
                     {
@@ -352,22 +359,27 @@ namespace NTDLS.CatMQ.Server.Server
                         Statistics.IncrementExplicitDropCount();
                         return CMqMessageState.Drop;
                     }
+                    else
+                    {
+                        throw new Exception($"Unexpected delivery disposition [{deliveryResult.Disposition}] for queue [{Configuration.QueueName}].");
+                    }
                 }
                 catch (Exception ex) //Delivery failure.
                 {
+                    failureToDeliverSubscriberIDs.Add(subscriber.SubscriberId);
                     Statistics.IncrementFailedDeliveryCount();
                     subscriber.IncrementFailedDeliveryCount();
                     _queueServer.InvokeOnLog(ex.GetBaseException());
                 }
 
                 //If we have tried to deliver this message to this subscriber too many times, then mark this subscriber-message as satisfied.
-                if (Configuration.MaxDeliveryAttempts >= 0 && subscriberDeliveryStatistics.DeliveryAttemptCount >= Configuration.MaxDeliveryAttempts)
+                if (Configuration.MaxDeliveryAttempts > 0 && subscriberDeliveryStatistics.DeliveryAttemptCount >= Configuration.MaxDeliveryAttempts)
                 {
                     //Even if we reached the max delivery count, there is no need to mark this as a failure if the
                     //  subscriber is satisfied (as that indicates that the latest delivery attempt was finally successful).
                     if (message.SatisfiedDeliverySubscriberIDs.Contains(subscriber.SubscriberId) == false)
                     {
-                        message.FailedDeliverySubscriberIDs.Add(subscriber.SubscriberId);
+                        message.DeliveryLimitReachedSubscriberIDs.Add(subscriber.SubscriberId);
                     }
                 }
             }
@@ -377,10 +389,18 @@ namespace NTDLS.CatMQ.Server.Server
                 return CMqMessageState.Shutdown;
             }
 
+            bool allDeliveriesFailed = !subscriberDispositions.Remaining.Select(o => o.SubscriberId).Except(failureToDeliverSubscriberIDs).Any();
+
             //Get fresh subscriber dispositions.
             subscriberDispositions = new SubscriberDispositions(this, message);
 
-            if (subscriberDispositions.Remaining.Count == 0)
+            if (allDeliveriesFailed)
+            {
+                //All of the deliveries failed. They may even have disconnected mid-delivery and the subscriber count may now be zero.
+                //Keep the message in the queue for re-delivery later or eventual expiration.
+                return CMqMessageState.Ready;
+            }
+            else if (subscriberDispositions.Remaining.Count == 0)
             {
                 //All subscribers have received a copy of the message or have received their maximum number
                 //  of retries, so we can now remove the message from the queue.
@@ -388,7 +408,7 @@ namespace NTDLS.CatMQ.Server.Server
                 //If there were any failed deliveries, then we want to retain a copy of the message in the dead-letter queue.
                 //This is because we handle FirstConsumedSubscriber consumption schemes in the logic above, meaning that this
                 //  message was intended for successful delivery to all subscribers (which was obviously not achieved).
-                if (message.FailedDeliverySubscriberIDs.Count != 0 && Configuration.DeadLetterConfiguration != null)
+                if (message.DeliveryLimitReachedSubscriberIDs.Count != 0 && Configuration.DeadLetterConfiguration != null)
                 {
                     return CMqMessageState.DeadLetter;
                 }

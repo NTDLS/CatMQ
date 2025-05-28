@@ -73,7 +73,7 @@ namespace NTDLS.CatMQ.Server.Server
         /// Subscribers where the failed delivery count has reached the retry-attempt limit.
         /// </summary>
         [JsonIgnore]
-        public HashSet<Guid> FailedDeliverySubscriberIDs { get; set; } = new();
+        public HashSet<Guid> DeliveryLimitReachedSubscriberIDs { get; set; } = new();
 
         public EnqueuedMessage CloneForDeadLetter(string queueName, ulong serialNumber)
         {

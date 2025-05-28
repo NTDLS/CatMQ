@@ -38,8 +38,11 @@
     public enum CMqConsumptionDisposition
     {
         /// <summary>
-        /// The message was not consumed by the subscriber.
-        /// The message will not be re-attempted to the subscriber but will continue to be delivered to other subscribers.
+        /// The message was not consumed by the subscriber and delivery will not be re-attempted to this subscriber.
+        /// </summary>
+        NotInterested,
+        /// <summary>
+        /// The message was not consumed by the subscriber and delivery will be re-attempted to this subscriber.
         /// </summary>
         NotConsumed,
         /// <summary>
@@ -58,7 +61,11 @@
         /// <summary>
         /// Subscriber requesting that the message be immediately dropped from the queue and cache.
         /// </summary>
-        Drop
+        Drop,
+        /// <summary>
+        /// An exception occurred while delivering or processing the message.
+        /// </summary>
+        Exception
     }
 
     /// <summary>
@@ -69,7 +76,7 @@
         /// <summary>
         /// The messages are delivered to each subscriber, the message is removed once it is delivered to all subscribers even if they do not consume it.
         /// </summary>
-        Delivered,
+        DeliveredToAllSubscribers,
         /// <summary>
         /// The messages are delivered to each subscriber, but is removed when any one of the subscribers consumes the message.
         /// </summary>
@@ -82,13 +89,17 @@
     public enum CMqDeliveryScheme
     {
         /// <summary>
-        /// Messages are delivered to the subscribers in the order which they were subscribed.
+        /// Messages are delivered to the subscribers based on the attempted delivery count to each subscriber.
         /// </summary>
-        RoundRobbin,
+        Balanced,
         /// <summary>
         /// Messages are delivered to subscribers in a random order.
         /// </summary>
-        Balanced
+        Random,
+        /// <summary>
+        /// 
+        /// </summary>
+        gggg
     }
 
     /// <summary>

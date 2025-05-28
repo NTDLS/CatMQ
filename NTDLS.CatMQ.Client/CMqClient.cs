@@ -12,6 +12,7 @@ namespace NTDLS.CatMQ.Client
     /// Connects to a MessageServer then sends/received and processes notifications/queries.
     /// </summary>
     public class CMqClient
+        : IDisposable
     {
         private readonly RmClient _rmClient;
         private bool _explicitDisconnect = false;
@@ -196,7 +197,7 @@ namespace NTDLS.CatMQ.Client
                 }
             }
 
-            return new CMqConsumeResult(CMqConsumptionDisposition.NotConsumed);
+            return new CMqConsumeResult(CMqConsumptionDisposition.NotInterested);
         }
 
         internal void InvokeOnException(CMqClient client, string? queueName, Exception ex)
@@ -552,6 +553,15 @@ namespace NTDLS.CatMQ.Client
             {
                 throw new Exception(result.ErrorMessage);
             }
+        }
+
+        /// <summary>
+        /// Disconnects the client from the queue server.
+        /// This does not need to be called if Disconnect() is called.
+        /// </summary>
+        public void Dispose()
+        {
+            Disconnect();
         }
     }
 }

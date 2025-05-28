@@ -15,6 +15,7 @@ namespace NTDLS.CatMQ.Server
     /// Listens for connections from MessageClients and processes the incoming notifications/queries.
     /// </summary>
     public class CMqServer
+        : IDisposable
     {
         private bool _keepRunning = false;
         private readonly CMqServerConfiguration _configuration;
@@ -727,7 +728,7 @@ namespace NTDLS.CatMQ.Server
                 DeferredCount = enqueuedMessage.DeferredCount,
                 SubscriberDeliveryCount = enqueuedMessage.SubscriberMessageDeliveries.Count,
                 SatisfiedSubscriberCount = enqueuedMessage.SatisfiedDeliverySubscriberIDs.Count,
-                FailedSubscriberCount = enqueuedMessage.FailedDeliverySubscriberIDs.Count
+                FailedSubscriberCount = enqueuedMessage.DeliveryLimitReachedSubscriberIDs.Count
             };
 
             var result = await _rmServer.QueryAsync(subscriberId, message);
@@ -1044,6 +1045,15 @@ namespace NTDLS.CatMQ.Server
                 }
                 Thread.Sleep(CMqDefaults.DEFAULT_DEADLOCK_AVOIDANCE_WAIT_MS);
             }
+        }
+
+        /// <summary>
+        /// Stops the message queue server.
+        /// This does not need to be called if Stop() is called.
+        /// </summary>
+        public void Dispose()
+        {
+            Stop();
         }
 
         #endregion
