@@ -12,14 +12,16 @@ namespace NTDLS.CatMQ.Server.Server
     /// </summary>
     internal class SingleMessageQueueServer
     {
-        private readonly Thread _deliveryThread;
         private readonly CMqServer _queueServer;
+        private Task? _deliveryTask;
+        private bool _KeepRunning;
 
         internal AutoResetEvent DeliveryThreadWaitEvent = new(false);
-        internal bool KeepRunning { get; set; } = false;
 
         /// <summary>
         /// List of subscriber connection IDs.
+        /// We use OptimisticCriticalResource instead of ConcurrentDictionary to avoid
+        ///     lock interleaving thereby eliminating the possibility of deadlocks.
         /// </summary>
         internal OptimisticCriticalResource<Dictionary<Guid, CMqSubscriberDescriptor>> Subscribers { get; set; } = new();
 
@@ -36,10 +38,9 @@ namespace NTDLS.CatMQ.Server.Server
         {
             _queueServer = mqServer;
             Configuration = queueConfiguration;
-            _deliveryThread = new(DeliveryThreadProc);
         }
 
-        private void DeliveryThreadProc(object? p)
+        private async Task DeliveryThreadProc()
         {
 #if DEBUG
             Thread.CurrentThread.Name = $"DeliveryThreadProc_{Environment.CurrentManagedThreadId}";
@@ -49,7 +50,7 @@ namespace NTDLS.CatMQ.Server.Server
 
             int threadYieldBurndown = CMqDefaults.QUEUE_THREAD_DELIVERY_BURNDOWN; //Just used to omit waiting. We want to spin fast when we are delivering messages.
 
-            while (KeepRunning)
+            while (_KeepRunning)
             {
                 var now = DateTime.UtcNow;
 
@@ -106,6 +107,13 @@ namespace NTDLS.CatMQ.Server.Server
                                         message.State = CMqMessageState.DeadLetter;
                                     }
                                 }
+                                else
+                                {
+                                    //No dead-letter queue, just drop the message.
+                                    message.State = CMqMessageState.Drop;
+                                }
+
+                                Statistics.IncrementExpiredMessageCount();
                             }
                         }
 
@@ -145,10 +153,14 @@ namespace NTDLS.CatMQ.Server.Server
                         Statistics.IncrementOutstandingDeliveries();
                         topMessage.State = CMqMessageState.OutForDelivery;
 
-                        DistributeToSubscribers(topMessage).ContinueWith((t) =>
+                        try
+                        {
+                            await DistributeToSubscribers(topMessage);
+                        }
+                        finally
                         {
                             Statistics.DecrementOutstandingDeliveries();
-                        });
+                        }
                     }
                     else if (threadYieldBurndown < CMqDefaults.QUEUE_THREAD_DELIVERY_BURNDOWN)
                     {
@@ -195,10 +207,11 @@ namespace NTDLS.CatMQ.Server.Server
                     {
                         if (Configuration.DeliveryThrottle.TotalSeconds >= 1)
                         {
-                            int sleepSeconds = (int)Configuration.DeliveryThrottle.TotalSeconds;
-                            for (int sleep = 0; sleep < sleepSeconds && KeepRunning; sleep++)
+                            int sleeps = (int)(Configuration.DeliveryThrottle.TotalMilliseconds / 100);
+
+                            for (int sleep = 0; sleep < sleeps && _KeepRunning; sleep++)
                             {
-                                Thread.Sleep(1000);
+                                Thread.Sleep(100);
                             }
                         }
                         else
@@ -214,7 +227,7 @@ namespace NTDLS.CatMQ.Server.Server
                     _queueServer.InvokeOnLog(ex.GetBaseException());
                 }
 
-                if (threadYieldBurndown >= CMqDefaults.QUEUE_THREAD_DELIVERY_BURNDOWN && KeepRunning)
+                if (threadYieldBurndown >= CMqDefaults.QUEUE_THREAD_DELIVERY_BURNDOWN && _KeepRunning)
                 {
                     threadYieldBurndown = CMqDefaults.QUEUE_THREAD_DELIVERY_BURNDOWN;
                     DeliveryThreadWaitEvent.WaitOne(10);
@@ -230,8 +243,8 @@ namespace NTDLS.CatMQ.Server.Server
             }
             catch
             {
-                _queueServer.InvokeOnLog(CMqErrorLevel.Fatal, $"Failure of DistributeToSubscribersWithResolution [{Configuration.QueueName}].");
                 message.State = CMqMessageState.Ready;
+                _queueServer.InvokeOnLog(CMqErrorLevel.Fatal, $"Failure of DistributeToSubscribersWithResolution [{Configuration.QueueName}].");
             }
         }
 
@@ -244,20 +257,23 @@ namespace NTDLS.CatMQ.Server.Server
 
             if (subscriberDispositions.Remaining.Count == 0)
             {
-                //The flow control below should not allow us to ever get here, but logically I feel we need to test for it.
-                //Given that this is an "exception" to the proper flow, I think the only appropriate action to to give a
-                //warning and dead-letter the message, unless at least one subscriber has been recorded as consuming the message.
+                // The flow control below should not allow us to ever get here, but logically I feel we need to test for it.
+                // Given that this is an "exception" to the proper flow, I think the only appropriate action to to give a
+                //  warning and dead-letter the message, unless at least one subscriber has been recorded as consuming the message.
 
-                if (subscriberDispositions.ConsumedIDs.Count > 0)
+                if (subscriberDispositions.ConsumedSubscriberIDs.Count > 0)
                 {
                     message.State = CMqMessageState.Drop;
                 }
                 return CMqMessageState.DeadLetter;
             }
 
+            var failureToDeliverSubscriberIDs = new HashSet<Guid>();
+
+
             foreach (var subscriber in subscriberDispositions.Remaining)
             {
-                if (KeepRunning == false)
+                if (_KeepRunning == false)
                 {
                     return CMqMessageState.Shutdown;
                 }
@@ -296,11 +312,26 @@ namespace NTDLS.CatMQ.Server.Server
                             //  need to break the delivery loop so the message can be removed from the queue.
                             return CMqMessageState.Drop;
                         }
+                        else if (Configuration.ConsumptionScheme == CMqConsumptionScheme.AllSubscribersSatisfied)
+                        {
+                            //Message was delivered and consumed, but we still need to deliver it to the remaining subscribers.
+                            //We do not break the loop here, as we want to ensure that all subscribers receive a copy of the message.
+                        }
+                        else
+                        {
+                            //This is an unexpected consumption scheme, we should not be here.
+                            _queueServer.InvokeOnLog(CMqErrorLevel.Fatal, $"Unexpected consumption scheme [{Configuration.ConsumptionScheme}] for queue [{Configuration.QueueName}].");
+                            return CMqMessageState.DeadLetter;
+                        }
+                    }
+                    else if (deliveryResult.Disposition == CMqConsumptionDisposition.NotInterested)
+                    {
+                        //The message was marked as not-interested by the subscriber, so this subscriber is satisfied.
+                        message.SatisfiedDeliverySubscriberIDs.Add(subscriber.SubscriberId);
                     }
                     else if (deliveryResult.Disposition == CMqConsumptionDisposition.NotConsumed)
                     {
-                        //The message was marked as not-consumed by the subscriber, so this subscriber is satisfied.
-                        message.SatisfiedDeliverySubscriberIDs.Add(subscriber.SubscriberId);
+                        //The message was marked as not-consumed by the subscriber, so this subscriber is NOT satisfied.
                     }
                     else if (deliveryResult.Disposition == CMqConsumptionDisposition.Defer)
                     {
@@ -313,51 +344,66 @@ namespace NTDLS.CatMQ.Server.Server
                         Statistics.IncrementDeferredDeliveryCount();
 
                         EnqueuedMessages.Read(m => m.Database.Store(message));
+
+                        //We return "Ready" so that the message can be re-delivered later and we do not deliver it to any other subscribers.
+                        return CMqMessageState.Ready;
                     }
                     else if (deliveryResult.Disposition == CMqConsumptionDisposition.DeadLetter)
                     {
-                        //When a subscriber responds with "DeadLetter" or "Drop", we short-circuit
+                        //When a subscriber responds with "DeadLetter" we short-circuit
                         //  the delivery flow logic and take the requested action on the message.
                         Statistics.IncrementExplicitDeadLetterCount();
                         return CMqMessageState.DeadLetter;
                     }
                     else if (deliveryResult.Disposition == CMqConsumptionDisposition.Drop)
                     {
-                        //When a subscriber responds with "DeadLetter" or "Drop", we short-circuit
+                        //When a subscriber responds with "Drop", we short-circuit
                         //  the delivery flow logic and take the requested action on the message.
                         Statistics.IncrementExplicitDropCount();
                         return CMqMessageState.Drop;
                     }
+                    else
+                    {
+                        throw new Exception($"Unexpected delivery disposition [{deliveryResult.Disposition}] for queue [{Configuration.QueueName}].");
+                    }
                 }
                 catch (Exception ex) //Delivery failure.
                 {
+                    failureToDeliverSubscriberIDs.Add(subscriber.SubscriberId);
                     Statistics.IncrementFailedDeliveryCount();
                     subscriber.IncrementFailedDeliveryCount();
                     _queueServer.InvokeOnLog(ex.GetBaseException());
                 }
 
                 //If we have tried to deliver this message to this subscriber too many times, then mark this subscriber-message as satisfied.
-                if (Configuration.MaxDeliveryAttempts >= 0 && subscriberDeliveryStatistics.DeliveryAttemptCount >= Configuration.MaxDeliveryAttempts)
+                if (Configuration.MaxDeliveryAttempts > 0 && subscriberDeliveryStatistics.DeliveryAttemptCount >= Configuration.MaxDeliveryAttempts)
                 {
-                    //Even if we reached the max delivery count, there is not need to mark this as a
-                    // failure if the subscriber is satisfied, as this would indicate that the latest
-                    //  delivery attempt was finally successful.
+                    //Even if we reached the max delivery count, there is no need to mark this as a failure if the
+                    //  subscriber is satisfied (as that indicates that the latest delivery attempt was finally successful).
                     if (message.SatisfiedDeliverySubscriberIDs.Contains(subscriber.SubscriberId) == false)
                     {
-                        message.FailedDeliverySubscriberIDs.Add(subscriber.SubscriberId);
+                        message.DeliveryLimitReachedSubscriberIDs.Add(subscriber.SubscriberId);
                     }
                 }
             }
 
-            if (KeepRunning == false)
+            if (_KeepRunning == false)
             {
                 return CMqMessageState.Shutdown;
             }
 
+            bool allDeliveriesFailed = !subscriberDispositions.Remaining.Select(o => o.SubscriberId).Except(failureToDeliverSubscriberIDs).Any();
+
             //Get fresh subscriber dispositions.
             subscriberDispositions = new SubscriberDispositions(this, message);
 
-            if (subscriberDispositions.Remaining.Count == 0)
+            if (allDeliveriesFailed)
+            {
+                //All of the deliveries failed. They may even have disconnected mid-delivery and the subscriber count may now be zero.
+                //Keep the message in the queue for re-delivery later or eventual expiration.
+                return CMqMessageState.Ready;
+            }
+            else if (subscriberDispositions.Remaining.Count == 0)
             {
                 //All subscribers have received a copy of the message or have received their maximum number
                 //  of retries, so we can now remove the message from the queue.
@@ -365,7 +411,7 @@ namespace NTDLS.CatMQ.Server.Server
                 //If there were any failed deliveries, then we want to retain a copy of the message in the dead-letter queue.
                 //This is because we handle FirstConsumedSubscriber consumption schemes in the logic above, meaning that this
                 //  message was intended for successful delivery to all subscribers (which was obviously not achieved).
-                if (message.FailedDeliverySubscriberIDs.Count != 0 && Configuration.DeadLetterConfiguration != null)
+                if (message.DeliveryLimitReachedSubscriberIDs.Count != 0 && Configuration.DeadLetterConfiguration != null)
                 {
                     return CMqMessageState.DeadLetter;
                 }
@@ -473,23 +519,23 @@ namespace NTDLS.CatMQ.Server.Server
             });
         }
 
-        public void StartAsync()
+        public void Start()
         {
             _queueServer.InvokeOnLog(CMqErrorLevel.Information, $"Starting delivery thread for [{Configuration.QueueName}].");
-            KeepRunning = true;
-            _deliveryThread.Start();
+            _KeepRunning = true;
+            _deliveryTask = Task.Run(() => DeliveryThreadProc());
         }
 
-        public void StopAsync()
+        public void SignalShutdown()
         {
             _queueServer.InvokeOnLog(CMqErrorLevel.Information, $"Signaling shutdown for [{Configuration.QueueName}].");
-            KeepRunning = false;
+            _KeepRunning = false;
         }
 
-        public void WaitOnStop()
+        public void WaitForShutdown()
         {
             _queueServer.InvokeOnLog(CMqErrorLevel.Information, $"Waiting on delivery thread to quit for [{Configuration.QueueName}].");
-            _deliveryThread.Join();
+            _deliveryTask?.Wait();
 
             _queueServer.InvokeOnLog(CMqErrorLevel.Information, $"Shutting down database connection for [{Configuration.QueueName}].");
             EnqueuedMessages.Write(m =>

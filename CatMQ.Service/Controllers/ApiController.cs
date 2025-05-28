@@ -19,7 +19,7 @@ namespace CatMQ.Service.Controllers
         public IActionResult Enqueue(string queueName, string assemblyQualifiedTypeName, [FromBody] dynamic messageJson)
         {
             string jsonText = messageJson.ToString();
-            _mqServer.EnqueueMessage(queueName, null, assemblyQualifiedTypeName, jsonText);
+            _mqServer.Enqueue(queueName, null, assemblyQualifiedTypeName, jsonText);
             return Ok();
         }
 

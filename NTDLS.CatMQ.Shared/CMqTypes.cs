@@ -1,5 +1,11 @@
 ﻿namespace NTDLS.CatMQ.Shared
 {
+    /// <summary>
+    /// Represents the state of a message in the message queue.
+    /// </summary>
+    /// <remarks>This enumeration defines the various states a message can be in during its lifecycle within
+    /// the message queue. The state indicates whether the message is ready for delivery, actively being delivered, or
+    /// requires special handling.</remarks>
     public enum CMqMessageState
     {
         /// <summary>
@@ -24,11 +30,19 @@
         Shutdown
     }
 
+    /// <summary>
+    /// Represents the possible dispositions for a message after being processed by a subscriber.
+    /// </summary>
+    /// <remarks>This enumeration defines how a subscriber can indicate the outcome of processing a message.
+    /// The disposition affects whether the message is re-delivered, deferred, or removed from the queue.</remarks>
     public enum CMqConsumptionDisposition
     {
         /// <summary>
-        /// The message was not consumed by the subscriber.
-        /// The message will not be re-attempted to the subscriber but will continue to be delivered to other subscribers.
+        /// The message was not consumed by the subscriber and delivery will not be re-attempted to this subscriber.
+        /// </summary>
+        NotInterested,
+        /// <summary>
+        /// The message was not consumed by the subscriber and delivery will be re-attempted to this subscriber.
         /// </summary>
         NotConsumed,
         /// <summary>
@@ -47,7 +61,11 @@
         /// <summary>
         /// Subscriber requesting that the message be immediately dropped from the queue and cache.
         /// </summary>
-        Drop
+        Drop,
+        /// <summary>
+        /// An exception occurred while delivering or processing the message.
+        /// </summary>
+        Exception
     }
 
     /// <summary>
@@ -56,13 +74,13 @@
     public enum CMqConsumptionScheme
     {
         /// <summary>
-        /// The messages are delivered to each subscriber, the message is removed once it is delivered to all subscribers even if they do not consume it.
+        /// The messages are delivered to each subscriber, the message is removed once it is delivered to all subscribers and they have consumed or explicitly rejected it.
         /// </summary>
-        Delivered,
+        AllSubscribersSatisfied,
         /// <summary>
-        /// The messages are delivered to each subscriber, but is removed when any one of the subscribers consumes the message.
+        /// The messages are delivered to subscribers, but is removed and delivery is stopped when any one of the subscribers consumes the message.
         /// </summary>
-        FirstConsumedSubscriber
+        FirstConsumedSubscriber,
     }
 
     /// <summary>
@@ -71,13 +89,17 @@
     public enum CMqDeliveryScheme
     {
         /// <summary>
-        /// Messages are delivered to the subscribers in the order which they were subscribed.
+        /// Messages are delivered to the subscribers based on the attempted delivery count to each subscriber.
         /// </summary>
-        RoundRobbin,
+        Balanced,
         /// <summary>
         /// Messages are delivered to subscribers in a random order.
         /// </summary>
-        Balanced
+        Random,
+        /// <summary>
+        /// 
+        /// </summary>
+        gggg
     }
 
     /// <summary>

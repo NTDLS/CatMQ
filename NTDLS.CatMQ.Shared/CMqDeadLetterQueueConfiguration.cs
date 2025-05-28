@@ -26,13 +26,13 @@ namespace NTDLS.CatMQ.Shared
         /// Determines when to remove messages from the queue as they are distributed to subscribers.
         /// </summary>
         [JsonConverter(typeof(JsonStringEnumConverter))]
-        public CMqConsumptionScheme ConsumptionScheme { get; set; } = CMqConsumptionScheme.Delivered;
+        public CMqConsumptionScheme ConsumptionScheme { get; set; } = CMqConsumptionScheme.AllSubscribersSatisfied;
 
         /// <summary>
         /// Determines how messages are distributed to subscribers.
         /// </summary>
         [JsonConverter(typeof(JsonStringEnumConverter))]
-        public CMqDeliveryScheme DeliveryScheme { get; set; } = CMqDeliveryScheme.Balanced;
+        public CMqDeliveryScheme DeliveryScheme { get; set; } = CMqDeliveryScheme.Random;
 
         /// <summary>
         /// Whether the queue is persisted or ephemeral.
@@ -47,6 +47,17 @@ namespace NTDLS.CatMQ.Shared
         {
         }
 
+        /// <summary>
+        /// Converts the current queue settings into a <see cref="CMqQueueConfiguration"/> instance configured as a
+        /// dead-letter queue.
+        /// </summary>
+        /// <remarks>The generated dead-letter queue configuration uses the parent queue name to derive
+        /// its name by appending ".dlq". The configuration is tailored for handling undeliverable messages, with
+        /// properties such as <see cref="CMqQueueConfiguration.IsDeadLetter"/> set to <see langword="true"/>.</remarks>
+        /// <param name="parentQueueName">The name of the parent queue. This value is used to generate the name of the dead-letter queue.</param>
+        /// <returns>A <see cref="CMqQueueConfiguration"/> instance representing the dead-letter queue configuration. The
+        /// returned configuration includes properties such as <see cref="CMqQueueConfiguration.IsDeadLetter"/>, <see
+        /// cref="CMqQueueConfiguration.MaxMessageAge"/>, and <see cref="CMqQueueConfiguration.MaxDeliveryAttempts"/>.</returns>
         public CMqQueueConfiguration ToConfiguration(string parentQueueName)
         {
             return new CMqQueueConfiguration($"{parentQueueName}.dlq")

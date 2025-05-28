@@ -1,5 +1,11 @@
 ﻿namespace NTDLS.CatMQ.Shared
 {
+    /// <summary>
+    /// Provides default configuration values for a message queue system.
+    /// </summary>
+    /// <remarks>This class contains constants that define default settings for various aspects of the message
+    /// queue system, such as buffer sizes, timeout durations, and delivery thread behavior. These values are intended
+    /// to be used as sensible defaults but can be overridden in specific implementations if needed.</remarks>
     public static class CMqDefaults
     {
         /// <summary>

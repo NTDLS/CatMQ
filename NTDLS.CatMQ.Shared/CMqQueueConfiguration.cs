@@ -34,7 +34,7 @@ namespace NTDLS.CatMQ.Shared
         public bool IsDeadLetter { get; set; } = false;
 
         /// <summary>
-        /// The maximum number of times the server will attempt to deliver any message to a subscriber before giving up. 0 = infinite.
+        /// The maximum number of times the server will attempt to deliver any message to a subscriber before giving up, this includes deferred deliveries. 0 = infinite.
         /// </summary>
         public int MaxDeliveryAttempts { get; set; } = 10;
 
@@ -47,13 +47,13 @@ namespace NTDLS.CatMQ.Shared
         /// Determines when to remove messages from the queue as they are distributed to subscribers.
         /// </summary>
         [JsonConverter(typeof(JsonStringEnumConverter))]
-        public CMqConsumptionScheme ConsumptionScheme { get; set; } = CMqConsumptionScheme.Delivered;
+        public CMqConsumptionScheme ConsumptionScheme { get; set; } = CMqConsumptionScheme.AllSubscribersSatisfied;
 
         /// <summary>
         /// Determines how messages are distributed to subscribers.
         /// </summary>
         [JsonConverter(typeof(JsonStringEnumConverter))]
-        public CMqDeliveryScheme DeliveryScheme { get; set; } = CMqDeliveryScheme.Balanced;
+        public CMqDeliveryScheme DeliveryScheme { get; set; } = CMqDeliveryScheme.Random;
 
         /// <summary>
         /// Whether the queue is persisted or ephemeral.
@@ -76,7 +76,6 @@ namespace NTDLS.CatMQ.Shared
         /// <summary>
         /// Instantiates a new instance of CMqQueueConfiguration.
         /// </summary>
-        /// <param name="queueName"></param>
         public CMqQueueConfiguration(string queueName)
         {
             QueueName = queueName;

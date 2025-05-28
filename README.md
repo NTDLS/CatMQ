@@ -18,6 +18,7 @@ So, we built one. __Welcome to CatMQ: a reliable yet slim message queue.__
 
 ## See also:
  - https://github.com/NTDLS/KitKey
+ - https://github.com/NTDLS/NTDLS.ReliableMessaging
 
 ## Server
 Running the server is as simple as downloading and installing the [dedicated CatMQ Service](https://github.com/NTDLS/CatMQ/releases), which is a platform independent service that includes a web management interface.
