@@ -239,7 +239,7 @@ namespace NTDLS.CatMQ.Server.Server
         {
             try
             {
-                message.State = await DistributeToSubscribersWithResolution(message);
+                message.State = await DistributeToSubscribersWithDisposition(message);
             }
             catch
             {
@@ -248,10 +248,11 @@ namespace NTDLS.CatMQ.Server.Server
             }
         }
 
+
         /// <summary>
-        /// Delivers the message to any remaining subscribers resulting in a defined state for the message
+        /// Delivers the message to any remaining subscribers and waits for a disposition from the subscriber.
         /// </summary>
-        private async Task<CMqMessageState> DistributeToSubscribersWithResolution(EnqueuedMessage message)
+        private async Task<CMqMessageState> DistributeToSubscribersWithDisposition(EnqueuedMessage message)
         {
             var subscriberDispositions = new SubscriberDispositions(this, message);
 
@@ -269,7 +270,6 @@ namespace NTDLS.CatMQ.Server.Server
             }
 
             var failureToDeliverSubscriberIDs = new HashSet<Guid>();
-
 
             foreach (var subscriber in subscriberDispositions.Remaining)
             {
@@ -293,7 +293,7 @@ namespace NTDLS.CatMQ.Server.Server
                 {
                     subscriber.IncrementAttemptedDeliveryCount();
 
-                    var deliveryResult = await _queueServer.DeliverMessage(subscriber.SubscriberId, Configuration.QueueName, message);
+                    var deliveryResult = await _queueServer.DeliverMessageWithResult(subscriber.SubscriberId, Configuration.QueueName, message);
 
                     Statistics.IncrementDeliveredMessageCount();
                     subscriber.IncrementSuccessfulDeliveryCount();

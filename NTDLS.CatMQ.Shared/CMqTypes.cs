@@ -80,7 +80,7 @@
         /// <summary>
         /// The messages are delivered to subscribers, but is removed and delivery is stopped when any one of the subscribers consumes the message.
         /// </summary>
-        FirstConsumedSubscriber,
+        FirstConsumedSubscriber
     }
 
     /// <summary>
@@ -96,10 +96,6 @@
         /// Messages are delivered to subscribers in a random order.
         /// </summary>
         Random,
-        /// <summary>
-        /// 
-        /// </summary>
-        gggg
     }
 
     /// <summary>

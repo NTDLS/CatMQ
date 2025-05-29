@@ -203,7 +203,6 @@ namespace NTDLS.CatMQ.Client
         internal void InvokeOnException(CMqClient client, string? queueName, Exception ex)
             => OnException?.Invoke(client, queueName, ex);
 
-
         /// <summary>
         /// Connects the client to a queue server.
         /// </summary>
