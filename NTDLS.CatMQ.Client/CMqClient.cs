@@ -73,15 +73,13 @@ namespace NTDLS.CatMQ.Client
 
             var rmConfiguration = new RmConfiguration()
             {
-                InitialReceiveBufferSize = configuration.InitialReceiveBufferSize,
-                MaxReceiveBufferSize = configuration.MaxReceiveBufferSize,
-                QueryTimeout = configuration.QueryTimeout,
-                ReceiveBufferGrowthRate = configuration.ReceiveBufferGrowthRate
+                InitialReceiveBufferSize = _configuration.InitialReceiveBufferSize,
+                MaxReceiveBufferSize = _configuration.MaxReceiveBufferSize,
+                QueryTimeout = _configuration.QueryTimeout,
+                ReceiveBufferGrowthRate = _configuration.ReceiveBufferGrowthRate
             };
 
             _rmClient = new RmClient(rmConfiguration);
-            _rmClient.SetCompressionProvider(new RmDeflateCompressionProvider());
-
             _rmClient.AddHandler(new InternalClientQueryHandlers(this));
         }
 
@@ -92,12 +90,17 @@ namespace NTDLS.CatMQ.Client
         {
             _configuration = new CMqClientConfiguration();
 
-            _rmClient = new RmClient();
-            _rmClient.SetCompressionProvider(new RmDeflateCompressionProvider());
+            var rmConfiguration = new RmConfiguration()
+            {
+                InitialReceiveBufferSize = _configuration.InitialReceiveBufferSize,
+                MaxReceiveBufferSize = _configuration.MaxReceiveBufferSize,
+                QueryTimeout = _configuration.QueryTimeout,
+                ReceiveBufferGrowthRate = _configuration.ReceiveBufferGrowthRate
+            };
 
+            _rmClient = new RmClient(rmConfiguration);
             _rmClient.OnConnected += RmClient_OnConnected;
             _rmClient.OnDisconnected += RmClient_OnDisconnected;
-
             _rmClient.AddHandler(new InternalClientQueryHandlers(this));
         }
 

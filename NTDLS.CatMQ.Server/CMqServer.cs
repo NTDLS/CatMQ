@@ -46,17 +46,16 @@ namespace NTDLS.CatMQ.Server
 
             var rmConfiguration = new RmConfiguration()
             {
-                InitialReceiveBufferSize = configuration.InitialReceiveBufferSize,
-                MaxReceiveBufferSize = configuration.MaxReceiveBufferSize,
-                QueryTimeout = TimeSpan.FromSeconds(configuration.AcknowledgmentTimeoutSeconds),
-                ReceiveBufferGrowthRate = configuration.ReceiveBufferGrowthRate,
+                InitialReceiveBufferSize = _configuration.InitialReceiveBufferSize,
+                MaxReceiveBufferSize = _configuration.MaxReceiveBufferSize,
+                QueryTimeout = TimeSpan.FromSeconds(_configuration.AcknowledgmentTimeoutSeconds),
+                ReceiveBufferGrowthRate = _configuration.ReceiveBufferGrowthRate,
+                CompressionProvider = new RmDeflateCompressionProvider(),
             };
 
             _rmServer = new RmServer(rmConfiguration);
-            _rmServer.SetCompressionProvider(new RmDeflateCompressionProvider());
             _rmServer.OnException += RmServer_OnException;
             _rmServer.OnDisconnected += RmServer_OnDisconnected;
-
             _rmServer.AddHandler(new InternalServerQueryHandlers(this));
         }
 
@@ -66,11 +65,19 @@ namespace NTDLS.CatMQ.Server
         public CMqServer()
         {
             _configuration = new CMqServerConfiguration();
-            _rmServer = new RmServer();
-            _rmServer.SetCompressionProvider(new RmDeflateCompressionProvider());
+
+            var rmConfiguration = new RmConfiguration()
+            {
+                InitialReceiveBufferSize = _configuration.InitialReceiveBufferSize,
+                MaxReceiveBufferSize = _configuration.MaxReceiveBufferSize,
+                QueryTimeout = TimeSpan.FromSeconds(_configuration.AcknowledgmentTimeoutSeconds),
+                ReceiveBufferGrowthRate = _configuration.ReceiveBufferGrowthRate,
+                CompressionProvider = new RmDeflateCompressionProvider(),
+            };
+
+            _rmServer = new RmServer(rmConfiguration);
             _rmServer.OnException += RmServer_OnException;
             _rmServer.OnDisconnected += RmServer_OnDisconnected;
-
             _rmServer.AddHandler(new InternalServerQueryHandlers(this));
         }
 
