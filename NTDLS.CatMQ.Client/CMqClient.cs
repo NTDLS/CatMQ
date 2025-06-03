@@ -76,7 +76,8 @@ namespace NTDLS.CatMQ.Client
                 InitialReceiveBufferSize = _configuration.InitialReceiveBufferSize,
                 MaxReceiveBufferSize = _configuration.MaxReceiveBufferSize,
                 QueryTimeout = _configuration.QueryTimeout,
-                ReceiveBufferGrowthRate = _configuration.ReceiveBufferGrowthRate
+                ReceiveBufferGrowthRate = _configuration.ReceiveBufferGrowthRate,
+                CompressionProvider = new RmDeflateCompressionProvider()
             };
 
             _rmClient = new RmClient(rmConfiguration);
@@ -95,7 +96,8 @@ namespace NTDLS.CatMQ.Client
                 InitialReceiveBufferSize = _configuration.InitialReceiveBufferSize,
                 MaxReceiveBufferSize = _configuration.MaxReceiveBufferSize,
                 QueryTimeout = _configuration.QueryTimeout,
-                ReceiveBufferGrowthRate = _configuration.ReceiveBufferGrowthRate
+                ReceiveBufferGrowthRate = _configuration.ReceiveBufferGrowthRate,
+                CompressionProvider = new RmDeflateCompressionProvider()
             };
 
             _rmClient = new RmClient(rmConfiguration);
