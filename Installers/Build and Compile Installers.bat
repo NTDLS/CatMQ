@@ -8,9 +8,9 @@ rd output /q /s
 md output
 md publish
 
-dotnet publish ..\CatMQ.Service -c Release -o publish\win-x64 --runtime win-x64 --self-contained false
+dotnet publish ..\CatMQ.Service -c Release -o publish\win-x64 --runtime win-x64 --self-contained false -f net10.0
 del publish\win-x64\*.pdb /q
-dotnet publish ..\CatMQ.Service -c Release -o publish\linux-x64 --runtime linux-x64 --self-contained false
+dotnet publish ..\CatMQ.Service -c Release -o publish\linux-x64 --runtime linux-x64 --self-contained false -f net10.0
 del publish\linux-x64\*.pdb /q
 
 7z.exe a -tzip -r -mx9 ".\output\CatMQ.linux.x64.zip" ".\publish\linux-x64\*.*"

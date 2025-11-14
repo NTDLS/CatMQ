@@ -1,4 +1,4 @@
-#define AppVersion "2.4.7"
+#define AppVersion "2.4.8"
 
 [Setup]
 ;-- Main Setup Information
