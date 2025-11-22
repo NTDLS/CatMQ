@@ -293,7 +293,7 @@ namespace NTDLS.CatMQ.Server.Server
                 {
                     subscriber.IncrementAttemptedDeliveryCount();
 
-                    var deliveryResult = await _queueServer.DeliverMessageWithResult(subscriber.SubscriberId, Configuration.QueueName, message);
+                    var deliveryResult = await _queueServer.DeliverMessageWithResultAsync(subscriber.SubscriberId, Configuration.QueueName, message);
 
                     Statistics.IncrementDeliveredMessageCount();
                     subscriber.IncrementSuccessfulDeliveryCount();

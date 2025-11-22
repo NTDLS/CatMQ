@@ -725,7 +725,7 @@ namespace NTDLS.CatMQ.Server
         /// <summary>
         /// Deliver a message from a server queue to a subscribed client.
         /// </summary>
-        internal async Task<CMqConsumeResult> DeliverMessageWithResult(Guid subscriberId, string queueName, EnqueuedMessage enqueuedMessage)
+        internal async Task<CMqConsumeResult> DeliverMessageWithResultAsync(Guid subscriberId, string queueName, EnqueuedMessage enqueuedMessage)
         {
             var message = new CMqMessageDeliveryQuery(queueName, enqueuedMessage.SerialNumber,
                 enqueuedMessage.AssemblyQualifiedTypeName, enqueuedMessage.MessageJson)
@@ -739,10 +739,7 @@ namespace NTDLS.CatMQ.Server
             };
 
             var result = await _rmServer.QueryAsync(subscriberId, message);
-            if (string.IsNullOrEmpty(result.ErrorMessage) == false)
-            {
-                throw new Exception(result.ErrorMessage);
-            }
+            result.ThrowIfFailed();
             return result.ConsumeResult;
         }
 

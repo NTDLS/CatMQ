@@ -67,5 +67,19 @@ namespace NTDLS.CatMQ.Shared.Payload.ClientToServer
         public CMqCreateQueueQueryReply()
         {
         }
+
+        /// <summary>
+        /// Throws an exception if the current operation did not succeed.
+        /// </summary>
+        /// <remarks>Use this method to enforce that the operation completed successfully. If the
+        /// operation failed, an exception is thrown to indicate the error condition.</remarks>
+        /// <exception cref="Exception">Thrown if the operation has failed. The exception message contains the associated error message.</exception>
+        public void ThrowIfFailed()
+        {
+            if (!IsSuccess)
+            {
+                throw new Exception(ErrorMessage);
+            }
+        }
     }
 }
