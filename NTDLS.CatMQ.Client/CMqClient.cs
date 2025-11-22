@@ -609,7 +609,7 @@ namespace NTDLS.CatMQ.Client
         /// <param name="queueName">Name of the queue in which to place the message into.</param>
         /// <param name="message">Payload message inheriting from ICMqMessage.</param>
         /// <param name="options">Options for message enqueuing.</param>
-        public async Task EnqueueAsync<T>(string queueName, T message, EnqueueOptions? options = null)
+        public async Task EnqueueAsync<T>(string queueName, T message, CMqEnqueueOptions? options = null)
             where T : ICMqMessage
         {
             string? messageJson;
@@ -637,7 +637,7 @@ namespace NTDLS.CatMQ.Client
         /// <param name="assemblyQualifiedName">Fully assembly qualified type of the message type for deserialization.</param>
         /// <param name="messageJson">Json for payload message of type inheriting from ICMqMessage.</param>
         /// <param name="options">Options for message enqueuing.</param>
-        public async Task EnqueueAsync(string queueName, string assemblyQualifiedName, string messageJson, EnqueueOptions? options = null)
+        public async Task EnqueueAsync(string queueName, string assemblyQualifiedName, string messageJson, CMqEnqueueOptions? options = null)
         {
             var result = await _rmClient.QueryAsync(new CMqEnqueueMessageToQueue(
                 queueName, options?.DeferDeliveryDuration, assemblyQualifiedName, messageJson), options?.ServerDeliveryTimeout);
@@ -652,7 +652,7 @@ namespace NTDLS.CatMQ.Client
         /// <param name="queueName">Name of the queue in which to place the message into.</param>
         /// <param name="message">Payload message inheriting from ICMqMessage.</param>
         /// <param name="options">Options for message enqueuing.</param>
-        public void Enqueue<T>(string queueName, T message, EnqueueOptions? options = null)
+        public void Enqueue<T>(string queueName, T message, CMqEnqueueOptions? options = null)
             where T : ICMqMessage
         {
             string? messageJson;
@@ -680,7 +680,7 @@ namespace NTDLS.CatMQ.Client
         /// <param name="assemblyQualifiedName">Fully assembly qualified type of the message type for deserialization.</param>
         /// <param name="messageJson">Json for payload message of type inheriting from ICMqMessage.</param>
         /// <param name="options">Options for message enqueuing.</param>
-        public void Enqueue(string queueName, string assemblyQualifiedName, string messageJson, EnqueueOptions? options = null)
+        public void Enqueue(string queueName, string assemblyQualifiedName, string messageJson, CMqEnqueueOptions? options = null)
         {
             var result = _rmClient.Query(new CMqEnqueueMessageToQueue(
                 queueName, options?.DeferDeliveryDuration, assemblyQualifiedName, messageJson), options?.ServerDeliveryTimeout).Result;

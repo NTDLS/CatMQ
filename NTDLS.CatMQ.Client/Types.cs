@@ -17,7 +17,7 @@ namespace NTDLS.CatMQ.Client
     /// Represents options for configuring message enqueueing behavior, such as delivery delay and server confirmation
     /// timeouts.
     /// </summary>
-    public class EnqueueOptions
+    public class CMqEnqueueOptions
     {
         /// <summary>
         /// Amount of time, when if set, which the server will delay delivery of the message to subscribers.
