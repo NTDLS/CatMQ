@@ -376,6 +376,7 @@ namespace NTDLS.CatMQ.Server
                                             Timestamp = message.Timestamp,
                                             SubscriberCount = sKVP.Count,
                                             DeferredUntil = message.DeferredUntil,
+                                            DeferredDeliveryCount = message.DeferredCount,
                                             SubscriberMessageDeliveries = message.SubscriberMessageDeliveries.Keys.ToHashSet(),
                                             SatisfiedSubscribersSubscriberIDs = message.SatisfiedDeliverySubscriberIDs,
                                             AssemblyQualifiedTypeName = message.AssemblyQualifiedTypeName,
@@ -407,6 +408,7 @@ namespace NTDLS.CatMQ.Server
                                                 Timestamp = persistedMessage.Timestamp,
                                                 SubscriberCount = sKVP.Count,
                                                 DeferredUntil = persistedMessage.DeferredUntil,
+                                                DeferredDeliveryCount = persistedMessage.DeferredCount,
                                                 SubscriberMessageDeliveries = persistedMessage.SubscriberMessageDeliveries.Keys.ToHashSet(),
                                                 SatisfiedSubscribersSubscriberIDs = persistedMessage.SatisfiedDeliverySubscriberIDs,
                                                 AssemblyQualifiedTypeName = persistedMessage.AssemblyQualifiedTypeName,
@@ -495,6 +497,8 @@ namespace NTDLS.CatMQ.Server
                                     SatisfiedSubscribersSubscriberIDs = persistedMessage.SatisfiedDeliverySubscriberIDs,
                                     AssemblyQualifiedTypeName = persistedMessage.AssemblyQualifiedTypeName,
                                     MessageJson = persistedMessage.MessageJson,
+                                    DeferredUntil = persistedMessage.DeferredUntil,
+                                    DeferredDeliveryCount = persistedMessage.DeferredCount
                                 };
                             }
                         }) && success;

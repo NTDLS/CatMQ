@@ -30,14 +30,14 @@
             <table class="table table-striped table-bordered">
                 <thead class="table-light">
                     <tr>
-                        <th colspan="6">Metadata</th>
+                        <th colspan="7">Metadata</th>
                     </tr>
                 </thead>
                 <thead class="table-light">
                     <tr>
-                        <th>Serial#</th>
+                        <th>Serial</th>
                         <th>Timestamp</th>
-                        <th>Deferred Until</th>
+                        <th>Due</th>
                         <th>Deferred</th>
                         <th>Delivered</th>
                         <th>Consumed</th>
@@ -48,7 +48,7 @@
                     <tr>
                         <td>@Model.Message.SerialNumber</td>
                         <td>@Model.Message.Timestamp</td>
-                        <td>@Model.Message.DeferredUntil.ToString()</td>
+                        <td>@(Model.Message.DeferredUntil?.ToString() ?? "asap")</td>
                         <td>@Model.Message.DeferredDeliveryCount.ToString("n0")</td>
                         <td>@Model.Message.SubscriberMessageDeliveries.Count.ToString("n0")</td>
                         <td>@Model.Message.SatisfiedSubscribersSubscriberIDs.Count.ToString("n0")</td>
