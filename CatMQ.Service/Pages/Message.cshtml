@@ -37,6 +37,7 @@
                     <tr>
                         <th>Serial#</th>
                         <th>Timestamp</th>
+                        <th>Deferred Until</th>
                         <th>Deferred</th>
                         <th>Delivered</th>
                         <th>Consumed</th>
@@ -48,6 +49,7 @@
                         <td>@Model.Message.SerialNumber</td>
                         <td>@Model.Message.Timestamp</td>
                         <td>@Model.Message.DeferredUntil.ToString()</td>
+                        <td>@Model.Message.DeferredDeliveryCount.ToString("n0")</td>
                         <td>@Model.Message.SubscriberMessageDeliveries.Count.ToString("n0")</td>
                         <td>@Model.Message.SatisfiedSubscribersSubscriberIDs.Count.ToString("n0")</td>
                         <td>@Model.Message.AssemblyQualifiedTypeName</td>

@@ -474,6 +474,8 @@ namespace NTDLS.CatMQ.Server
                                     SatisfiedSubscribersSubscriberIDs = message.SatisfiedDeliverySubscriberIDs,
                                     AssemblyQualifiedTypeName = message.AssemblyQualifiedTypeName,
                                     MessageJson = message.MessageJson,
+                                    DeferredUntil = message.DeferredUntil,
+                                    DeferredDeliveryCount = message.DeferredCount
                                 };
                             }
                             else if (messageQueue.Configuration.PersistenceScheme == CMqPersistenceScheme.Persistent)

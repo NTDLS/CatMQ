@@ -36,6 +36,11 @@
         public DateTime? DeferredUntil { get; set; }
 
         /// <summary>
+        /// Gets or sets the number of times delivery of this message has been deferred.
+        /// </summary>
+        public int DeferredDeliveryCount { get; set; }
+
+        /// <summary>
         /// The list of connection IDs that the message has been successfully delivered to.
         /// </summary>
         public HashSet<Guid> SubscriberMessageDeliveries { get; internal set; } = new();
