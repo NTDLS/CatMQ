@@ -211,11 +211,11 @@
                         <th>Persistence</th>
                         <th>Consumption</th>
                         <th>Delivery</th>
-                        <th>Max. Outstanding</th>
-                        <th>Throttle</th>
-                        <th>Retries</th>
-                        <th>Expiration</th>
-                        <th>Action</th>
+                        <th class="text-end">Max. Outstanding</th>
+                        <th class="text-end">Throttle</th>
+                        <th class="text-end">Retries</th>
+                        <th class="text-end">Expiration</th>
+                        <th class="text-end">Action</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -223,11 +223,11 @@
                         <td id="q-persistenceScheme">...</td>
                         <td id="q-consumptionScheme"></td>
                         <td id="q-deliveryScheme"></td>
-                        <td id="q-maxOutstandingDeliveries">...</td>
-                        <td id="q-deliveryThrottle">...</td>
-                        <td id="q-maxDeliveryAttempts">...</td>
-                        <td id="q-maxMessageAge">...</td>
-                        <td>
+                        <td class="text-end" id="q-maxOutstandingDeliveries">...</td>
+                        <td class="text-end" id="q-deliveryThrottle">...</td>
+                        <td class="text-end" id="q-maxDeliveryAttempts">...</td>
+                        <td class="text-end" id="q-maxMessageAge">...</td>
+                        <td class="text-end">
                             <a class="btn btn-danger btn-thin" href="javascript:void(0)" onclick="onDeleteQueue()">Delete</a>
                         </td>
                     </tr>
@@ -245,28 +245,28 @@
             <table class="table table-striped table-bordered mt-1">
                 <thead class="table-light">
                     <tr>
-                        <th>Subscribers</th>
-                        <th>Depth</th>
-                        <th>Outstanding</th>
-                        <th>Received</th>
-                        <th>Delivered</th>
-                        <th>Deferred</th>
-                        <th>Expired</th>
-                        <th>Failures</th>
-                        <th>Action</th>
+                        <th class="text-end">Subscribers</th>
+                        <th class="text-end">Depth</th>
+                        <th class="text-end">Outstanding</th>
+                        <th class="text-end">Received</th>
+                        <th class="text-end">Delivered</th>
+                        <th class="text-end">Deferred</th>
+                        <th class="text-end">Expired</th>
+                        <th class="text-end">Failures</th>
+                        <th class="text-end">Action</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr>
-                        <td id="q-currentSubscriberCount">...</td>
-                        <td><a id="q-queueDepth" href="/messages/@Model.QueueName">...</a></td>
-                        <td id="q-currentOutstandingDeliveries">...</td>
-                        <td id="q-receivedMessageCount">...</td>
-                        <td id="q-deliveredMessageCount">...</td>
-                        <td id="q-deferredDeliveryCount">...</td>
-                        <td id="q-expiredMessageCount">...</td>
-                        <td id="q-failedDeliveryCount">...</td>
-                        <td>
+                        <td class="text-end" id="q-currentSubscriberCount">...</td>
+                        <td class="text-end"><a id="q-queueDepth" href="/messages/@Model.QueueName">...</a></td>
+                        <td class="text-end" id="q-currentOutstandingDeliveries">...</td>
+                        <td class="text-end" id="q-receivedMessageCount">...</td>
+                        <td class="text-end" id="q-deliveredMessageCount">...</td>
+                        <td class="text-end" id="q-deferredDeliveryCount">...</td>
+                        <td class="text-end" id="q-expiredMessageCount">...</td>
+                        <td class="text-end" id="q-failedDeliveryCount">...</td>
+                        <td class="text-end">
                             <a class="btn btn-danger btn-thin" href="javascript:void(0)" onclick="onPurgeQueue()">Purge</a>
                         </td>
                     </tr>
@@ -285,12 +285,12 @@
                     <tr>
                         <th>SubscriberId</th>
                         <th>Address</th>
-                        <th>Attempts</th>
-                        <th>Successful</th>
-                        <th>Deferred</th>
-                        <th>Consumed</th>
-                        <th>Failures</th>
-                        <th>Action</th>
+                        <th class="text-end">Attempts</th>
+                        <th class="text-end">Successful</th>
+                        <th class="text-end">Deferred</th>
+                        <th class="text-end">Consumed</th>
+                        <th class="text-end">Failures</th>
+                        <th class="text-end">Action</th>
                     </tr>
                 </thead>
                 <tbody id="subscribers-body">

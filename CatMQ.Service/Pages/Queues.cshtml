@@ -12,7 +12,6 @@
             setInterval(refreshQueues, 5000);
         });
 
-
         async function refreshQueues() {
             try {
                 const url = `?handler=Queues`;
@@ -65,7 +64,6 @@
         }
 
     </script>
-    <script src="~/js/queueChart.js"></script>
 }
 
 <div>
@@ -78,13 +76,13 @@
                 <thead class="table-light">
                     <tr>
                         <th>Name</th>
-                        <th>Subscribers</th>
-                        <th>Depth</th>
-                        <th>Outstanding</th>
-                        <th>Received</th>
-                        <th>Delivered</th>
-                        <th>Expired</th>
-                        <th>Failures</th>
+                        <th class="text-end">Subscribers</th>
+                        <th class="text-end">Depth</th>
+                        <th class="text-end">Outstanding</th>
+                        <th class="text-end">Received</th>
+                        <th class="text-end">Delivered</th>
+                        <th class="text-end">Expired</th>
+                        <th class="text-end">Failures</th>
                     </tr>
                 </thead>
 

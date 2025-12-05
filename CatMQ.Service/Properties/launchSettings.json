@@ -12,7 +12,6 @@
     "https": {
       "commandName": "Project",
       "launchBrowser": true,
-      "launchUrl": "queue/MyFirstQueue",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       },

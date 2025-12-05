@@ -345,11 +345,17 @@ namespace NTDLS.CatMQ.Server
         }
 
         /// <summary>
-        /// Returns a cloned copy of the historical statistics.
+        /// Returns a cloned copy of the historical statistics for a given queue.
         /// </summary>
         public Dictionary<DateTime, CMqQueueHistoricalStatisticsDescriptor> GetQueueHistoricalStatistics(string queueName)
-            => HistoricalStatistics.GetQueueStatistics(queueName)
-                ?? new Dictionary<DateTime, CMqQueueHistoricalStatisticsDescriptor>();
+            => HistoricalStatistics.GetQueueStatistics(queueName) ?? [];
+
+        /// <summary>
+        /// Returns a cloned copy of the historical statistics for all queues.
+        /// </summary>
+        /// <returns></returns>
+        public Dictionary<DateTime, CMqQueueHistoricalStatisticsDescriptor> GetAllQueuesHistoricalStatistics()
+            => HistoricalStatistics.GetAllQueueStatistics() ?? [];
 
         /// <summary>
         /// Returns a read-only copy messages in the queue.
