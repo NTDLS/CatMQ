@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NTDLS.CatMQ.Server;
 using NTDLS.CatMQ.Server.Management;
+using NTDLS.Helpers;
 
 namespace CatMQ.Service.Pages
 {
@@ -13,15 +14,15 @@ namespace CatMQ.Service.Pages
         public string QueueName { get; set; } = string.Empty;
 
         private readonly ILogger<QueueModel> _logger = logger;
-        public CMqQueueDescriptor Queue { get; private set; } = new();
+        //public CMqQueueDescriptor Queue { get; private set; } = new();
         public List<CMqSubscriberDescriptor> Subscribers { get; set; } = new();
 
         public void OnGet()
         {
             try
             {
-                Queue = mqServer.GetQueues()?.Where(o => o.QueueName.Equals(QueueName, StringComparison.OrdinalIgnoreCase)).FirstOrDefault() ?? new();
-                Subscribers = mqServer.GetSubscribers(Queue.QueueName)?.OrderBy(o => o.SubscriberId)?.ToList() ?? new();
+                //Get the queue name (case insensitive) from the server to ensure it exists.
+                QueueName = mqServer.GetQueue(QueueName)?.QueueName ?? string.Empty;
             }
             catch (Exception ex)
             {
@@ -30,6 +31,33 @@ namespace CatMQ.Service.Pages
             }
         }
 
+        #region Queue Subscribers.
+
+        public JsonResult OnGetQueueSubscribers(string queueName)
+        {
+            var subscribers = mqServer.GetSubscribers(queueName)?.OrderBy(o => o.SubscriberId)?.ToList() ?? new();
+
+            List<object> records = new();
+
+            foreach (var subscriber in subscribers)
+            {
+                records.Add(new
+                {
+                    SubscriberId = subscriber.SubscriberId,
+                    remotePeer = $"{subscriber.RemoteAddress} : {subscriber.RemotePort}",
+                    attemptedDeliveryCount = subscriber.AttemptedDeliveryCount.ToString("n0"),
+                    successfulDeliveryCount = subscriber.SuccessfulDeliveryCount.ToString("n0"),
+                    deferredDeliveryCount = subscriber.DeferredDeliveryCount.ToString("n0"),
+                    consumedDeliveryCount = subscriber.ConsumedDeliveryCount.ToString("n0"),
+                    failedDeliveryCount = subscriber.FailedDeliveryCount.ToString("n0")
+                });
+            }
+
+            return new JsonResult(records);
+        }
+
+        #endregion
+
         #region Queue Data.
 
         public JsonResult OnGetQueueData(string queueName)
@@ -37,10 +65,31 @@ namespace CatMQ.Service.Pages
             var queue = mqServer.GetQueues()?
                 .Where(o => o.QueueName.Equals(QueueName, StringComparison.OrdinalIgnoreCase))
                 .FirstOrDefault() ?? new();
-         
-            return new JsonResult(queue);
-        }
 
+            var record = new
+            {
+                queueName = queue.QueueName,
+                deliveryThrottle = queue.DeliveryThrottle.ToString(),
+                maxOutstandingDeliveries = queue.MaxOutstandingDeliveries.ToString("N0"),
+                maxDeliveryAttempts = queue.MaxDeliveryAttempts.ToString("N0"),
+                maxMessageAge = queue.MaxMessageAge?.ToString() ?? "\u221E",
+                consumptionScheme = Text.SeparateCamelCase(queue.ConsumptionScheme.ToString()),
+                deliveryScheme = Text.SeparateCamelCase(queue.DeliveryScheme.ToString()),
+                queueDepth = queue.QueueDepth.ToString("N0"),
+                currentSubscriberCount = queue.CurrentSubscriberCount.ToString("N0"),
+                currentOutstandingDeliveries = queue.CurrentOutstandingDeliveries.ToString("N0"),
+                receivedMessageCount = queue.ReceivedMessageCount.ToString("N0"),
+                expiredMessageCount = queue.ExpiredMessageCount.ToString("N0"),
+                deliveredMessageCount = queue.DeliveredMessageCount.ToString("N0"),
+                failedDeliveryCount = queue.FailedDeliveryCount.ToString("N0"),
+                deferredDeliveryCount = queue.DeferredDeliveryCount.ToString("N0"),
+                explicitDropCount = queue.ExplicitDropCount.ToString("N0"),
+                explicitDeadLetterCount = queue.ExplicitDeadLetterCount.ToString("N0"),
+                persistenceScheme = Text.SeparateCamelCase(queue.PersistenceScheme.ToString())
+            };
+
+            return new JsonResult(record);
+        }
 
         #endregion
 
@@ -69,7 +118,7 @@ namespace CatMQ.Service.Pages
                 .ToArray();
 
             var enqueuedValues = ordered
-                .Select(kvp => (double)kvp.Value.EnqueuedCount) 
+                .Select(kvp => (double)kvp.Value.EnqueuedCount)
                 .ToArray();
 
             var deliveredValues = ordered

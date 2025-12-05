@@ -6,14 +6,20 @@
 
 @section Scripts {
     <script>
-        const fmt = n => n.toLocaleString();
+        const queueName = '@Model.QueueName';
 
         window.chartDataUrl = '@Url.Page(null, "ChartData", new { queueName = Model.QueueName })';
 
         document.addEventListener("DOMContentLoaded", async function () {
             await refreshQueueData();
-            setInterval(refreshQueueData, 5000);
+            await refreshSubscribers();
+            setInterval(refreshAll, 5000);
         });
+
+        function refreshAll() {
+            refreshQueueData();
+            refreshSubscribers();
+        }
 
         async function loadQueueData() {
             const url = '@Url.Page(null, "QueueData", new { queueName = Model.QueueName })';;
@@ -25,17 +31,166 @@
             return await response.json();
         }
 
-
         async function refreshQueueData() {
             const data = await loadQueueData();
-            document.getElementById('q-subscribers').textContent   = fmt(data.currentSubscriberCount);
-            document.getElementById('q-depth-link').textContent    = fmt(data.queueDepth);
-            document.getElementById('q-outstanding').textContent   = fmt(data.currentOutstandingDeliveries);
-            document.getElementById('q-received').textContent      = fmt(data.receivedMessageCount);
-            document.getElementById('q-delivered').textContent     = fmt(data.deliveredMessageCount);
-            document.getElementById('q-deferred').textContent      = fmt(data.deferredDeliveryCount);
-            document.getElementById('q-expired').textContent       = fmt(data.expiredMessageCount);
-            document.getElementById('q-failed').textContent        = fmt(data.failedDeliveryCount);
+
+            //Configuration table.
+            document.getElementById('q-persistenceScheme').textContent = data.persistenceScheme;
+            document.getElementById('q-consumptionScheme').textContent = data.consumptionScheme;
+            document.getElementById('q-deliveryScheme').textContent = data.deliveryScheme;
+            document.getElementById('q-maxOutstandingDeliveries').textContent = data.maxOutstandingDeliveries;
+            document.getElementById('q-deliveryThrottle').textContent = data.deliveryThrottle;
+            document.getElementById('q-maxDeliveryAttempts').textContent = data.maxDeliveryAttempts;
+            document.getElementById('q-maxMessageAge').textContent = data.maxMessageAge;
+
+            //Statistics table.
+            document.getElementById('q-currentSubscriberCount').textContent = data.currentSubscriberCount;
+            document.getElementById('q-queueDepth').textContent = data.queueDepth;
+            document.getElementById('q-currentOutstandingDeliveries').textContent = data.currentOutstandingDeliveries;
+            document.getElementById('q-receivedMessageCount').textContent = data.receivedMessageCount;
+            document.getElementById('q-deliveredMessageCount').textContent = data.deliveredMessageCount;
+            document.getElementById('q-deferredDeliveryCount').textContent = data.deferredDeliveryCount;
+            document.getElementById('q-expiredMessageCount').textContent = data.expiredMessageCount;
+            document.getElementById('q-failedDeliveryCount').textContent = data.failedDeliveryCount;
+        }
+
+        async function refreshSubscribers() {
+            try {
+                const url = `?handler=QueueSubscribers&queueName=${encodeURIComponent(queueName)}`;
+                const response = await fetch(url, {
+                    headers: { 'Accept': 'application/json' }
+                });
+
+                if (!response.ok) {
+                    console.error('Failed to load subscribers. HTTP', response.status);
+                    return;
+                }
+
+                const data = await response.json();
+                renderSubscribers(data);
+            } catch (err) {
+                console.error('Error loading subscribers:', err);
+            }
+        }
+
+        async function onRemoveSubscription(subscriberId) {
+            const url = `/ui/Unsubscribe/${queueName}/${subscriberId}`;
+            const message = `Removing the subscription for '${subscriberId}' from '${queueName}' will cause the subscriber to fail. Continue?`;
+
+            const ok = await showConfirmModal(message);
+            if (!ok) return;
+
+            try {
+                const response = await fetch(url, {
+                    method: "POST",
+                    credentials: 'same-origin',
+                    headers: {
+                        "Accept": "application/json",
+                    }
+                });
+
+                if (!response.ok) {
+                    alert("Operation failed.");
+                    return;
+                }
+
+                refreshSubscribers();
+            }
+            catch (error) {
+                alert(`Operation failed: ${error}`);
+            }
+        }
+
+        async function onPurgeQueue() {
+            const url = `/ui/PurgeQueue/${queueName}`;
+            const message = `Purging the queue '${queueName}' will result in permanent message loss. Continue?`;
+
+            const ok = await showConfirmModal(message);
+            if (!ok) return;
+
+            try {
+                const response = await fetch(url, {
+                    method: "POST",
+                    credentials: 'same-origin',
+                    headers: {
+                        "Accept": "application/json",
+                    }
+                });
+
+                if (!response.ok) {
+                    alert("Operation failed.");
+                    return;
+                }
+
+                refreshQueueData();
+            }
+            catch (error) {
+                alert(`Operation failed: ${error}`);
+            }
+        }
+
+        async function onDeleteQueue() {
+            const url = `/ui/DeleteQueue/${queueName}`;
+            const message = `Deleting the queue '${queueName}' will result in permanent message loss and any subscribers will fail. Continue?`;
+
+            const ok = await showConfirmModal(message);
+            if (!ok) return;
+
+            try {
+                const response = await fetch(url, {
+                    method: "POST",
+                    credentials: 'same-origin',
+                    headers: {
+                        "Accept": "application/json",
+                    }
+                });
+
+                if (!response.ok) {
+                    alert("Operation failed.");
+                    return;
+                }
+
+                window.location.href = "/Queues";
+            }
+            catch (error) {
+                alert(`Operation failed: ${error}`);
+            }
+        }
+
+        // Build a single row of HTML for one subscriber
+        function buildRow(sub) {
+            return `
+                <tr>
+                    <td>${sub.subscriberId}</td>
+                    <td>${sub.remotePeer}</td>
+                    <td class="text-end">${sub.attemptedDeliveryCount}</td>
+                    <td class="text-end">${sub.successfulDeliveryCount}</td>
+                    <td class="text-end">${sub.deferredDeliveryCount}</td>
+                    <td class="text-end">${sub.consumedDeliveryCount}</td>
+                    <td class="text-end">${sub.failedDeliveryCount}</td>
+                    <td>
+                        <a class="btn btn-danger btn-thin" href="javascript:void(0)" onclick="onRemoveSubscription('${sub.subscriberId}')">Remove</a>
+                    </td>
+                </tr>`;
+        }
+
+        // Render the entire table body from the JSON array
+        function renderSubscribers(subscribers) {
+            const tbody = document.getElementById('subscribers-body');
+            if (!tbody) return;
+
+            if (!Array.isArray(subscribers) || subscribers.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="8" class="text-center text-muted">
+                            No subscribers.
+                        </td>
+                    </tr>`;
+                return;
+            }
+
+            const rowsHtml = subscribers.map(buildRow).join('');
+            tbody.innerHTML = rowsHtml;
         }
 
     </script>
@@ -43,7 +198,7 @@
 }
 
 <div>
-    <h6 class="display-6">@Model.Queue.QueueName</h6>
+    <h6 class="display-6">@Model.QueueName</h6>
 
     <div class="container mt-4">
 
@@ -67,16 +222,15 @@
             </thead>
             <tbody>
                 <tr>
-                    <td>@Model.Queue.PersistenceScheme</td>
-                    <td>@Model.Queue.ConsumptionScheme</td>
-                    <td>@Model.Queue.DeliveryScheme</td>
-                    <td>@Model.Queue.MaxOutstandingDeliveries</td>
-                    <td>@Model.Queue.DeliveryThrottle</td>
-                    <td>@Model.Queue.MaxDeliveryAttempts</td>
-                    <td>@Model.Queue.MaxMessageAge</td>
-                    <td>@Html.Raw(ConfirmActionHelper.GenerateDangerLink(
-                        $"Deleting the queue '{@Model.Queue.QueueName}' will result in permanent message loss and any subscribers will fail. Continue?",
-                        "Delete", $"/DeleteQueue/{@Model.Queue.QueueName}", "btn-thin"))
+                    <td id="q-persistenceScheme">...</td>
+                    <td id="q-consumptionScheme"></td>
+                    <td id="q-deliveryScheme"></td>
+                    <td id="q-maxOutstandingDeliveries">...</td>
+                    <td id="q-deliveryThrottle">...</td>
+                    <td id="q-maxDeliveryAttempts">...</td>
+                    <td id="q-maxMessageAge">...</td>
+                    <td>
+                        <a class="btn btn-danger btn-thin" href="javascript:void(0)" onclick="onDeleteQueue('${sub.subscriberId}')">Delete</a>
                     </td>
                 </tr>
             </tbody>
@@ -111,18 +265,16 @@
             </thead>
             <tbody>
                 <tr>
-                    <td id="q-subscribers"></td>
-                    <td><a id="q-depth-link" href="/messages/@Model.Queue.QueueName">...</a></td>
-                    <td id="q-outstanding"></td>
-                    <td id="q-received"></td>
-                    <td id="q-delivered"></td>
-                    <td id="q-deferred"></td>
-                    <td id="q-expired"></td>
-                    <td id="q-failed"></td>
+                    <td id="q-currentSubscriberCount">...</td>
+                    <td><a id="q-queueDepth" href="/messages/@Model.QueueName">...</a></td>
+                    <td id="q-currentOutstandingDeliveries">...</td>
+                    <td id="q-receivedMessageCount">...</td>
+                    <td id="q-deliveredMessageCount">...</td>
+                    <td id="q-deferredDeliveryCount">...</td>
+                    <td id="q-expiredMessageCount">...</td>
+                    <td id="q-failedDeliveryCount">...</td>
                     <td>
-                        @Html.Raw(ConfirmActionHelper.GenerateDangerLink(
-                            $"Purging the queue '{@Model.Queue.QueueName}' will result in permanent message loss. Continue?",
-                            "Purge", $"/PurgeQueue/{@Model.Queue.QueueName}", "btn-thin"))
+                        <a class="btn btn-danger btn-thin" href="javascript:void(0)" onclick="onPurgeQueue('${sub.subscriberId}')">Purge</a>
                     </td>
                 </tr>
             </tbody>
@@ -146,23 +298,8 @@
                     <th>Action</th>
                 </tr>
             </thead>
-            <tbody>
-                @foreach (var queue in Model.Subscribers)
-                {
-                    <tr>
-                        <td>@queue.SubscriberId</td>
-                        <td>@queue.RemoteAddress : @queue.RemotePort</td>
-                        <td>@queue.AttemptedDeliveryCount.ToString("n0")</td>
-                        <td>@queue.SuccessfulDeliveryCount.ToString("n0")</td>
-                        <td>@queue.DeferredDeliveryCount.ToString("n0")</td>
-                        <td>@queue.ConsumedDeliveryCount.ToString("n0")</td>
-                        <td>@queue.FailedDeliveryCount.ToString("n0")</td>
-                        <td>@Html.Raw(ConfirmActionHelper.GenerateDangerLink(
-                            $"Removing the subscription for '{@queue.SubscriberId}' from '{@Model.Queue.QueueName}' will cause the subscriber to fail. Continue?",
-                            "Remove", $"/RemoveSubscription/{@Model.Queue.QueueName}/{@queue.SubscriberId}", "btn-thin"))
-                        </td>
-                    </tr>
-                }
+            <tbody id="subscribers-body">
+                <!-- Filled by JS -->
             </tbody>
         </table>
     </div>
