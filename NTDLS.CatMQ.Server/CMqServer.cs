@@ -345,6 +345,13 @@ namespace NTDLS.CatMQ.Server
         }
 
         /// <summary>
+        /// Returns a cloned copy of the historical statistics.
+        /// </summary>
+        public Dictionary<DateTime, CMqQueueHistoricalStatisticsDescriptor> GetQueueHistoricalStatistics(string queueName)
+            => HistoricalStatistics.GetQueueStatistics(queueName)
+                ?? new Dictionary<DateTime, CMqQueueHistoricalStatisticsDescriptor>();
+
+        /// <summary>
         /// Returns a read-only copy messages in the queue.
         /// </summary>
         public CMqEnqueuedMessageDescriptorCollection? GetQueueMessages(string queueName, int offset, int take)
@@ -995,6 +1002,9 @@ namespace NTDLS.CatMQ.Server
                                 //We have to keep all ephemeral messages in memory.
                                 m.MessageBuffer.Add(message);
                             }
+
+                            HistoricalStatistics.IncrementEnqueuedCount(queueName);
+
                             messageQueue.DeliveryThreadWaitEvent.Set();
                         }) && success;
                     }

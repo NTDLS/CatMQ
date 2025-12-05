@@ -4,10 +4,49 @@
     ViewData["Title"] = $"{@Model.QueueName} Queue";
 }
 
+@section Scripts {
+    <script>
+        const fmt = n => n.toLocaleString();
+
+        window.chartDataUrl = '@Url.Page(null, "ChartData", new { queueName = Model.QueueName })';
+
+        document.addEventListener("DOMContentLoaded", async function () {
+            await refreshQueueData();
+            setInterval(refreshQueueData, 5000);
+        });
+
+        async function loadQueueData() {
+            const url = '@Url.Page(null, "QueueData", new { queueName = Model.QueueName })';;
+            const response = await fetch(url);
+            if (!response.ok) {
+                console.error("Failed to load queue data:", response.status, response.statusText);
+                return null;
+            }
+            return await response.json();
+        }
+
+
+        async function refreshQueueData() {
+            const data = await loadQueueData();
+            document.getElementById('q-subscribers').textContent   = fmt(data.currentSubscriberCount);
+            document.getElementById('q-depth-link').textContent    = fmt(data.queueDepth);
+            document.getElementById('q-outstanding').textContent   = fmt(data.currentOutstandingDeliveries);
+            document.getElementById('q-received').textContent      = fmt(data.receivedMessageCount);
+            document.getElementById('q-delivered').textContent     = fmt(data.deliveredMessageCount);
+            document.getElementById('q-deferred').textContent      = fmt(data.deferredDeliveryCount);
+            document.getElementById('q-expired').textContent       = fmt(data.expiredMessageCount);
+            document.getElementById('q-failed').textContent        = fmt(data.failedDeliveryCount);
+        }
+
+    </script>
+    <script src="~/js/queueChart.js"></script>
+}
+
 <div>
     <h6 class="display-6">@Model.Queue.QueueName</h6>
 
     <div class="container mt-4">
+
         <table class="table table-striped table-bordered">
             <thead class="table-light">
                 <tr>
@@ -49,6 +88,14 @@
                     <th colspan="9">Statistics</th>
                 </tr>
             </thead>
+            <tbody>
+                <tr>
+                    <td colspan="9">
+                        <canvas id="queueChart" height="50"></canvas>
+                    </td>
+                </tr>
+            </tbody>
+
             <thead class="table-light">
                 <tr>
                     <th>Subscribers</th>
@@ -64,17 +111,18 @@
             </thead>
             <tbody>
                 <tr>
-                    <td>@Model.Queue.CurrentSubscriberCount.ToString("n0")</td>
-                    <td><a href="/messages/@Model.Queue.QueueName">@Model.Queue.QueueDepth.ToString("n0")</a></td>
-                    <td>@Model.Queue.CurrentOutstandingDeliveries.ToString("n0")</td>
-                    <td>@Model.Queue.ReceivedMessageCount.ToString("n0")</td>
-                    <td>@Model.Queue.DeliveredMessageCount.ToString("n0")</td>
-                    <td>@Model.Queue.DeferredDeliveryCount.ToString("n0")</td>
-                    <td>@Model.Queue.ExpiredMessageCount.ToString("n0")</td>
-                    <td>@Model.Queue.FailedDeliveryCount.ToString("n0")</td>
-                    <td>@Html.Raw(ConfirmActionHelper.GenerateDangerLink(
-                        $"Purging the queue '{@Model.Queue.QueueName}' will result in permanent message loss. Continue?",
-                        "Purge", $"/PurgeQueue/{@Model.Queue.QueueName}", "btn-thin"))
+                    <td id="q-subscribers"></td>
+                    <td><a id="q-depth-link" href="/messages/@Model.Queue.QueueName">...</a></td>
+                    <td id="q-outstanding"></td>
+                    <td id="q-received"></td>
+                    <td id="q-delivered"></td>
+                    <td id="q-deferred"></td>
+                    <td id="q-expired"></td>
+                    <td id="q-failed"></td>
+                    <td>
+                        @Html.Raw(ConfirmActionHelper.GenerateDangerLink(
+                            $"Purging the queue '{@Model.Queue.QueueName}' will result in permanent message loss. Continue?",
+                            "Purge", $"/PurgeQueue/{@Model.Queue.QueueName}", "btn-thin"))
                     </td>
                 </tr>
             </tbody>

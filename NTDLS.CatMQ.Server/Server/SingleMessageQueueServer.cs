@@ -113,6 +113,8 @@ namespace NTDLS.CatMQ.Server.Server
                                     message.State = CMqMessageState.Drop;
                                 }
 
+                                HistoricalStatistics.IncrementDequeuedCount(Configuration.QueueName);
+
                                 Statistics.IncrementExpiredMessageCount();
                             }
                         }
@@ -240,6 +242,11 @@ namespace NTDLS.CatMQ.Server.Server
             try
             {
                 message.State = await DistributeToSubscribersWithDisposition(message);
+
+                if(message.State == CMqMessageState.Drop || message.State == CMqMessageState.DeadLetter)
+                {
+                    HistoricalStatistics.IncrementDequeuedCount(Configuration.QueueName);
+                }
             }
             catch
             {
@@ -264,7 +271,8 @@ namespace NTDLS.CatMQ.Server.Server
 
                 if (subscriberDispositions.ConsumedSubscriberIDs.Count > 0)
                 {
-                    message.State = CMqMessageState.Drop;
+                    //Someone received, the message - so lets just drop it.
+                    return CMqMessageState.Drop;
                 }
                 return CMqMessageState.DeadLetter;
             }
@@ -294,6 +302,7 @@ namespace NTDLS.CatMQ.Server.Server
                     subscriber.IncrementAttemptedDeliveryCount();
 
                     var deliveryResult = await _queueServer.DeliverMessageWithResultAsync(subscriber.SubscriberId, Configuration.QueueName, message);
+                    HistoricalStatistics.IncrementDeliveryCount(Configuration.QueueName);
 
                     Statistics.IncrementDeliveredMessageCount();
                     subscriber.IncrementSuccessfulDeliveryCount();
