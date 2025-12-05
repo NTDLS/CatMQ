@@ -2,7 +2,6 @@ using CatMQ.Service.Models.Page;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NTDLS.CatMQ.Server;
-using NTDLS.CatMQ.Server.Management;
 using NTDLS.Helpers;
 
 namespace CatMQ.Service.Pages
@@ -14,8 +13,6 @@ namespace CatMQ.Service.Pages
         public string QueueName { get; set; } = string.Empty;
 
         private readonly ILogger<QueueModel> _logger = logger;
-        //public CMqQueueDescriptor Queue { get; private set; } = new();
-        public List<CMqSubscriberDescriptor> Subscribers { get; set; } = new();
 
         public void OnGet()
         {
