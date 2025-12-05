@@ -200,107 +200,103 @@
 <div>
     <h6 class="display-6">@Model.QueueName</h6>
 
-    <div class="container mt-4">
+    <div class="card shadow-lg mt-2">
+        <div class="card-header">
+            <h5>Configuration</h5>
+        </div>
+        <div class="card-body">
+            <table class="table table-striped table-bordered">
+                <thead class="table-light">
+                    <tr>
+                        <th>Persistence</th>
+                        <th>Consumption</th>
+                        <th>Delivery</th>
+                        <th>Max. Outstanding</th>
+                        <th>Throttle</th>
+                        <th>Retries</th>
+                        <th>Expiration</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td id="q-persistenceScheme">...</td>
+                        <td id="q-consumptionScheme"></td>
+                        <td id="q-deliveryScheme"></td>
+                        <td id="q-maxOutstandingDeliveries">...</td>
+                        <td id="q-deliveryThrottle">...</td>
+                        <td id="q-maxDeliveryAttempts">...</td>
+                        <td id="q-maxMessageAge">...</td>
+                        <td>
+                            <a class="btn btn-danger btn-thin" href="javascript:void(0)" onclick="onDeleteQueue()">Delete</a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
 
-        <table class="table table-striped table-bordered">
-            <thead class="table-light">
-                <tr>
-                    <th colspan="8">Configuration</th>
-                </tr>
-            </thead>
-            <thead class="table-light">
-                <tr>
-                    <th>Persistence</th>
-                    <th>Consumption</th>
-                    <th>Delivery</th>
-                    <th>Max. Outstanding</th>
-                    <th>Throttle</th>
-                    <th>Retries</th>
-                    <th>Expiration</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td id="q-persistenceScheme">...</td>
-                    <td id="q-consumptionScheme"></td>
-                    <td id="q-deliveryScheme"></td>
-                    <td id="q-maxOutstandingDeliveries">...</td>
-                    <td id="q-deliveryThrottle">...</td>
-                    <td id="q-maxDeliveryAttempts">...</td>
-                    <td id="q-maxMessageAge">...</td>
-                    <td>
-                        <a class="btn btn-danger btn-thin" href="javascript:void(0)" onclick="onDeleteQueue('${sub.subscriberId}')">Delete</a>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
+    <div class="card shadow-lg mt-2">
+        <div class="card-header">
+            <h5>Statistics</h5>
+        </div>
+        <div class="card-body">
+            <canvas id="queueChart" height="50"></canvas>
+            <table class="table table-striped table-bordered mt-1">
+                <thead class="table-light">
+                    <tr>
+                        <th>Subscribers</th>
+                        <th>Depth</th>
+                        <th>Outstanding</th>
+                        <th>Received</th>
+                        <th>Delivered</th>
+                        <th>Deferred</th>
+                        <th>Expired</th>
+                        <th>Failures</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td id="q-currentSubscriberCount">...</td>
+                        <td><a id="q-queueDepth" href="/messages/@Model.QueueName">...</a></td>
+                        <td id="q-currentOutstandingDeliveries">...</td>
+                        <td id="q-receivedMessageCount">...</td>
+                        <td id="q-deliveredMessageCount">...</td>
+                        <td id="q-deferredDeliveryCount">...</td>
+                        <td id="q-expiredMessageCount">...</td>
+                        <td id="q-failedDeliveryCount">...</td>
+                        <td>
+                            <a class="btn btn-danger btn-thin" href="javascript:void(0)" onclick="onPurgeQueue()">Purge</a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
 
-        <table class="table table-striped table-bordered">
-            <thead class="table-light">
-                <tr>
-                    <th colspan="9">Statistics</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td colspan="9">
-                        <canvas id="queueChart" height="50"></canvas>
-                    </td>
-                </tr>
-            </tbody>
-
-            <thead class="table-light">
-                <tr>
-                    <th>Subscribers</th>
-                    <th>Depth</th>
-                    <th>Outstanding</th>
-                    <th>Received</th>
-                    <th>Delivered</th>
-                    <th>Deferred</th>
-                    <th>Expired</th>
-                    <th>Failures</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td id="q-currentSubscriberCount">...</td>
-                    <td><a id="q-queueDepth" href="/messages/@Model.QueueName">...</a></td>
-                    <td id="q-currentOutstandingDeliveries">...</td>
-                    <td id="q-receivedMessageCount">...</td>
-                    <td id="q-deliveredMessageCount">...</td>
-                    <td id="q-deferredDeliveryCount">...</td>
-                    <td id="q-expiredMessageCount">...</td>
-                    <td id="q-failedDeliveryCount">...</td>
-                    <td>
-                        <a class="btn btn-danger btn-thin" href="javascript:void(0)" onclick="onPurgeQueue('${sub.subscriberId}')">Purge</a>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
-
-        <table class="table table-striped table-bordered">
-            <thead class="table-light">
-                <tr>
-                    <th colspan="8">Subscribers</th>
-                </tr>
-            </thead>
-            <thead class="table-light">
-                <tr>
-                    <th>SubscriberId</th>
-                    <th>Address</th>
-                    <th>Attempts</th>
-                    <th>Successful</th>
-                    <th>Deferred</th>
-                    <th>Consumed</th>
-                    <th>Failures</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody id="subscribers-body">
-                <!-- Filled by JS -->
-            </tbody>
-        </table>
+    <div class="card shadow-lg mt-2">
+        <div class="card-header">
+            <h5>Subscribers</h5>
+        </div>
+        <div class="card-body">
+            <table class="table table-striped table-bordered">
+                <thead class="table-light">
+                    <tr>
+                        <th>SubscriberId</th>
+                        <th>Address</th>
+                        <th>Attempts</th>
+                        <th>Successful</th>
+                        <th>Deferred</th>
+                        <th>Consumed</th>
+                        <th>Failures</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="subscribers-body">
+                    <!-- Filled by JS -->
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>

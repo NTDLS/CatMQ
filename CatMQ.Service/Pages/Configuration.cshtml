@@ -6,91 +6,85 @@
 }
 
 <div>
-    <div class="container mt-4">
-        <form method="post">
+    <form method="post">
+        <div class="card shadow-lg">
+            <div class="card-header">
+                <h5>Web Administration</h5>
+            </div>
+            <div class="card-body">
 
-            <div class="card">
-                <div class="card-header">
-                    <h4>Web Administration</h4>
+                <div class="mb-3">
+                    <label for="EnableWebUI" class="form-label fw-bold">Enabled Web UI</label>
+                    <span asp-validation-for="ServerConfig.EnableWebUI" class="text-danger"></span>
+                    <select id="enableWebUI" asp-for="ServerConfig.EnableWebUI" class="form-select">
+                        <option value="true">True</option>
+                        <option value="false">False</option>
+                    </select>
                 </div>
-                <div class="card-body">
 
-                    <div class="mb-3">
-                        <label for="EnableWebUI" class="form-label fw-bold">Enabled Web UI</label>
-                        <span asp-validation-for="ServerConfig.EnableWebUI" class="text-danger"></span>
-                        <select id="enableWebUI" asp-for="ServerConfig.EnableWebUI" class="form-select">
-                            <option value="true">True</option>
-                            <option value="false">False</option>
-                        </select>
-                    </div>
+                <div class="mb-3">
+                    <label for="webUIURL" class="form-label fw-bold">Web UI Binding</label>
+                    <span asp-validation-for="ServerConfig.WebListenURL" class="text-danger"></span>
+                    <input type="text" id="webUIURL" class="form-control" asp-for="ServerConfig.WebListenURL">
+                </div>
 
-                    <div class="mb-3">
-                        <label for="webUIURL" class="form-label fw-bold">Web UI Binding</label>
-                        <span asp-validation-for="ServerConfig.WebListenURL" class="text-danger"></span>
-                        <input type="text" id="webUIURL" class="form-control" asp-for="ServerConfig.WebListenURL">
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="dataPath" class="form-label fw-bold">Data Path</label>
-                        <span asp-validation-for="ServerConfig.DataPath" class="text-danger"></span>
-                        <input type="text" id="dataPath" class="form-control" placeholder="Enter file path" asp-for="ServerConfig.DataPath">
-                    </div>
+                <div class="mb-3">
+                    <label for="dataPath" class="form-label fw-bold">Data Path</label>
+                    <span asp-validation-for="ServerConfig.DataPath" class="text-danger"></span>
+                    <input type="text" id="dataPath" class="form-control" placeholder="Enter file path" asp-for="ServerConfig.DataPath">
                 </div>
             </div>
-            <br />
+        </div>
 
-            <div class="card">
-                <div class="card-header">
-                    <h4>Message Queue</h4>
+        <div class="card shadow-lg mt-2">
+            <div class="card-header">
+                <h5>Message Queue</h5>
+            </div>
+            <div class="card-body">
+
+                <div class="mb-3">
+                    <label for="queuePort" class="form-label fw-bold">Queue Port</label>
+                    <span asp-validation-for="ServerConfig.QueuePort" class="text-danger"></span>
+                    <input type="number" id="queuePort" class="form-control" asp-for="ServerConfig.QueuePort" min="1" max="65535">
                 </div>
-                <div class="card-body">
-
-                    <div class="mb-3">
-                        <label for="queuePort" class="form-label fw-bold">Queue Port</label>
-                        <span asp-validation-for="ServerConfig.QueuePort" class="text-danger"></span>
-                        <input type="number" id="queuePort" class="form-control" asp-for="ServerConfig.QueuePort" min="1" max="65535">
-                    </div>
-                    <div class="mb-3">
-                        <label for="dataPath" class="form-label fw-bold">Data Path</label>
-                        <span asp-validation-for="ServerConfig.DataPath" class="text-danger"></span>
-                        <input type="text" id="dataPath" class="form-control" placeholder="Enter file path" asp-for="ServerConfig.DataPath">
-                    </div>
+                <div class="mb-3">
+                    <label for="dataPath" class="form-label fw-bold">Data Path</label>
+                    <span asp-validation-for="ServerConfig.DataPath" class="text-danger"></span>
+                    <input type="text" id="dataPath" class="form-control" placeholder="Enter file path" asp-for="ServerConfig.DataPath">
                 </div>
             </div>
-            <br />
+        </div>
 
-            <div class="card">
-                <div class="card-header">
-                    <h4>Messaging</h4>
-                </div>
-                <div class="card-body">
-
-                    <div class="mb-3">
-                        <label for="acknowledgmentTimeoutSeconds" class="form-label fw-bold">Query Timeout (s)</label>
-                        <span asp-validation-for="ServerConfig.AcknowledgmentTimeoutSeconds" class="text-danger"></span>
-                        <input type="number" id="acknowledgmentTimeoutSeconds" class="form-control" asp-for="ServerConfig.AcknowledgmentTimeoutSeconds" min="1">
-                    </div>
-                    <div class="mb-3">
-                        <label for="initialReceiveBufferSize" class="form-label fw-bold">Initial Receive Buffer Size (bytes)</label>
-                        <span asp-validation-for="ServerConfig.InitialReceiveBufferSize" class="text-danger"></span>
-                        <input type="number" id="initialReceiveBufferSize" class="form-control" asp-for="ServerConfig.InitialReceiveBufferSize" min="1024">
-                    </div>
-                    <div class="mb-3">
-                        <label for="maxReceiveBufferSize" class="form-label fw-bold">Max Receive Buffer Size (bytes)</label>
-                        <span asp-validation-for="ServerConfig.MaxReceiveBufferSize" class="text-danger"></span>
-                        <input type="number" id="maxReceiveBufferSize" class="form-control" asp-for="ServerConfig.MaxReceiveBufferSize" min="1024">
-                    </div>
-                    <div class="mb-3">
-                        <label for="receiveBufferGrowthRate" class="form-label fw-bold">Receive Buffer Growth Rate (decimal %)</label>
-                        <span asp-validation-for="ServerConfig.ReceiveBufferGrowthRate" class="text-danger"></span>
-                        <input type="number" id="receiveBufferGrowthRate" class="form-control" asp-for="ServerConfig.ReceiveBufferGrowthRate" step="0.1" min="0.1">
-                    </div>
-
-                </div>
+        <div class="card shadow-lg mt-2">
+            <div class="card-header">
+                <h5>Messaging</h5>
             </div>
-            <br />
+            <div class="card-body">
 
-            <button type="submit" class="btn btn-primary">Save</button>
-        </form>
-    </div>
+                <div class="mb-3">
+                    <label for="acknowledgmentTimeoutSeconds" class="form-label fw-bold">Query Timeout (s)</label>
+                    <span asp-validation-for="ServerConfig.AcknowledgmentTimeoutSeconds" class="text-danger"></span>
+                    <input type="number" id="acknowledgmentTimeoutSeconds" class="form-control" asp-for="ServerConfig.AcknowledgmentTimeoutSeconds" min="1">
+                </div>
+                <div class="mb-3">
+                    <label for="initialReceiveBufferSize" class="form-label fw-bold">Initial Receive Buffer Size (bytes)</label>
+                    <span asp-validation-for="ServerConfig.InitialReceiveBufferSize" class="text-danger"></span>
+                    <input type="number" id="initialReceiveBufferSize" class="form-control" asp-for="ServerConfig.InitialReceiveBufferSize" min="1024">
+                </div>
+                <div class="mb-3">
+                    <label for="maxReceiveBufferSize" class="form-label fw-bold">Max Receive Buffer Size (bytes)</label>
+                    <span asp-validation-for="ServerConfig.MaxReceiveBufferSize" class="text-danger"></span>
+                    <input type="number" id="maxReceiveBufferSize" class="form-control" asp-for="ServerConfig.MaxReceiveBufferSize" min="1024">
+                </div>
+                <div class="mb-3">
+                    <label for="receiveBufferGrowthRate" class="form-label fw-bold">Receive Buffer Growth Rate (decimal %)</label>
+                    <span asp-validation-for="ServerConfig.ReceiveBufferGrowthRate" class="text-danger"></span>
+                    <input type="number" id="receiveBufferGrowthRate" class="form-control" asp-for="ServerConfig.ReceiveBufferGrowthRate" step="0.1" min="0.1">
+                </div>
+
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary mt-2">Save</button>
+    </form>
 </div>

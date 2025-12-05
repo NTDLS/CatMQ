@@ -28,5 +28,26 @@ namespace CatMQ.Service.Controllers
             mqServer.DeleteQueue(queueName);
             return Ok();
         }
+
+        [HttpPost("DeleteAccount/{accountId}")]
+        public IActionResult DeleteAccount(Guid accountId)
+        {
+            var accounts = Configs.GetAccounts();
+            accounts.RemoveAll(o => o.Id.Equals(accountId));
+            Configs.PutAccounts(accounts);
+            return Ok();
+        }
+
+        [HttpPost("DeleteAPIKey/{accountId}/{apiKeyId}")]
+        public IActionResult DeleteAPIKey(Guid accountId, Guid apiKeyId)
+        {
+            var accounts = Configs.GetAccounts();
+
+            accounts.Where(o => o.Id.Equals(accountId)).Single()
+                .ApiKeys.RemoveAll(o => o.Id == apiKeyId);
+
+            Configs.PutAccounts(accounts);
+            return Ok();
+        }
     }
 }
