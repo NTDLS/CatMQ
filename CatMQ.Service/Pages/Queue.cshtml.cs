@@ -57,7 +57,7 @@ namespace CatMQ.Service.Pages
 
         #region Queue Data.
 
-        public JsonResult OnGetQueueData(string queueName)
+        public JsonResult OnGetQueueData()
         {
             var queue = mqServer.GetQueues()?
                 .Where(o => o.QueueName.Equals(QueueName, StringComparison.OrdinalIgnoreCase))

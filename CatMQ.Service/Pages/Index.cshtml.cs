@@ -92,7 +92,7 @@ namespace CatMQ.Service.Pages
 
         #region Chart Data.
 
-        public JsonResult OnGetChartData(string queueName)
+        public JsonResult OnGetChartData()
         {
             var history = mqServer.GetAllQueuesHistoricalStatistics();
 
