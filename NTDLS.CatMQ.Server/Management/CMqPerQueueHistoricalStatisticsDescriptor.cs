@@ -41,6 +41,12 @@
         public long OutstandingDeliveries;
         internal void SetOutstandingDeliveries(long value) => Interlocked.Exchange(ref OutstandingDeliveries, value);
 
+        /// <summary>
+        /// The total number of times a subscriber has requested that an attempted delivery be deferred to a later time.
+        /// </summary>
+        public long DeferredDeliveries;
+        internal void IncrementDeferredDeliveries() => Interlocked.Increment(ref DeferredDeliveries);
+
         internal void SetDescreteValues(CMqQueueDescriptor queueDescriptor)
         {
             SetQueueDepth(queueDescriptor.QueueDepth);
@@ -61,7 +67,8 @@
                 DequeuedCount = DequeuedCount,
                 QueueDepth = QueueDepth,
                 SubscriberCount = SubscriberCount,
-                OutstandingDeliveries = OutstandingDeliveries
+                OutstandingDeliveries = OutstandingDeliveries,
+                DeferredDeliveries = DeferredDeliveries
             };
         }
     }

@@ -108,6 +108,7 @@ namespace NTDLS.CatMQ.Server.Server
                                 agg.QueueDepth += kvp.Value.QueueDepth;
                                 agg.SubscriberCount += kvp.Value.SubscriberCount;
                                 agg.OutstandingDeliveries += kvp.Value.OutstandingDeliveries;
+                                agg.DeferredDeliveries += kvp.Value.DeferredDeliveries;
                             }
                             else
                             {
@@ -133,5 +134,8 @@ namespace NTDLS.CatMQ.Server.Server
 
         public void IncrementDequeuedCount(string queueName)
             => GetCurrentGranularitySlot(queueName)?.IncrementDequeuedCount();
+
+        public void IncrementDeferredDeliveries(string queueName)
+            => GetCurrentGranularitySlot(queueName)?.IncrementDeferredDeliveries();
     }
 }

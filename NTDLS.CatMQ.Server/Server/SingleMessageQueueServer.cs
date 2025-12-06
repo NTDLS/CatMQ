@@ -351,6 +351,7 @@ namespace NTDLS.CatMQ.Server.Server
                         message.DeferredCount++;
                         subscriber.IncrementDeferredDeliveryCount();
                         Statistics.IncrementDeferredDeliveryCount();
+                        _queueServer.PerQueueHistoricalStatistics?.IncrementDeferredDeliveries(Configuration.QueueName);
 
                         EnqueuedMessages.Read(m => m.Database.Store(message));
 

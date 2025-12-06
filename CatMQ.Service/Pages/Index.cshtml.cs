@@ -111,7 +111,7 @@ namespace CatMQ.Service.Pages
                 .ToList();
 
             var labels = ordered
-                .Select(kvp => kvp.Key.ToLocalTime().ToString("HH:mm"))
+                .Select(kvp => kvp.Key.ToLocalTime().ToString("HH:mm:ss"))
                 .ToArray();
 
             var enqueuedValues = ordered
@@ -132,6 +132,10 @@ namespace CatMQ.Service.Pages
 
             var outstandingValues = ordered
                 .Select(kvp => (double)kvp.Value.OutstandingDeliveries)
+                .ToArray();
+
+            var deferredValues = ordered
+                .Select(kvp => (double)kvp.Value.DeferredDeliveries)
                 .ToArray();
 
             var series = new[]
@@ -160,6 +164,11 @@ namespace CatMQ.Service.Pages
                 {
                     Label = "Outstanding",
                     Values = outstandingValues
+                },
+                new ChartSeriesDto
+                {
+                    Label = "Deferred",
+                    Values = deferredValues
                 }
             };
 

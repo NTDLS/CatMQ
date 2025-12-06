@@ -13,7 +13,7 @@
             &nbsp; | &nbsp;
             @if (Model.PageNumber > 0)
             {
-                <a href="/messages/@Model.QueueName/@(Model.PageNumber-1)">&lt; Previous</a>
+                <a href="/messages/@Model.QueueName/@(Model.PageNumber - 1)">&lt; Previous</a>
             }
             else
             {
@@ -26,53 +26,55 @@
             }
             else
             {
-                <a href="/messages/@Model.QueueName/@(Model.PageNumber+1)">Next &gt;</a>
+                <a href="/messages/@Model.QueueName/@(Model.PageNumber + 1)">Next &gt;</a>
             }
             &nbsp; | &nbsp;
             <a href="/messages/@Model.QueueName/@(Model.TotalPages)">Last &gt;&gt;</a>
         </center>
     </div>
-    <table class="table table-striped table-bordered mt-1">
-        <thead class="table-light">
-            <tr>
-                <th colspan="8">Messages</th>
-            </tr>
-        </thead>
-        <thead class="table-light">
-            <tr>
-                <th>Serial</th>
-                <th>Timestamp</th>
-                <th>Due</th>
-                <th class="text-end">Deferred</th>
-                <th class="text-end">Subscribers</th>
-                <th class="text-end">Delivered</th>
-                <th class="text-end">Consumed</th>
-                <th>Type</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var message in Model.Messages)
-            {
+    <div class="table-responsive">
+        <table class="table table-striped table-bordered mt-1">
+            <thead class="table-light">
                 <tr>
-                    <td><a href="/message/@Model.QueueName/@message.SerialNumber">@message.SerialNumber</a></td>
-                    <td>@message.Timestamp</td>
-                    <td>@(message.DeferredUntil?.ToString() ?? "asap")</td>
-                    <td class="text-end">@message.DeferredDeliveryCount.ToString("n0")</td>
-                    <td class="text-end">@message.SubscriberCount.ToString("n0")</td>
-                    <td class="text-end">@message.SubscriberMessageDeliveries.Count.ToString("n0")</td>
-                    <td class="text-end">@message.SatisfiedSubscribersSubscriberIDs.Count.ToString("n0")</td>
-                    <td>@message.AssemblyQualifiedTypeName</td>
+                    <th colspan="8">Messages</th>
                 </tr>
-            }
-        </tbody>
-    </table>
+            </thead>
+            <thead class="table-light">
+                <tr>
+                    <th>Serial</th>
+                    <th>Timestamp</th>
+                    <th>Due</th>
+                    <th class="text-end">Deferred</th>
+                    <th class="text-end">Subscribers</th>
+                    <th class="text-end">Delivered</th>
+                    <th class="text-end">Consumed</th>
+                    <th>Type</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var message in Model.Messages)
+                {
+                    <tr>
+                        <td><a href="/message/@Model.QueueName/@message.SerialNumber">@message.SerialNumber</a></td>
+                        <td>@message.Timestamp</td>
+                        <td>@(message.DeferredUntil?.ToString() ?? "asap")</td>
+                        <td class="text-end">@message.DeferredDeliveryCount.ToString("n0")</td>
+                        <td class="text-end">@message.SubscriberCount.ToString("n0")</td>
+                        <td class="text-end">@message.SubscriberMessageDeliveries.Count.ToString("n0")</td>
+                        <td class="text-end">@message.SatisfiedSubscribersSubscriberIDs.Count.ToString("n0")</td>
+                        <td>@message.AssemblyQualifiedTypeName</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
 
     <center>
         <a href="/messages/@Model.QueueName/0">&lt;&lt; First</a>
         &nbsp; | &nbsp;
         @if (Model.PageNumber > 0)
         {
-            <a href="/messages/@Model.QueueName/@(Model.PageNumber-1)">&lt; Previous</a>
+            <a href="/messages/@Model.QueueName/@(Model.PageNumber - 1)">&lt; Previous</a>
         }
         else
         {
@@ -85,7 +87,7 @@
         }
         else
         {
-            <a href="/messages/@Model.QueueName/@(Model.PageNumber+1)">Next &gt;</a>
+            <a href="/messages/@Model.QueueName/@(Model.PageNumber + 1)">Next &gt;</a>
         }
         &nbsp; | &nbsp;
         <a href="/messages/@Model.QueueName/@(Model.TotalPages)">Last &gt;&gt;</a>
