@@ -184,8 +184,11 @@ __(yes, that's over 1-billion messages).__ 👀
 
 ![image](https://github.com/user-attachments/assets/48ed2204-0efa-4ee0-8b8a-50f557f74d24)
 
+### Newer Home Screen
+<img width="1327" height="984" alt="image" src="https://github.com/user-attachments/assets/42a8df05-066e-471f-ac6e-d426c4ef23e0" />
+
 ### Queue view
-![image](https://github.com/user-attachments/assets/2e636a0c-1955-4940-9f0d-74c8c239e64c)
+<img width="1323" height="897" alt="image" src="https://github.com/user-attachments/assets/2e2ce6b8-f669-4e00-844a-5eb5b5e79e47" />
 
 ### Messages view
 ![image](https://github.com/user-attachments/assets/5782e58e-66f7-4f7b-9d2e-8098cb02e616)
