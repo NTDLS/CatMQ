@@ -12,10 +12,12 @@
 
         public async Task InvokeAsync(HttpContext context)
         {
-            var endpoint = context.GetEndpoint();
-            if (endpoint?.Metadata.GetMetadata<Microsoft.AspNetCore.Mvc.Controllers.ControllerActionDescriptor>() == null)
+            var path = context.Request.Path;
+
+            // Only enforce API key for the API (e.g. /api/)
+            if (!path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase))
             {
-                await _next(context); // Skip middleware if the endpoint is a Razor Page.
+                await _next(context);
                 return;
             }
 

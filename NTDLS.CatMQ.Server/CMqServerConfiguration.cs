@@ -32,5 +32,15 @@ namespace NTDLS.CatMQ.Server
         /// For persistent queues, this is where the data will be stored.
         /// </summary>
         public string? PersistencePath { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether historical statistics are enabled for data collection or analysis.
+        /// </summary>
+        public bool EnableHistoricalStatistics { get; set; } = true;
+
+        /// <summary>
+        /// The number historical datapoints to retain per queue.
+        /// </summary>
+        public int MaxHistoricalStatisticsDatapoints { get; set; } = 60;
     }
 }

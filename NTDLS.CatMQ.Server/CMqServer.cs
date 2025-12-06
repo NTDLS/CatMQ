@@ -17,11 +17,14 @@ namespace NTDLS.CatMQ.Server
     public class CMqServer
         : IDisposable
     {
-        private bool _keepRunning = false;
+        internal CancellationTokenSource CancelContext { get; set; }
+
         private readonly CMqServerConfiguration _configuration;
         private readonly JsonSerializerOptions _indentedJsonOptions = new() { WriteIndented = true };
         private readonly OptimisticCriticalResource<MessageQueueDictionary> _messageQueues = new();
         private readonly RmServer _rmServer;
+
+        internal PerQueueHistoricalStatistics? PerQueueHistoricalStatistics { get; private set; }
 
         internal CMqServerConfiguration Configuration => _configuration;
 
@@ -41,6 +44,9 @@ namespace NTDLS.CatMQ.Server
         public CMqServer(CMqServerConfiguration configuration)
         {
             //ThreadLockOwnershipTracking.Enable();
+
+            CancelContext = new CancellationTokenSource();
+            CancelContext.Cancel();
 
             _configuration = configuration;
 
@@ -64,6 +70,9 @@ namespace NTDLS.CatMQ.Server
         /// </summary>
         public CMqServer()
         {
+            CancelContext = new CancellationTokenSource();
+            CancelContext.Cancel();
+
             _configuration = new CMqServerConfiguration();
 
             var rmConfiguration = new RmConfiguration()
@@ -110,7 +119,7 @@ namespace NTDLS.CatMQ.Server
 
         private void RmServer_OnDisconnected(RmContext context)
         {
-            while (_keepRunning)
+            while (!CancelContext.IsCancellationRequested)
             {
                 bool success = true;
 
@@ -180,11 +189,17 @@ namespace NTDLS.CatMQ.Server
         }
 
         /// <summary>
+        /// Gets the name of all queues.
+        /// </summary>
+        public string[] GetQueueNames()
+            => _messageQueues.Read(mqd => mqd.Values.Select(q => q.Configuration.QueueName).ToArray());
+
+        /// <summary>
         /// Returns a read-only copy of the queues.
         /// </summary>
         public ReadOnlyCollection<CMqQueueDescriptor>? GetQueues()
         {
-            while (_keepRunning)
+            while (!CancelContext.IsCancellationRequested)
             {
                 bool success = true;
                 List<CMqQueueDescriptor>? result = new();
@@ -245,7 +260,7 @@ namespace NTDLS.CatMQ.Server
         /// </summary>
         public CMqQueueDescriptor? GetQueue(string queueName)
         {
-            while (_keepRunning)
+            while (!CancelContext.IsCancellationRequested)
             {
                 bool success = true;
                 CMqQueueDescriptor? result = new();
@@ -310,7 +325,7 @@ namespace NTDLS.CatMQ.Server
         /// </summary>
         public ReadOnlyCollection<CMqSubscriberDescriptor>? GetSubscribers(string queueName)
         {
-            while (_keepRunning)
+            while (!CancelContext.IsCancellationRequested)
             {
                 bool success = true;
                 var result = new List<CMqSubscriberDescriptor>();
@@ -345,11 +360,24 @@ namespace NTDLS.CatMQ.Server
         }
 
         /// <summary>
+        /// Returns a cloned copy of the historical statistics for a given queue.
+        /// </summary>
+        public Dictionary<DateTime, CMqPerQueueHistoricalStatisticsDescriptor> GetQueueHistoricalStatistics(string queueName)
+            => PerQueueHistoricalStatistics?.GetQueueStatistics(queueName) ?? [];
+
+        /// <summary>
+        /// Returns a cloned copy of the historical statistics for all queues.
+        /// </summary>
+        /// <returns></returns>
+        public Dictionary<DateTime, CMqPerQueueHistoricalStatisticsDescriptor> GetAllQueuesHistoricalStatistics()
+            => PerQueueHistoricalStatistics?.GetAllQueueStatistics() ?? [];
+
+        /// <summary>
         /// Returns a read-only copy messages in the queue.
         /// </summary>
         public CMqEnqueuedMessageDescriptorCollection? GetQueueMessages(string queueName, int offset, int take)
         {
-            while (_keepRunning)
+            while (!CancelContext.IsCancellationRequested)
             {
                 bool success = true;
                 List<CMqEnqueuedMessageDescriptor>? result = new();
@@ -453,7 +481,7 @@ namespace NTDLS.CatMQ.Server
         /// </summary>
         public CMqEnqueuedMessageDescriptor? GetQueueMessage(string queueName, ulong serialNumber, int? truncateToBytes = null)
         {
-            while (_keepRunning)
+            while (!CancelContext.IsCancellationRequested)
             {
                 bool success = true;
                 CMqEnqueuedMessageDescriptor? result = null;
@@ -535,14 +563,19 @@ namespace NTDLS.CatMQ.Server
         /// <summary>
         /// Starts the message queue server.
         /// </summary>
+        /// 
         public void Start(int listenPort)
         {
-            if (_keepRunning)
+            // Already running?
+            if (!CancelContext.IsCancellationRequested)
             {
                 return;
             }
 
-            _keepRunning = true;
+            CancelContext?.Dispose(); // If we had an old CancellationTokenSource, clean it up.
+
+            CancelContext = new CancellationTokenSource();
+            var token = CancelContext.Token;
 
             var messageQueuesToLoad = new List<SingleMessageQueueServer>();
             var deadLetterQueuesToLoad = new List<SingleMessageQueueServer>();
@@ -610,25 +643,64 @@ namespace NTDLS.CatMQ.Server
 
             _rmServer.Start(listenPort);
 
-            new Thread(() => HeartbeatThread())
-            {
-                IsBackground = true
-            }.Start();
+            Task.Run(async () => await HeartbeatThread(CancelContext.Token), CancelContext.Token);
         }
 
-        private void HeartbeatThread()
+        private async Task HeartbeatThread(CancellationToken token)
         {
-            var lastCheckpoint = DateTime.UtcNow;
-
-            while (_keepRunning)
+            try
             {
-                if (DateTime.UtcNow - lastCheckpoint > TimeSpan.FromSeconds(30))
-                {
-                    CheckpointPersistentMessageQueues();
-                    lastCheckpoint = DateTime.UtcNow;
-                }
+                var lastCheckpoint = DateTime.UtcNow;
+                var lastHistoricalStatisticsTouch = DateTime.UtcNow;
 
-                Thread.Sleep(100);
+                PerQueueHistoricalStatistics = _configuration.EnableHistoricalStatistics ? new PerQueueHistoricalStatistics(_configuration) : null;
+
+                while (!token.IsCancellationRequested)
+                {
+                    if (PerQueueHistoricalStatistics != null)
+                    {
+                        try
+                        {
+                            // Periodically touch each queue's granularity slot to ensure that even
+                            //  if no messages are flowing, we still have data points for the charts.
+                            if (DateTime.UtcNow - lastHistoricalStatisticsTouch > TimeSpan.FromSeconds(3))
+                            {
+                                var queues = GetQueues();
+                                if (queues != null)
+                                {
+                                    foreach (var queue in queues)
+                                    {
+                                        PerQueueHistoricalStatistics?.SetDescreteValues(queue.QueueName, queue);
+                                    }
+                                }
+                                lastHistoricalStatisticsTouch = DateTime.UtcNow;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            OnLog?.Invoke(this, CMqErrorLevel.Error, "An error occured while touching HistoricalStatistics", ex);
+                        }
+                    }
+
+                    try
+                    {
+                        if (DateTime.UtcNow - lastCheckpoint > TimeSpan.FromSeconds(30))
+                        {
+                            CheckpointPersistentMessageQueues();
+                            lastCheckpoint = DateTime.UtcNow;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        OnLog?.Invoke(this, CMqErrorLevel.Error, "An error occured in CheckpointPersistentMessageQueues", ex);
+                    }
+
+                    await Task.Delay(1000, token);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Normal during shutdown.
             }
         }
 
@@ -639,7 +711,7 @@ namespace NTDLS.CatMQ.Server
         {
             OnLog?.Invoke(this, CMqErrorLevel.Information, "Stopping service.");
 
-            _keepRunning = false;
+            CancelContext.Cancel();
             OnLog?.Invoke(this, CMqErrorLevel.Information, "Stopping reliable messaging.");
             _rmServer.Stop();
 
@@ -678,7 +750,7 @@ namespace NTDLS.CatMQ.Server
             var dlqName = $"{sourceQueueName}.dlq";
             var dlqKey = dlqName.ToLowerInvariant();
 
-            while (_keepRunning)
+            while (!CancelContext.IsCancellationRequested)
             {
                 bool success = true;
 
@@ -823,7 +895,7 @@ namespace NTDLS.CatMQ.Server
 
             string queueKey = queueName.ToLowerInvariant();
 
-            while (_keepRunning)
+            while (!CancelContext.IsCancellationRequested)
             {
                 bool success = true;
 
@@ -883,7 +955,7 @@ namespace NTDLS.CatMQ.Server
 
             string queueKey = queueName.ToLowerInvariant();
 
-            while (_keepRunning)
+            while (!CancelContext.IsCancellationRequested)
             {
                 bool success = true;
 
@@ -928,7 +1000,7 @@ namespace NTDLS.CatMQ.Server
 
             string queueKey = queueName.ToLowerInvariant();
 
-            while (_keepRunning)
+            while (!CancelContext.IsCancellationRequested)
             {
                 bool success = true;
 
@@ -960,7 +1032,7 @@ namespace NTDLS.CatMQ.Server
 
             string queueKey = queueName.ToLowerInvariant();
 
-            while (_keepRunning)
+            while (!CancelContext.IsCancellationRequested)
             {
                 bool success = true;
 
@@ -995,6 +1067,9 @@ namespace NTDLS.CatMQ.Server
                                 //We have to keep all ephemeral messages in memory.
                                 m.MessageBuffer.Add(message);
                             }
+
+                            PerQueueHistoricalStatistics?.IncrementEnqueuedCount(queueName);
+
                             messageQueue.DeliveryThreadWaitEvent.Set();
                         }) && success;
                     }
@@ -1019,7 +1094,7 @@ namespace NTDLS.CatMQ.Server
         {
             OnLog?.Invoke(this, CMqErrorLevel.Verbose, $"Purging queue: [{queueName}].");
 
-            while (_keepRunning)
+            while (!CancelContext.IsCancellationRequested)
             {
                 bool success = true;
 

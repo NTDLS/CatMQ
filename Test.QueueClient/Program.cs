@@ -83,6 +83,7 @@ namespace Test.QueueClient
 
                         //client.Enqueue("MyFirstQueue", new MyMessage($"Test message {i:n0}"), TimeSpan.FromSeconds(60));
                         client.Enqueue("MyFirstQueue", new MyMessage($"Test message {i:n0}"));
+                        Thread.Sleep(5);
                     }
                 }).Start();
             }
