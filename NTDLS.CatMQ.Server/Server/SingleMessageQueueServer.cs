@@ -243,7 +243,7 @@ namespace NTDLS.CatMQ.Server.Server
             {
                 message.State = await DistributeToSubscribersWithDisposition(message);
 
-                if(message.State == CMqMessageState.Drop || message.State == CMqMessageState.DeadLetter)
+                if (message.State == CMqMessageState.Drop || message.State == CMqMessageState.DeadLetter)
                 {
                     _queueServer.PerQueueHistoricalStatistics?.IncrementDequeuedCount(Configuration.QueueName);
                 }

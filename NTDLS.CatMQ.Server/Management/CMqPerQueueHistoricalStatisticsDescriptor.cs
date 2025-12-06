@@ -3,7 +3,7 @@
     /// <summary>
     /// Contains information about the performance of a queue.
     /// </summary>
-    public class CMqPerQueueHistoricalStatisticsDescriptor: ICloneable
+    public class CMqPerQueueHistoricalStatisticsDescriptor : ICloneable
     {
         /// <summary>
         /// The number of messages received by a client.

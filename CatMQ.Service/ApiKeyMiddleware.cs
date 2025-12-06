@@ -1,6 +1,4 @@
-﻿using System.IO;
-
-namespace CatMQ.Service
+﻿namespace CatMQ.Service
 {
     public class ApiKeyMiddleware
     {
