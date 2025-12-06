@@ -97,6 +97,7 @@ namespace Test.QueueClient
         private static CMqConsumeResult OnMessageReceived(CMqClient client, CMqReceivedMessage rawMessage)
         {
             var message = rawMessage.Deserialize();
+
             if (message is MyMessage myMessage)
             {
                 Console.WriteLine($"Received: {myMessage.Text.Length:n0} bytes");
@@ -105,6 +106,8 @@ namespace Test.QueueClient
             {
                 //Console.WriteLine($"Received: '{message.ObjectType}'->'{message.MessageJson}'");
             }
+
+            Thread.Sleep(20); //Simulate some processing time.
 
             if (rawMessage.DeferredCount > 2)
             {

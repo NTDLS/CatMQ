@@ -155,13 +155,30 @@ namespace NTDLS.CatMQ.Server.Server
                         Statistics.IncrementOutstandingDeliveries();
                         topMessage.State = CMqMessageState.OutForDelivery;
 
-                        try
+                        if (Configuration.AsycnronousDelivery)
                         {
-                            await DistributeToSubscribers(topMessage);
+                            _ = Task.Run(async () =>
+                            {
+                                try
+                                {
+                                    await DistributeToSubscribers(topMessage);
+                                }
+                                finally
+                                {
+                                    Statistics.DecrementOutstandingDeliveries();
+                                }
+                            });
                         }
-                        finally
+                        else
                         {
-                            Statistics.DecrementOutstandingDeliveries();
+                            try
+                            {
+                                await DistributeToSubscribers(topMessage);
+                            }
+                            finally
+                            {
+                                Statistics.DecrementOutstandingDeliveries();
+                            }
                         }
                     }
                     else if (threadYieldBurndown < CMqDefaults.QUEUE_THREAD_DELIVERY_BURNDOWN)
@@ -213,12 +230,12 @@ namespace NTDLS.CatMQ.Server.Server
 
                             for (int sleep = 0; sleep < sleeps && _KeepRunning; sleep++)
                             {
-                                Thread.Sleep(100);
+                                await Task.Delay(100);
                             }
                         }
                         else
                         {
-                            Thread.Sleep((int)Configuration.DeliveryThrottle.TotalMilliseconds);
+                            await Task.Delay((int)Configuration.DeliveryThrottle.TotalMilliseconds);
                         }
                     }
 

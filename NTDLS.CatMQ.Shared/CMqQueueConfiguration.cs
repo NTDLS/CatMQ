@@ -19,6 +19,12 @@ namespace NTDLS.CatMQ.Shared
         }
 
         /// <summary>
+        /// Whether messages are delivered to subscribers asynchronously.
+        /// Messages are still delivered in order per subscriber, but multiple messages can be in-flight to different subscribers at the same time.
+        /// </summary>
+        public bool AsycnronousDelivery { get; set; } = true;
+
+        /// <summary>
         /// The maximum number of simultaneously outstanding asynchronous deliveries.
         /// </summary>
         public int MaxOutstandingDeliveries { get; set; } = 10;
