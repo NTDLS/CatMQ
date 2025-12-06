@@ -35,13 +35,30 @@ namespace CatMQ.Service.Pages
         {
             var queues = mqServer.GetQueues()?.OrderBy(o => o.QueueName)?.ToList() ?? new();
 
-            List<object> records = new();
+            List<object> queueRecords = new();
+
+            long totalSubscribers = 0;
+            long totalDepth = 0;
+            long totalOutstanding = 0;
+            ulong totalReceived = 0;
+            ulong totalDelivered = 0;
+            ulong totalExpired = 0;
+            ulong totalFailed = 0;
+            ulong totalDeferred = 0;
 
             foreach (var queue in queues)
             {
-                records.Add(new
-                {
+                totalSubscribers += queue.CurrentSubscriberCount;
+                totalDepth += queue.QueueDepth;
+                totalOutstanding += queue.CurrentOutstandingDeliveries;
+                totalReceived += queue.ReceivedMessageCount;
+                totalDelivered += queue.DeliveredMessageCount;
+                totalExpired += queue.ExpiredMessageCount;
+                totalFailed += queue.FailedDeliveryCount;
+                totalDeferred += queue.DeferredDeliveryCount;
 
+                queueRecords.Add(new
+                {
                     queueName = queue.QueueName,
                     currentSubscriberCount = queue.CurrentSubscriberCount.ToString("n0"),
                     queueDepth = queue.QueueDepth.ToString("n0"),
@@ -50,10 +67,27 @@ namespace CatMQ.Service.Pages
                     deliveredMessageCount = queue.DeliveredMessageCount.ToString("n0"),
                     expiredMessageCount = queue.ExpiredMessageCount.ToString("n0"),
                     failedDeliveryCount = queue.FailedDeliveryCount.ToString("n0"),
+                    deferredDeliveryCount = queue.DeferredDeliveryCount.ToString("n0")
                 });
             }
 
-            return new JsonResult(records);
+            var totals = new
+            {
+                currentSubscriberCount = totalSubscribers.ToString("n0"),
+                queueDepth = totalDepth.ToString("n0"),
+                currentOutstandingDeliveries = totalOutstanding.ToString("n0"),
+                receivedMessageCount = totalReceived.ToString("n0"),
+                deliveredMessageCount = totalDelivered.ToString("n0"),
+                expiredMessageCount = totalExpired.ToString("n0"),
+                failedDeliveryCount = totalFailed.ToString("n0"),
+                deferredDeliveryCount = totalDeferred.ToString("n0"),
+            };
+
+            return new JsonResult(new
+            {
+                queues = queueRecords,
+                totals = totals
+            });
         }
 
         #region Chart Data.
@@ -92,6 +126,14 @@ namespace CatMQ.Service.Pages
                 .Select(kvp => (double)kvp.Value.DequeuedCount)
                 .ToArray();
 
+            var queueDepthValues = ordered
+                .Select(kvp => (double)kvp.Value.QueueDepth)
+                .ToArray();
+
+            var outstandingValues = ordered
+                .Select(kvp => (double)kvp.Value.OutstandingDeliveries)
+                .ToArray();
+
             var series = new[]
             {
                 new ChartSeriesDto
@@ -108,6 +150,16 @@ namespace CatMQ.Service.Pages
                 {
                     Label = "Dequeued",
                     Values = dequeuedValues
+                },
+                new ChartSeriesDto
+                {
+                    Label = "Depth",
+                    Values = queueDepthValues
+                },
+                new ChartSeriesDto
+                {
+                    Label = "Outstanding",
+                    Values = outstandingValues
                 }
             };
 

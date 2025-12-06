@@ -113,7 +113,7 @@ namespace NTDLS.CatMQ.Server.Server
                                     message.State = CMqMessageState.Drop;
                                 }
 
-                                HistoricalStatistics.IncrementDequeuedCount(Configuration.QueueName);
+                                _queueServer.PerQueueHistoricalStatistics?.IncrementDequeuedCount(Configuration.QueueName);
 
                                 Statistics.IncrementExpiredMessageCount();
                             }
@@ -245,7 +245,7 @@ namespace NTDLS.CatMQ.Server.Server
 
                 if(message.State == CMqMessageState.Drop || message.State == CMqMessageState.DeadLetter)
                 {
-                    HistoricalStatistics.IncrementDequeuedCount(Configuration.QueueName);
+                    _queueServer.PerQueueHistoricalStatistics?.IncrementDequeuedCount(Configuration.QueueName);
                 }
             }
             catch
@@ -302,7 +302,7 @@ namespace NTDLS.CatMQ.Server.Server
                     subscriber.IncrementAttemptedDeliveryCount();
 
                     var deliveryResult = await _queueServer.DeliverMessageWithResultAsync(subscriber.SubscriberId, Configuration.QueueName, message);
-                    HistoricalStatistics.IncrementDeliveryCount(Configuration.QueueName);
+                    _queueServer.PerQueueHistoricalStatistics?.IncrementDeliveryCount(Configuration.QueueName);
 
                     Statistics.IncrementDeliveredMessageCount();
                     subscriber.IncrementSuccessfulDeliveryCount();

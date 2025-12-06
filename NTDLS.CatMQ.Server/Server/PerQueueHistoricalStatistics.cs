@@ -1,27 +1,35 @@
 ﻿using Microsoft.Extensions.Caching.Memory;
 using NTDLS.CatMQ.Server.Management;
+using NTDLS.Helpers;
 
 namespace NTDLS.CatMQ.Server.Server
 {
     /// <summary>
     /// Used to keep a historical record of each queue metrics for the UI charts.
     /// </summary>
-    internal static class HistoricalStatistics
+    internal class PerQueueHistoricalStatistics
     {
-        private const int maxHistoryIntervals = 60;
-        private static readonly MemoryCache _cache = new(new MemoryCacheOptions());
+        private int _maxHistoryIntervals = 60;
+        private readonly MemoryCache _cache = new(new MemoryCacheOptions());
 
-        private static Dictionary<DateTime, CMqQueueHistoricalStatisticsDescriptor> GetQueueDictionary(string queueName)
+        public PerQueueHistoricalStatistics(CMqServerConfiguration _configuration)
         {
-            // GetOrCreate guarantees this returns a non-null dictionary for the key.
-            return _cache.GetOrCreate(queueName, entry =>
-            {
-                entry.SlidingExpiration = TimeSpan.FromHours(1);
-                return new Dictionary<DateTime, CMqQueueHistoricalStatisticsDescriptor>();
-            })!;
+            _maxHistoryIntervals = _configuration.MaxHistoricalStatisticsDatapoints;
         }
 
-        private static CMqQueueHistoricalStatisticsDescriptor? GetCurrentGranularitySlot(string queueName)
+        private Dictionary<DateTime, CMqPerQueueHistoricalStatisticsDescriptor> GetQueueDictionary(string queueName)
+        {
+            return _cache.GetOrCreate(queueName.ToLowerInvariant(), entry =>
+            {
+                entry.SlidingExpiration = TimeSpan.FromHours(1);
+                return new Dictionary<DateTime, CMqPerQueueHistoricalStatisticsDescriptor>();
+            }).EnsureNotNull();
+        }
+
+        public void SetDescreteValues(string queueName, CMqQueueDescriptor queueDescriptor)
+            => GetCurrentGranularitySlot(queueName).SetDescreteValues(queueDescriptor);
+
+        private CMqPerQueueHistoricalStatisticsDescriptor GetCurrentGranularitySlot(string queueName)
         {
             var utcNow = DateTime.UtcNow;
 
@@ -37,19 +45,15 @@ namespace NTDLS.CatMQ.Server.Server
                 DateTimeKind.Utc);
 
             var dictionary = GetQueueDictionary(queueName);
-            if (dictionary == null)
-            {
-                return null;
-            }
 
             lock (dictionary)
             {
                 // Trim the dictionary to the max size (oldest first).
-                if (dictionary.Count > maxHistoryIntervals)
+                if (dictionary.Count > _maxHistoryIntervals)
                 {
                     var keysToRemove = dictionary
                         .OrderBy(kvp => kvp.Key)
-                        .Take(dictionary.Count - maxHistoryIntervals)
+                        .Take(dictionary.Count - _maxHistoryIntervals)
                         .Select(kvp => kvp.Key)
                         .ToList();
 
@@ -62,7 +66,7 @@ namespace NTDLS.CatMQ.Server.Server
                 // Get or create the descriptor for this minute bucket.
                 if (!dictionary.TryGetValue(slot, out var descriptor))
                 {
-                    descriptor = new CMqQueueHistoricalStatisticsDescriptor();
+                    descriptor = new CMqPerQueueHistoricalStatisticsDescriptor();
                     dictionary[slot] = descriptor;
                 }
 
@@ -70,31 +74,27 @@ namespace NTDLS.CatMQ.Server.Server
             }
         }
 
-        public static Dictionary<DateTime, CMqQueueHistoricalStatisticsDescriptor>? GetQueueStatistics(string queueName)
+        public Dictionary<DateTime, CMqPerQueueHistoricalStatisticsDescriptor> GetQueueStatistics(string queueName)
         {
             var dictionary = GetQueueDictionary(queueName);
-            if (dictionary == null)
-            {
-                return null;
-            }
 
             lock (dictionary)
             {
                 // Return a deep-ish clone so callers can't mutate the cached instance.
                 return dictionary.ToDictionary(
                     kvp => kvp.Key,
-                    kvp => (CMqQueueHistoricalStatisticsDescriptor)kvp.Value.Clone()
+                    kvp => (CMqPerQueueHistoricalStatisticsDescriptor)kvp.Value.Clone()
                 );
             }
         }
 
-        public static Dictionary<DateTime, CMqQueueHistoricalStatisticsDescriptor> GetAllQueueStatistics()
+        public Dictionary<DateTime, CMqPerQueueHistoricalStatisticsDescriptor> GetAllQueueStatistics()
         {
-            var result = new Dictionary<DateTime, CMqQueueHistoricalStatisticsDescriptor>();
+            var result = new Dictionary<DateTime, CMqPerQueueHistoricalStatisticsDescriptor>();
 
             foreach (var key in _cache.Keys)
             {
-                if (_cache.TryGetValue(key, out var cacheItem) && cacheItem is Dictionary<DateTime, CMqQueueHistoricalStatisticsDescriptor> dictionary)
+                if (_cache.TryGetValue(key, out var cacheItem) && cacheItem is Dictionary<DateTime, CMqPerQueueHistoricalStatisticsDescriptor> dictionary)
                 {
                     lock (dictionary)
                     {
@@ -105,11 +105,14 @@ namespace NTDLS.CatMQ.Server.Server
                                 agg.EnqueuedCount += kvp.Value.EnqueuedCount;
                                 agg.DeliveryCount += kvp.Value.DeliveryCount;
                                 agg.DequeuedCount += kvp.Value.DequeuedCount;
+                                agg.QueueDepth += kvp.Value.QueueDepth;
+                                agg.SubscriberCount += kvp.Value.SubscriberCount;
+                                agg.OutstandingDeliveries += kvp.Value.OutstandingDeliveries;
                             }
                             else
                             {
                                 // start with a clone so modifications don’t affect cache.
-                                result[kvp.Key] = (CMqQueueHistoricalStatisticsDescriptor)kvp.Value.Clone();
+                                result[kvp.Key] = (CMqPerQueueHistoricalStatisticsDescriptor)kvp.Value.Clone();
                             }
                         }
                     }
@@ -122,14 +125,13 @@ namespace NTDLS.CatMQ.Server.Server
                 .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
         }
 
-
-        public static void IncrementEnqueuedCount(string queueName)
+        public void IncrementEnqueuedCount(string queueName)
             => GetCurrentGranularitySlot(queueName)?.IncrementEnqueuedCount();
 
-        public static void IncrementDeliveryCount(string queueName)
+        public void IncrementDeliveryCount(string queueName)
             => GetCurrentGranularitySlot(queueName)?.IncrementDeliveryCount();
 
-        public static void IncrementDequeuedCount(string queueName)
+        public void IncrementDequeuedCount(string queueName)
             => GetCurrentGranularitySlot(queueName)?.IncrementDequeuedCount();
     }
 }

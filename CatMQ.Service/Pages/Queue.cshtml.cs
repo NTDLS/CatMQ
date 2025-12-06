@@ -126,6 +126,14 @@ namespace CatMQ.Service.Pages
                 .Select(kvp => (double)kvp.Value.DequeuedCount)
                 .ToArray();
 
+            var queueDepthValues = ordered
+                .Select(kvp => (double)kvp.Value.QueueDepth)
+                .ToArray();
+
+            var outstandingValues = ordered
+                .Select(kvp => (double)kvp.Value.OutstandingDeliveries)
+                .ToArray();
+
             var series = new[]
             {
                 new ChartSeriesDto
@@ -142,6 +150,16 @@ namespace CatMQ.Service.Pages
                 {
                     Label = "Dequeued",
                     Values = dequeuedValues
+                },
+                new ChartSeriesDto
+                {
+                    Label = "Depth",
+                    Values = queueDepthValues
+                },
+                new ChartSeriesDto
+                {
+                    Label = "Outstanding",
+                    Values = outstandingValues
                 }
             };
 

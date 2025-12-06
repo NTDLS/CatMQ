@@ -28,7 +28,16 @@
                 }
 
                 const data = await response.json();
-                renderQueues(data);
+                renderQueues(data.queues);
+
+                document.getElementById('q-currentSubscriberCount').textContent = data.totals.currentSubscriberCount;
+                document.getElementById('q-queueDepth').textContent = data.totals.queueDepth;
+                document.getElementById('q-currentOutstandingDeliveries').textContent = data.totals.currentOutstandingDeliveries;
+                document.getElementById('q-receivedMessageCount').textContent = data.totals.receivedMessageCount;
+                document.getElementById('q-deliveredMessageCount').textContent = data.totals.deliveredMessageCount;
+                document.getElementById('q-deferredDeliveryCount').textContent = data.totals.deferredDeliveryCount;
+                document.getElementById('q-expiredMessageCount').textContent = data.totals.expiredMessageCount;
+                document.getElementById('q-failedDeliveryCount').textContent = data.totals.failedDeliveryCount;
             } catch (err) {
                 console.error('Error loading subscribers:', err);
             }
@@ -40,9 +49,9 @@
                     <td><a href="/queue/${queue.queueName}">${queue.queueName}</a></td>
                     <td class="text-end">${queue.currentSubscriberCount}</td>
                     <td class="text-end"><a href="/messages/${queue.queueName}">${queue.queueDepth}</a></td>
-                    <td class="text-end">${queue.currentOutstandingDeliveries}</td>
                     <td class="text-end">${queue.receivedMessageCount}</td>
                     <td class="text-end">${queue.deliveredMessageCount}</td>
+                    <td class="text-end">${queue.deferredDeliveryCount}</td>
                     <td class="text-end">${queue.expiredMessageCount}</td>
                     <td class="text-end">${queue.failedDeliveryCount}</td>
                 </tr>`;
@@ -107,39 +116,34 @@
         </div>
         <div class="card-body">
             <canvas id="queueChart" height="50"></canvas>
-            @*  <table class="table table-striped table-bordered mt-1">
+              <table class="table table-striped table-bordered mt-1">
                 <thead class="table-light">
                     <tr>
-                        <th>Subscribers</th>
-                        <th>Depth</th>
-                        <th>Outstanding</th>
-                        <th>Received</th>
-                        <th>Delivered</th>
-                        <th>Deferred</th>
-                        <th>Expired</th>
-                        <th>Failures</th>
-                        <th>Action</th>
+                        <th class="text-end">Subscribers</th>
+                        <th class="text-end">Depth</th>
+                        <th class="text-end">Outstanding</th>
+                        <th class="text-end">Received</th>
+                        <th class="text-end">Delivered</th>
+                        <th class="text-end">Deferred</th>
+                        <th class="text-end">Expired</th>
+                        <th class="text-end">Failures</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr>
-                        <td id="q-currentSubscriberCount">...</td>
-                        <td><a id="q-queueDepth" href="/messages/@Model.QueueName">...</a></td>
-                        <td id="q-currentOutstandingDeliveries">...</td>
-                        <td id="q-receivedMessageCount">...</td>
-                        <td id="q-deliveredMessageCount">...</td>
-                        <td id="q-deferredDeliveryCount">...</td>
-                        <td id="q-expiredMessageCount">...</td>
-                        <td id="q-failedDeliveryCount">...</td>
-                        <td>
-                            <a class="btn btn-danger btn-thin" href="javascript:void(0)" onclick="onPurgeQueue()">Purge</a>
-                        </td>
+                        <td class="text-end" id="q-currentSubscriberCount">...</td>
+                        <td class="text-end" id="q-queueDepth">...</></td>
+                        <td class="text-end" id="q-currentOutstandingDeliveries">...</td>
+                        <td class="text-end" id="q-receivedMessageCount">...</td>
+                        <td class="text-end" id="q-deliveredMessageCount">...</td>
+                        <td class="text-end" id="q-deferredDeliveryCount">...</td>
+                        <td class="text-end" id="q-expiredMessageCount">...</td>
+                        <td class="text-end" id="q-failedDeliveryCount">...</td>
                     </tr>
                 </tbody>
-            </table> *@
+            </table> 
         </div>
     </div>
-
 
     <div class="card shadow-lg mt-2">
         <div class="card-header">
