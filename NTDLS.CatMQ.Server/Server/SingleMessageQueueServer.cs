@@ -158,28 +158,11 @@ namespace NTDLS.CatMQ.Server.Server
 
                         if (Configuration.AsycnronousDelivery)
                         {
-                            _ = Task.Run(async () =>
-                            {
-                                try
-                                {
-                                    await DistributeToSubscribers(topMessage);
-                                }
-                                finally
-                                {
-                                    Statistics.DecrementOutstandingDeliveries();
-                                }
-                            });
+                            _ = DistributeToSubscribersAsync(topMessage);
                         }
                         else
                         {
-                            try
-                            {
-                                await DistributeToSubscribers(topMessage);
-                            }
-                            finally
-                            {
-                                Statistics.DecrementOutstandingDeliveries();
-                            }
+                            await DistributeToSubscribersAsync(topMessage);
                         }
                     }
                     else if (threadYieldBurndown < CMqDefaults.QUEUE_THREAD_DELIVERY_BURNDOWN)
@@ -255,7 +238,7 @@ namespace NTDLS.CatMQ.Server.Server
             }
         }
 
-        private async Task DistributeToSubscribers(EnqueuedMessage message)
+        private async Task DistributeToSubscribersAsync(EnqueuedMessage message)
         {
             try
             {
@@ -265,6 +248,10 @@ namespace NTDLS.CatMQ.Server.Server
             {
                 message.State = CMqMessageState.Ready;
                 _queueServer.InvokeOnLog(CMqErrorLevel.Fatal, $"Failure of DistributeToSubscribersWithResolution [{Configuration.QueueName}].");
+            }
+            finally
+            {
+                Statistics.DecrementOutstandingDeliveries();
             }
         }
 
@@ -363,7 +350,8 @@ namespace NTDLS.CatMQ.Server.Server
                         subscriber.IncrementDeferredDeliveryCount();
                         Statistics.IncrementDeferredDeliveryCount();
 
-                        EnqueuedMessages.Read(m => m.Database.Store(message));
+                        //The rocksdb database can handle concurrent writes, so we really only need to obtain the object - not lock it.
+                        EnqueuedMessages.Read(messages => messages.Database.Store(message));
 
                         //We return "Ready" so that the message can be re-delivered later and we do not deliver it to any other subscribers.
                         return CMqMessageState.Ready;

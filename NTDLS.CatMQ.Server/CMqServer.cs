@@ -782,33 +782,45 @@ namespace NTDLS.CatMQ.Server
                 {
                     if (mqd.TryGetValue(dlqKey, out var messageQueue))
                     {
-                        success = messageQueue.EnqueuedMessages.TryWrite(CMqDefaults.DEFAULT_TRY_WAIT_MS, m =>
+                        if (messageQueue.Configuration.PersistenceScheme == CMqPersistenceScheme.Persistent)
                         {
-                            //Yes, DLQ messages get a new serial number, its a different queue after all.
-                            var message = givenMessage.CloneForDeadLetter(dlqName, messageQueue.Statistics.GetNextSerialNumber());
-
-                            messageQueue.Statistics.IncrementReceivedMessageCount();
-                            messageQueue.Statistics.IncrementQueueDepth();
-
-                            if (messageQueue.Configuration.PersistenceScheme == CMqPersistenceScheme.Persistent)
+                            //The rocksdb database can handle concurrent writes, so we really only need to obtain the object - not lock it.
+                            success = messageQueue.EnqueuedMessages.TryRead(CMqDefaults.DEFAULT_TRY_WAIT_MS, messages =>
                             {
-                                if (m.Database == null)
+                                if (messages.Database == null)
                                 {
                                     throw new Exception($"Persistence database has not been initialized for [{messageQueue.Configuration.QueueName}].");
                                 }
 
-                                m.Database.Store(message);
+                                //Yes, DLQ messages get a new serial number, its a different queue after all.
+                                var message = givenMessage.CloneForDeadLetter(dlqName, messageQueue.Statistics.GetNextSerialNumber());
+
+                                messageQueue.Statistics.IncrementReceivedMessageCount();
+                                messageQueue.Statistics.IncrementQueueDepth();
+
                                 //For persistent queues, the messages are only loaded into the database.
                                 //They will be buffered into the message buffer by the message queue delivery thread.
-                            }
-                            else
-                            {
-                                //We have to keep all ephemeral messages in memory.
-                                m.MessageBuffer.Add(message);
-                            }
+                                messages.Database.Store(message);
 
-                            messageQueue.DeliveryThreadWaitEvent.Set();
-                        }) && success;
+                                messageQueue.DeliveryThreadWaitEvent.Set();
+                            }) && success;
+                        }
+                        else
+                        {
+                            success = messageQueue.EnqueuedMessages.TryWrite(CMqDefaults.DEFAULT_TRY_WAIT_MS, messages =>
+                            {
+                                //Yes, DLQ messages get a new serial number, its a different queue after all.
+                                var message = givenMessage.CloneForDeadLetter(dlqName, messageQueue.Statistics.GetNextSerialNumber());
+
+                                messageQueue.Statistics.IncrementReceivedMessageCount();
+                                messageQueue.Statistics.IncrementQueueDepth();
+
+                                //We have to keep all ephemeral messages in memory.
+                                messages.MessageBuffer.Add(message);
+
+                                messageQueue.DeliveryThreadWaitEvent.Set();
+                            }) && success;
+                        }
                     }
                     else
                     {
@@ -1064,36 +1076,50 @@ namespace NTDLS.CatMQ.Server
                 {
                     if (mqd.TryGetValue(queueKey, out var messageQueue))
                     {
-                        success = messageQueue.EnqueuedMessages.TryWrite(CMqDefaults.DEFAULT_TRY_WAIT_MS, m =>
+                        if (messageQueue.Configuration.PersistenceScheme == CMqPersistenceScheme.Persistent)
                         {
-                            messageQueue.Statistics.IncrementReceivedMessageCount();
-                            messageQueue.Statistics.IncrementQueueDepth();
-
-                            var message = new EnqueuedMessage(queueKey, assemblyQualifiedTypeName, messageJson, messageQueue.Statistics.GetNextSerialNumber())
+                            success = messageQueue.EnqueuedMessages.TryRead(CMqDefaults.DEFAULT_TRY_WAIT_MS, messages =>
                             {
-                                DeferDuration = deferDeliveryDuration,
-                                DeferredUntil = deferDeliveryDuration == null ? null : DateTime.UtcNow + deferDeliveryDuration
-                            };
-
-                            if (messageQueue.Configuration.PersistenceScheme == CMqPersistenceScheme.Persistent)
-                            {
-                                if (m.Database == null)
+                                if (messages.Database == null)
                                 {
                                     throw new Exception($"Persistence database has not been initialized for [{queueName}].");
                                 }
 
-                                m.Database.Store(message);
+                                messageQueue.Statistics.IncrementReceivedMessageCount();
+                                messageQueue.Statistics.IncrementQueueDepth();
+
+                                var message = new EnqueuedMessage(queueKey, assemblyQualifiedTypeName, messageJson, messageQueue.Statistics.GetNextSerialNumber())
+                                {
+                                    DeferDuration = deferDeliveryDuration,
+                                    DeferredUntil = deferDeliveryDuration == null ? null : DateTime.UtcNow + deferDeliveryDuration
+                                };
+
                                 //For persistent queues, the messages are only loaded into the database.
                                 //They will be buffered into the message buffer by the message queue delivery thread.
-                            }
-                            else
-                            {
-                                //We have to keep all ephemeral messages in memory.
-                                m.MessageBuffer.Add(message);
-                            }
+                                messages.Database.Store(message);
 
-                            messageQueue.DeliveryThreadWaitEvent.Set();
-                        }) && success;
+                                messageQueue.DeliveryThreadWaitEvent.Set();
+                            }) && success;
+                        }
+                        else
+                        {
+                            success = messageQueue.EnqueuedMessages.TryWrite(CMqDefaults.DEFAULT_TRY_WAIT_MS, messages =>
+                            {
+                                messageQueue.Statistics.IncrementReceivedMessageCount();
+                                messageQueue.Statistics.IncrementQueueDepth();
+
+                                var message = new EnqueuedMessage(queueKey, assemblyQualifiedTypeName, messageJson, messageQueue.Statistics.GetNextSerialNumber())
+                                {
+                                    DeferDuration = deferDeliveryDuration,
+                                    DeferredUntil = deferDeliveryDuration == null ? null : DateTime.UtcNow + deferDeliveryDuration
+                                };
+
+                                //We have to keep all ephemeral messages in memory.
+                                messages.MessageBuffer.Add(message);
+
+                                messageQueue.DeliveryThreadWaitEvent.Set();
+                            }) && success;
+                        }
                     }
                     else
                     {
@@ -1160,6 +1186,7 @@ namespace NTDLS.CatMQ.Server
         /// </summary>
         public void Dispose()
         {
+            GC.SuppressFinalize(this);
             Stop();
         }
 
