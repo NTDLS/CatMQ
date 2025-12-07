@@ -114,61 +114,52 @@ namespace CatMQ.Service.Pages
                 .Select(kvp => kvp.Key.ToLocalTime().ToString("HH:mm:ss"))
                 .ToArray();
 
-            var enqueuedValues = ordered
-                .Select(kvp => (double)kvp.Value.EnqueuedCount)
+            var receiveRates = ordered
+                .Select(kvp => (double)kvp.Value.ReceiveRate)
                 .ToArray();
 
-            var deliveredValues = ordered
-                .Select(kvp => (double)kvp.Value.DeliveryCount)
+            var deliveryRates = ordered
+                .Select(kvp => (double)kvp.Value.DeliveryRate)
                 .ToArray();
 
-            var dequeuedValues = ordered
-                .Select(kvp => (double)kvp.Value.DequeuedCount)
+            var deferredDeliveryRates = ordered
+                .Select(kvp => (double)kvp.Value.DeferredDeliveryRate)
                 .ToArray();
 
-            var queueDepthValues = ordered
+            var queueDepths = ordered
                 .Select(kvp => (double)kvp.Value.QueueDepth)
                 .ToArray();
 
-            var outstandingValues = ordered
+            var OutstandingDeliveries = ordered
                 .Select(kvp => (double)kvp.Value.OutstandingDeliveries)
-                .ToArray();
-
-            var deferredValues = ordered
-                .Select(kvp => (double)kvp.Value.DeferredDeliveries)
                 .ToArray();
 
             var series = new[]
             {
                 new ChartSeriesDto
                 {
-                    Label = "Enqueued",
-                    Values = enqueuedValues
+                    Label = "Receive/s",
+                    Values = receiveRates
                 },
                 new ChartSeriesDto
                 {
-                    Label = "Delivered",
-                    Values = deliveredValues
+                    Label = "Delivered/s",
+                    Values = deliveryRates
                 },
                 new ChartSeriesDto
                 {
-                    Label = "Dequeued",
-                    Values = dequeuedValues
+                    Label = "Deferred/s",
+                    Values = deferredDeliveryRates
                 },
                 new ChartSeriesDto
                 {
                     Label = "Depth",
-                    Values = queueDepthValues
+                    Values = queueDepths
                 },
                 new ChartSeriesDto
                 {
                     Label = "Outstanding",
-                    Values = outstandingValues
-                },
-                new ChartSeriesDto
-                {
-                    Label = "Deferred",
-                    Values = deferredValues
+                    Values = OutstandingDeliveries
                 }
             };
 

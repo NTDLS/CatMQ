@@ -24,8 +24,6 @@ namespace NTDLS.CatMQ.Server
         private readonly OptimisticCriticalResource<MessageQueueDictionary> _messageQueues = new();
         private readonly RmServer _rmServer;
 
-        internal PerQueueHistoricalStatistics? PerQueueHistoricalStatistics { get; private set; }
-
         internal CMqServerConfiguration Configuration => _configuration;
 
         /// <summary>
@@ -363,14 +361,44 @@ namespace NTDLS.CatMQ.Server
         /// Returns a cloned copy of the historical statistics for a given queue.
         /// </summary>
         public Dictionary<DateTime, CMqPerQueueHistoricalStatisticsDescriptor> GetQueueHistoricalStatistics(string queueName)
-            => PerQueueHistoricalStatistics?.GetQueueStatistics(queueName) ?? [];
+        {
+            return _messageQueues.Read(mqd =>
+            {
+                return mqd.FirstOrDefault(o => o.Key.Equals(queueName, StringComparison.InvariantCultureIgnoreCase))
+                .Value?.HistoricalStatistics.GetQueueStatistics();
+            }) ?? [];
+        }
 
         /// <summary>
         /// Returns a cloned copy of the historical statistics for all queues.
         /// </summary>
         /// <returns></returns>
         public Dictionary<DateTime, CMqPerQueueHistoricalStatisticsDescriptor> GetAllQueuesHistoricalStatistics()
-            => PerQueueHistoricalStatistics?.GetAllQueueStatistics() ?? [];
+        {
+            var results = new Dictionary<DateTime, CMqPerQueueHistoricalStatisticsDescriptor>();
+
+            _messageQueues.Read(mqd =>
+            {
+                foreach (var mqdKVP in mqd)
+                {
+                    var singleQueueStats = mqdKVP.Value?.HistoricalStatistics.GetQueueStatistics() ?? [];
+
+                    foreach (var singleQueueStat in singleQueueStats)
+                    {
+                        if (results.TryGetValue(singleQueueStat.Key, out var existingResult))
+                        {
+                            existingResult.Merge(singleQueueStat.Value);
+                        }
+                        else
+                        {
+                            results[singleQueueStat.Key] = singleQueueStat.Value.Clone();
+                        }
+                    }
+                }
+            });
+
+            return results;
+        }
 
         /// <summary>
         /// Returns a read-only copy messages in the queue.
@@ -653,26 +681,22 @@ namespace NTDLS.CatMQ.Server
                 var lastCheckpoint = DateTime.UtcNow;
                 var lastHistoricalStatisticsTouch = DateTime.UtcNow;
 
-                PerQueueHistoricalStatistics = _configuration.EnableHistoricalStatistics ? new PerQueueHistoricalStatistics(_configuration) : null;
-
                 while (!token.IsCancellationRequested)
                 {
-                    if (PerQueueHistoricalStatistics != null)
+                    if (_configuration.EnableHistoricalStatistics)
                     {
                         try
                         {
-                            // Periodically touch each queue's granularity slot to ensure that even
-                            //  if no messages are flowing, we still have data points for the charts.
-                            if (DateTime.UtcNow - lastHistoricalStatisticsTouch > TimeSpan.FromSeconds(3))
+                            if (DateTime.UtcNow - lastHistoricalStatisticsTouch > TimeSpan.FromSeconds(1))
                             {
-                                var queues = GetQueues();
-                                if (queues != null)
+                                _messageQueues.Read(mqd =>
                                 {
-                                    foreach (var queue in queues)
+                                    foreach (var mqKVP in mqd)
                                     {
-                                        PerQueueHistoricalStatistics?.SetDescreteValues(queue.QueueName, queue);
+                                        mqKVP.Value.HistoricalStatistics.UpdateCurrentStatistics(mqKVP.Value.Statistics);
                                     }
-                                }
+                                });
+
                                 lastHistoricalStatisticsTouch = DateTime.UtcNow;
                             }
                         }
@@ -1067,8 +1091,6 @@ namespace NTDLS.CatMQ.Server
                                 //We have to keep all ephemeral messages in memory.
                                 m.MessageBuffer.Add(message);
                             }
-
-                            PerQueueHistoricalStatistics?.IncrementEnqueuedCount(queueName);
 
                             messageQueue.DeliveryThreadWaitEvent.Set();
                         }) && success;

@@ -48,7 +48,8 @@ namespace Test.QueueClient
             {
                 PersistenceScheme = CMqPersistenceScheme.Persistent,
                 ConsumptionScheme = CMqConsumptionScheme.FirstConsumedSubscriber,
-                MaxOutstandingDeliveries = 100,
+                AsycnronousDelivery = true,
+                MaxOutstandingDeliveries = 5,
                 DeadLetterConfiguration = new CMqDeadLetterQueueConfiguration()
                 {
                     PersistenceScheme = CMqPersistenceScheme.Persistent,
@@ -73,7 +74,7 @@ namespace Test.QueueClient
 
             for (int t = 0; t < 10; t++)
             {
-                new Thread(() =>
+                new Thread(async () =>
                 {
                     //Enqueue a few messages, note that the message is just a class and it must inherit from ICMqMessage.
                     for (int i = 0; i < 10000; i++)
@@ -82,8 +83,8 @@ namespace Test.QueueClient
                         //client.Enqueue("MyFirstQueue", new MyMessage(message));
 
                         //client.Enqueue("MyFirstQueue", new MyMessage($"Test message {i:n0}"), TimeSpan.FromSeconds(60));
-                        client.Enqueue("MyFirstQueue", new MyMessage($"Test message {i:n0}"));
-                        Thread.Sleep(5);
+                        await client.EnqueueAsync("MyFirstQueue", new MyMessage($"Test message {i:n0}"));
+                        Thread.Sleep(1);
                     }
                 }).Start();
             }
@@ -100,15 +101,18 @@ namespace Test.QueueClient
 
             if (message is MyMessage myMessage)
             {
-                Console.WriteLine($"Received: {myMessage.Text.Length:n0} bytes");
+                //Console.WriteLine($"Received: {myMessage.Text.Length:n0} bytes");
             }
             else
             {
                 //Console.WriteLine($"Received: '{message.ObjectType}'->'{message.MessageJson}'");
             }
 
-            Thread.Sleep(20); //Simulate some processing time.
+            //Thread.Sleep(20); //Simulate some processing time.
 
+            return new CMqConsumeResult(CMqConsumptionDisposition.Consumed);
+
+            /*
             if (rawMessage.DeferredCount > 2)
             {
                 return new CMqConsumeResult(CMqConsumptionDisposition.Consumed);
@@ -118,6 +122,7 @@ namespace Test.QueueClient
             {
                 DeferDuration = (rawMessage.DeferDuration ?? TimeSpan.Zero) + TimeSpan.FromSeconds(1)
             };
+            */
         }
 
         private static void OnBatchReceived(CMqClient client, List<CMqReceivedMessage> rawMessages)

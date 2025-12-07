@@ -3,72 +3,71 @@
     /// <summary>
     /// Contains information about the performance of a queue.
     /// </summary>
-    public class CMqPerQueueHistoricalStatisticsDescriptor : ICloneable
+    public class CMqPerQueueHistoricalStatisticsDescriptor
     {
         /// <summary>
-        /// The number of messages received by a client.
+        /// The rate for which messages are received by the queue (messages per second).
         /// </summary>
-        public long EnqueuedCount;
-        internal void IncrementEnqueuedCount() => Interlocked.Increment(ref EnqueuedCount);
-
+        public double ReceiveRate { get; set; }
         /// <summary>
-        /// The number of messages delivered to a subscriber.
+        /// The rate for which messages are delivered to the subscribers (messages per second).
         /// </summary>
-        public long DeliveryCount;
-        internal void IncrementDeliveryCount() => Interlocked.Increment(ref DeliveryCount);
-
+        public double DeliveryRate { get; set; }
         /// <summary>
-        /// The number of messages dequeued due to successfully deleivery to all requied subscribers, deadletter or expiration.
+        /// The rate at which the messages are expiring from the queue (messages per second).
         /// </summary>
-        public long DequeuedCount;
-        internal void IncrementDequeuedCount() => Interlocked.Increment(ref DequeuedCount);
-
+        public double ExpiracyRate { get; set; }
+        /// <summary>
+        /// The rate at which message deliveries are failing (messages per second).
+        /// </summary>
+        public double FailedDeliveryRate { get; set; }
+        /// <summary>
+        /// The rate at which message deliveries are being deferred (messages per second).
+        /// </summary>
+        public double DeferredDeliveryRate { get; set; }
+        /// <summary>
+        /// The rate at which messages are being explicitedly dead-lettered by the subscriber (messages per second).
+        /// </summary>
+        public double ExplicitDeadLetterRate { get; set; }
+        /// <summary>
+        /// The rate at which messages are being explicitedly dropped (messages per second).
+        /// </summary>
+        public double ExplicitDropRate { get; set; }
         /// <summary>
         /// The current depth of the queue.
         /// </summary>
-        public long QueueDepth;
-        internal void SetQueueDepth(long value) => Interlocked.Exchange(ref QueueDepth, value);
-
-        /// <summary>
-        /// The number of subscriber for this queue.
-        /// </summary>
-        public long SubscriberCount;
-        internal void SetSubscriberCount(long value) => Interlocked.Exchange(ref SubscriberCount, value);
-
+        public long QueueDepth { get; set; }
         /// <summary>
         /// The number of asynchronous deliveries that are currently outstanding.
         /// </summary>
-        public long OutstandingDeliveries;
-        internal void SetOutstandingDeliveries(long value) => Interlocked.Exchange(ref OutstandingDeliveries, value);
+        public long OutstandingDeliveries { get; set; }
 
-        /// <summary>
-        /// The total number of times a subscriber has requested that an attempted delivery be deferred to a later time.
-        /// </summary>
-        public long DeferredDeliveries;
-        internal void IncrementDeferredDeliveries() => Interlocked.Increment(ref DeferredDeliveries);
-
-        internal void SetDescreteValues(CMqQueueDescriptor queueDescriptor)
+        internal void Merge(CMqPerQueueHistoricalStatisticsDescriptor other)
         {
-            SetQueueDepth(queueDescriptor.QueueDepth);
-            SetSubscriberCount(queueDescriptor.CurrentSubscriberCount);
-            SetOutstandingDeliveries(queueDescriptor.CurrentOutstandingDeliveries);
+            ReceiveRate += other.ReceiveRate;
+            DeliveryRate += other.DeliveryRate;
+            ExpiracyRate += other.ExpiracyRate;
+            FailedDeliveryRate += other.FailedDeliveryRate;
+            DeferredDeliveryRate += other.DeferredDeliveryRate;
+            ExplicitDeadLetterRate += other.ExplicitDeadLetterRate;
+            ExplicitDropRate += other.ExplicitDropRate;
+            QueueDepth += other.QueueDepth;
+            OutstandingDeliveries += other.OutstandingDeliveries;
         }
 
-        /// <summary>
-        /// Returns a copy of the CMqQueueHistoricalStatisticsDescriptor.
-        /// </summary>
-        /// <returns></returns>
-        public object Clone()
+        internal CMqPerQueueHistoricalStatisticsDescriptor Clone()
         {
-            return new CMqPerQueueHistoricalStatisticsDescriptor
+            return new CMqPerQueueHistoricalStatisticsDescriptor()
             {
-                EnqueuedCount = EnqueuedCount,
-                DeliveryCount = DeliveryCount,
-                DequeuedCount = DequeuedCount,
-                QueueDepth = QueueDepth,
-                SubscriberCount = SubscriberCount,
-                OutstandingDeliveries = OutstandingDeliveries,
-                DeferredDeliveries = DeferredDeliveries
+                ReceiveRate = this.ReceiveRate,
+                DeliveryRate = this.DeliveryRate,
+                ExpiracyRate = this.ExpiracyRate,
+                FailedDeliveryRate = this.FailedDeliveryRate,
+                DeferredDeliveryRate = this.DeferredDeliveryRate,
+                ExplicitDeadLetterRate = this.ExplicitDeadLetterRate,
+                ExplicitDropRate = this.ExplicitDropRate,
+                QueueDepth = this.QueueDepth,
+                OutstandingDeliveries = this.OutstandingDeliveries
             };
         }
     }

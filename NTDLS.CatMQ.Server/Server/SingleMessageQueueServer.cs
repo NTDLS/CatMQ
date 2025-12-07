@@ -34,10 +34,13 @@ namespace NTDLS.CatMQ.Server.Server
 
         internal MessageQueueStatistics Statistics { get; set; } = new();
 
+        internal HistoricalStatistics HistoricalStatistics { get; private set; }
+
         public SingleMessageQueueServer(CMqServer mqServer, CMqQueueConfiguration queueConfiguration)
         {
             _queueServer = mqServer;
             Configuration = queueConfiguration;
+            HistoricalStatistics = new HistoricalStatistics(_queueServer.Configuration);
         }
 
         private async Task DeliveryThreadProc()
@@ -112,8 +115,6 @@ namespace NTDLS.CatMQ.Server.Server
                                     //No dead-letter queue, just drop the message.
                                     message.State = CMqMessageState.Drop;
                                 }
-
-                                _queueServer.PerQueueHistoricalStatistics?.IncrementDequeuedCount(Configuration.QueueName);
 
                                 Statistics.IncrementExpiredMessageCount();
                             }
@@ -259,11 +260,6 @@ namespace NTDLS.CatMQ.Server.Server
             try
             {
                 message.State = await DistributeToSubscribersWithDisposition(message);
-
-                if (message.State == CMqMessageState.Drop || message.State == CMqMessageState.DeadLetter)
-                {
-                    _queueServer.PerQueueHistoricalStatistics?.IncrementDequeuedCount(Configuration.QueueName);
-                }
             }
             catch
             {
@@ -271,7 +267,6 @@ namespace NTDLS.CatMQ.Server.Server
                 _queueServer.InvokeOnLog(CMqErrorLevel.Fatal, $"Failure of DistributeToSubscribersWithResolution [{Configuration.QueueName}].");
             }
         }
-
 
         /// <summary>
         /// Delivers the message to any remaining subscribers and waits for a disposition from the subscriber.
@@ -319,7 +314,6 @@ namespace NTDLS.CatMQ.Server.Server
                     subscriber.IncrementAttemptedDeliveryCount();
 
                     var deliveryResult = await _queueServer.DeliverMessageWithResultAsync(subscriber.SubscriberId, Configuration.QueueName, message);
-                    _queueServer.PerQueueHistoricalStatistics?.IncrementDeliveryCount(Configuration.QueueName);
 
                     Statistics.IncrementDeliveredMessageCount();
                     subscriber.IncrementSuccessfulDeliveryCount();
@@ -368,7 +362,6 @@ namespace NTDLS.CatMQ.Server.Server
                         message.DeferredCount++;
                         subscriber.IncrementDeferredDeliveryCount();
                         Statistics.IncrementDeferredDeliveryCount();
-                        _queueServer.PerQueueHistoricalStatistics?.IncrementDeferredDeliveries(Configuration.QueueName);
 
                         EnqueuedMessages.Read(m => m.Database.Store(message));
 
