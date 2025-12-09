@@ -61,25 +61,68 @@ namespace NTDLS.CatMQ.Server.Server
                 _deltaContainer.TryCalculatePerSecond("ExplicitDeadLetterCount", now, statistics.ExplicitDeadLetterCount, out var explicitDeadLetterRate);
                 _deltaContainer.TryCalculatePerSecond("ExplicitDropCount", now, statistics.ExplicitDropCount, out var explicitDropRate);
 
-                o[slot] = new CMqPerQueueHistoricalStatisticsDescriptor()
+                if (o.TryGetValue(slot, out var existingSlot))
                 {
+                    existingSlot.Samples++;
+
                     //Rate counters:
-                    ReceiveRate = receiveRate ?? 0,
-                    DeliveryRate = deliveryRate ?? 0,
-                    ExpiracyRate = expiracyRate ?? 0,
-                    FailedDeliveryRate = failedDeliveryRate ?? 0,
-                    DeferredDeliveryRate = deferredDeliveryRate ?? 0,
-                    ExplicitDeadLetterRate = explicitDeadLetterRate ?? 0,
-                    ExplicitDropRate = explicitDropRate ?? 0,
+                    existingSlot.ReceiveRate += receiveRate ?? 0;
+                    existingSlot.DeliveryRate += deliveryRate ?? 0;
+                    existingSlot.ExpiracyRate += expiracyRate ?? 0;
+                    existingSlot.FailedDeliveryRate += failedDeliveryRate ?? 0;
+                    existingSlot.DeferredDeliveryRate += deferredDeliveryRate ?? 0;
+                    existingSlot.ExplicitDeadLetterRate += explicitDeadLetterRate ?? 0;
+                    existingSlot.ExplicitDropRate += explicitDropRate ?? 0;
 
                     //Descrete counters:
-                    OutstandingDeliveries = statistics.OutstandingDeliveries,
-                    QueueDepth = statistics.QueueDepth,
-                };
+                    existingSlot.OutstandingDeliveries = statistics.OutstandingDeliveries;
+                    existingSlot.QueueDepth = statistics.QueueDepth;
+                }
+                else
+                {
+                    o[slot] = new CMqPerQueueHistoricalStatisticsDescriptor()
+                    {
+                        Samples = 1,
+
+                        //Rate counters:
+                        ReceiveRate = receiveRate ?? 0,
+                        DeliveryRate = deliveryRate ?? 0,
+                        ExpiracyRate = expiracyRate ?? 0,
+                        FailedDeliveryRate = failedDeliveryRate ?? 0,
+                        DeferredDeliveryRate = deferredDeliveryRate ?? 0,
+                        ExplicitDeadLetterRate = explicitDeadLetterRate ?? 0,
+                        ExplicitDropRate = explicitDropRate ?? 0,
+
+                        //Descrete counters:
+                        OutstandingDeliveries = statistics.OutstandingDeliveries,
+                        QueueDepth = statistics.QueueDepth,
+                    };
+                }
             });
         }
 
         public Dictionary<DateTime, CMqPerQueueHistoricalStatisticsDescriptor> GetQueueStatistics()
-            => _slots.Use(o => o.ToDictionary(kvp => kvp.Key, kvp => kvp.Value));
+        {
+            var values = _slots.Use(o =>
+            {
+                return o.ToDictionary(kvp => kvp.Key, kvp => new CMqPerQueueHistoricalStatisticsDescriptor()
+                {
+                    //Rate counters:
+                    ReceiveRate = kvp.Value.ReceiveRate / (double)kvp.Value.Samples,
+                    DeliveryRate = kvp.Value.DeliveryRate / (double)kvp.Value.Samples,
+                    ExpiracyRate = kvp.Value.ExpiracyRate / (double)kvp.Value.Samples,
+                    FailedDeliveryRate = kvp.Value.FailedDeliveryRate / (double)kvp.Value.Samples,
+                    DeferredDeliveryRate = kvp.Value.DeferredDeliveryRate / (double)kvp.Value.Samples,
+                    ExplicitDeadLetterRate = kvp.Value.ExplicitDeadLetterRate / (double)kvp.Value.Samples,
+                    ExplicitDropRate = kvp.Value.ExplicitDropRate / (double)kvp.Value.Samples,
+
+                    //Descrete counters:
+                    OutstandingDeliveries = kvp.Value.OutstandingDeliveries,
+                    QueueDepth = kvp.Value.QueueDepth,
+                });
+            });
+
+            return values;
+        }
     }
 }

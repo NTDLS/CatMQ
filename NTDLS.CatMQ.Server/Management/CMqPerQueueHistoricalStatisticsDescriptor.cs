@@ -6,6 +6,11 @@
     public class CMqPerQueueHistoricalStatisticsDescriptor
     {
         /// <summary>
+        /// The number of samples that were used to generate the statistics.
+        /// </summary>
+        public int Samples { get; set; }
+
+        /// <summary>
         /// The rate for which messages are received by the queue (messages per second).
         /// </summary>
         public double ReceiveRate { get; set; }
