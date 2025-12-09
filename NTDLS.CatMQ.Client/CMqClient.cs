@@ -133,9 +133,9 @@ namespace NTDLS.CatMQ.Client
         {
             OnDisconnected?.Invoke(this);
 
-            if (_explicitDisconnect == false && _configuration.AutoReconnect)
+            if (!_explicitDisconnect && _configuration.AutoReconnect)
             {
-                new Thread((o) =>
+                _ = Task.Run(() =>
                 {
                     while (!_explicitDisconnect && !_rmClient.IsConnected)
                     {
@@ -161,7 +161,7 @@ namespace NTDLS.CatMQ.Client
 
                         Thread.Sleep(1000);
                     }
-                }).Start();
+                });
             }
         }
 
@@ -241,7 +241,7 @@ namespace NTDLS.CatMQ.Client
         /// </summary>
         public void ConnectBackground(string hostName, int port)
         {
-            var thread = new Thread(() =>
+            _ = Task.Run(() =>
             {
                 while (!_explicitDisconnect)
                 {
@@ -259,12 +259,7 @@ namespace NTDLS.CatMQ.Client
                     }
                     Thread.Sleep(500);
                 }
-            })
-            {
-                IsBackground = true
-            };
-
-            thread.Start();
+            });
         }
 
         /// <summary>
@@ -272,7 +267,7 @@ namespace NTDLS.CatMQ.Client
         /// </summary>
         public void ConnectBackground(IPAddress ipAddress, int port)
         {
-            new Thread(() =>
+            _ = Task.Run(() =>
             {
                 while (!_explicitDisconnect)
                 {
@@ -290,10 +285,7 @@ namespace NTDLS.CatMQ.Client
                     }
                     Thread.Sleep(500);
                 }
-            })
-            {
-                IsBackground = true
-            }.Start();
+            });
         }
 
         /// <summary>

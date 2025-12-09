@@ -36,11 +36,11 @@ namespace NTDLS.CatMQ.Server
         /// <summary>
         /// Gets or sets a value indicating whether historical statistics are enabled for data collection or analysis.
         /// </summary>
-        public bool EnableHistoricalStatistics { get; set; } = true;
+        public bool EnableHistoricalStatistics { get; set; } = CMqDefaults.DEFAULT_ENABLE_HISTORICAL_STATISTICS;
 
         /// <summary>
         /// The number historical datapoints to retain per queue.
         /// </summary>
-        public int MaxHistoricalStatisticsDatapoints { get; set; } = 60;
+        public int MaxHistoricalStatisticsDatapoints { get; set; } = CMqDefaults.DEFAULT_MAX_HISTORICAL_STATISTICS_DATAPOINTS;
     }
 }

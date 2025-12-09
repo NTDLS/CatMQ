@@ -59,5 +59,20 @@
         /// The port which the queue service will listen on.
         /// </summary>
         public const int DEFAULT_LISTEN_PORT = 45784;
+
+        /// <summary>
+        /// Whether or not the client should attempt to reconnect when unexpectedly disconnected.
+        /// </summary>
+        public const bool DEFAULT_AUTO_RECONNECT = true;
+
+        /// <summary>
+        /// Gets or sets a value indicating whether historical statistics are enabled for data collection or analysis.
+        /// </summary>
+        public const bool DEFAULT_ENABLE_HISTORICAL_STATISTICS = true;
+
+        /// <summary>
+        /// The number historical datapoints to retain per queue.
+        /// </summary>
+        public const int DEFAULT_MAX_HISTORICAL_STATISTICS_DATAPOINTS = 60;
     }
 }

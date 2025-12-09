@@ -10,12 +10,12 @@ namespace NTDLS.CatMQ.Client
         /// <summary>
         /// Whether or not the client should attempt to reconnect when unexpectedly disconnected.
         /// </summary>
-        public bool AutoReconnect { get; set; } = true;
+        public bool AutoReconnect { get; set; } = CMqDefaults.DEFAULT_AUTO_RECONNECT;
 
         /// <summary>
         /// The default amount of time to wait for a query to reply before throwing a timeout exception.
         /// </summary>
-        public TimeSpan QueryTimeout { get; set; } = TimeSpan.FromSeconds(30);
+        public TimeSpan QueryTimeout { get; set; } = TimeSpan.FromSeconds(CMqDefaults.DEFAULT_ACK_TIMEOUT_SECONDS);
 
         /// <summary>
         /// The initial size in bytes of the receive buffer.
