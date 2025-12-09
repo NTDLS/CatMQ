@@ -1,4 +1,4 @@
-#define AppVersion "2.6.1"
+#define AppVersion "2.6.2
 
 [Setup]
 ;-- Main Setup Information

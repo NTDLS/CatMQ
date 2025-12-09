@@ -1,0 +1,167 @@
+﻿@page
+@using NTDLS.Helpers
+@model SystemModel
+@{
+    ViewData["Title"] = "System";
+    var p = Model.ProcessInfo;
+}
+
+<style>
+    .table-fit th:first-child,
+    .table-fit td:first-child {
+        white-space: nowrap;
+        width: 1%;
+    }
+</style>
+
+@section Scripts {
+    <script>
+        async function onCompact() {
+            const url = `/ui/LohCollect`;
+            const message = `Forcing an aggressive collection will release unused memory but can cause temporary performance issues. Continue?`;
+
+            const ok = await showConfirmModal(message);
+            if (!ok) return;
+
+            try {
+                const response = await fetch(url, {
+                    method: "POST",
+                    credentials: 'same-origin',
+                    headers: {
+                        "Accept": "application/json",
+                    }
+                });
+
+                if (!response.ok) {
+                    alert("Operation failed.");
+                    return;
+                }
+
+                window.location.href = "/System";
+            }
+            catch (error) {
+                alert(`Operation failed: ${error}`);
+            }
+        }
+    </script>
+}
+
+<div>
+    <div class="card shadow-lg mt-2">
+        <div class="card-header">
+            <h5>Application</h5>
+        </div>
+        <div class="card-body">
+            <table class="table table-sm table-striped table-fit">
+                <tbody>
+                    <tr><th>Vendor</th><td><a href="http://NetworkDLS.com/">NetworkDLS</a></td></tr>
+                    <tr><th>Product</th><td><a href="https://github.com/NTDLS/CatMQ">CatMQ</a> v@(Model.ApplicationVersion)</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card shadow-lg mt-2">
+        <div class="card-header">
+            <h5>Machine</h5>
+        </div>
+        <div class="card-body">
+            <table class="table table-sm table-striped table-fit">
+                <tbody>
+                    <tr><th>Name</th><td>@p.MachineName</td></tr>
+                    <tr><th>OS</th><td>@p.OSDescription</td></tr>
+                    <tr><th>.NET</th><td>@p.FrameworkDescription</td></tr>
+                    <tr><th>Uptime</th><td>@p.Uptime</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card shadow-lg mt-2">
+        <div class="card-header">
+            <h5>Process</h5>
+        </div>
+        <div class="card-body">
+            <table class="table table-sm table-striped table-fit">
+                <tbody>
+                    <tr><th>Process</th><td>@p.ProcessName (@p.ProcessId)</td></tr>
+                    <tr><th>Start (UTC)</th><td>@p.StartTimeUtc.ToString("u")</td></tr>
+                    <tr><th>Uptime</th><td>@p.Uptime.ToString(@"hh\:mm\:ss")</td></tr>
+                    <tr><th>Threads</th><td>@p.ThreadCount.ToString("N0")</td></tr>
+                    <tr><th>Handles</th><td>@p.HandleCount.ToString("N0")</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card shadow-lg mt-2">
+        <div class="card-header">
+            <h5>CPU</h5>
+        </div>
+        <div class="card-body">
+            <table class="table table-sm table-striped table-fit">
+                <tbody>
+                    <tr><th>CPU Cores</th><td>@p.ProcessorCount</td></tr>
+                    <tr><th>CPU Time</th><td>@p.TotalProcessorTime.ToString(@"hh\:mm\:ss")</td></tr>
+                    <tr><th>Avg. Utilization</th><td>@p.CpuUsagePercentAvg.ToString("N1")%</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card shadow-lg mt-2">
+        <div class="card-header">
+            <h5>Memory</h5>
+        </div>
+        <div class="card-body">
+            <table class="table table-sm table-striped table-fit">
+                <tbody>
+
+                    <tr><th>Working Set</th><td>@p.WorkingSetMb.ToString("N1") MB</td></tr>
+                    <tr><th>Private Memory</th><td>@p.PrivateMemoryMb.ToString("N1") MB</td></tr>
+                    <tr>
+                        <th>GC Heap</th>
+                        <td>
+                            @p.GcHeapSizeMb.ToString("N1") MB of @p.GcAvailableMemMb.ToString("N1") MB
+                            <a class="btn btn-danger btn-thin" href="javascript:void(0)" onclick="onCompact()">Compact</a>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th>GC Collections</th>
+                        <td>
+                            Gen0: @p.GcCollectionGen0,
+                            Gen1: @p.GcCollectionGen1,
+                            Gen2: @p.GcCollectionGen2
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card shadow-lg mt-2">
+        <div class="card-header">
+            <h5>Modules</h5>
+        </div>
+        <div class="card-body">
+            <table class="table table-sm table-striped table-fit">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Version</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var module in Model.Modules)
+                    {
+                        <tr>
+                            <td>@module.Name</td>
+                            <td>@module.Version</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
