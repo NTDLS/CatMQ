@@ -60,6 +60,8 @@ namespace NTDLS.CatMQ.Shared
         /// cref="CMqQueueConfiguration.MaxMessageAge"/>, and <see cref="CMqQueueConfiguration.MaxDeliveryAttempts"/>.</returns>
         public CMqQueueConfiguration ToConfiguration(string parentQueueName)
         {
+            ArgumentNullException.ThrowIfNullOrWhiteSpace(parentQueueName);
+
             return new CMqQueueConfiguration($"{parentQueueName}.dlq")
             {
                 IsDeadLetter = true,

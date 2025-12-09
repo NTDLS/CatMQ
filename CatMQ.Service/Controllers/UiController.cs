@@ -5,9 +5,10 @@ using System.Runtime;
 
 namespace CatMQ.Service.Controllers
 {
+    [ApiController]
     [Authorize]
     [Route("ui")]
-    public class UiController(CMqServer mqServer) : Controller
+    public class UiController(CMqServer mqServer) : ControllerBase
     {
         /// <summary>
         /// Forces garbage collection with aggressive compaction of the large object heap (LOH).
