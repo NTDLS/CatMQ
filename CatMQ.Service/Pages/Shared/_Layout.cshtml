@@ -1,5 +1,9 @@
-﻿@{
-    var accountId = User.Claims.Where(o => o.Type == System.Security.Claims.ClaimTypes.Sid).FirstOrDefault()?.Value;
+﻿@using System.Reflection
+@{
+    var _accountId = User.Claims.Where(o => o.Type == System.Security.Claims.ClaimTypes.Sid).FirstOrDefault()?.Value;
+    var _applicationVersion = string.Join('.', (Assembly.GetExecutingAssembly()
+        .GetName().Version?.ToString() ?? "0.0.0.0").Split('.').Take(3)); //Major.Minor.Patch
+
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -42,7 +46,7 @@
                             <li class="nav-item dropdown">
                                 <a class="nav-link dropdown-toggle text-dark" href="#" id="navbarDropdownMenuLink2" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">My</a>
                                 <div class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdownMenuLink2">
-                                    <a class="nav-link" href="/Account/@accountId">Account</a>
+                                    <a class="nav-link" href="/Account/@_accountId">Account</a>
                                     <div class="dropdown-divider"></div>
                                     <a class="nav-link" asp-page="/Logout">Logout</a>
                                 </div>
@@ -128,7 +132,7 @@
 
     <footer class="border-top footer text-muted">
         <div class="container">
-            CatMQ &copy; 2025 - NetworkDLS
+            <a href="https://github.com/NTDLS/CatMQ">CatMQ</a> v@(_applicationVersion) &copy; 2025 <a href="http://NetworkDLS.com/">NetworkDLS</a>
         </div>
     </footer>
 

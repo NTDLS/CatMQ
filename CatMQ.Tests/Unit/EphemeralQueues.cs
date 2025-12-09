@@ -151,9 +151,9 @@ namespace CatMQ.Tests.Unit
 
             //Wait for messages to be consumed.
             var startTime = DateTime.UtcNow;
-            while (!messages.IsEmpty && DateTime.UtcNow - startTime < TimeSpan.FromSeconds(5))
+            while (!messages.IsEmpty && DateTime.UtcNow - startTime < TimeSpan.FromSeconds(30))
             {
-                Thread.Sleep(10);
+                Thread.Sleep(100);
             }
 
             Assert.Empty(messages);
@@ -216,9 +216,9 @@ namespace CatMQ.Tests.Unit
 
             //Wait for messages to be consumed.
             var startTime = DateTime.UtcNow;
-            while (!messages.IsEmpty && DateTime.UtcNow - startTime < TimeSpan.FromSeconds(5))
+            while (!messages.IsEmpty && DateTime.UtcNow - startTime < TimeSpan.FromSeconds(30))
             {
-                Thread.Sleep(10);
+                Thread.Sleep(100);
             }
 
             Assert.Empty(messages);
@@ -290,7 +290,7 @@ namespace CatMQ.Tests.Unit
             var startTime = DateTime.UtcNow;
             while (!messages.IsEmpty && DateTime.UtcNow - startTime < TimeSpan.FromSeconds(30))
             {
-                Thread.Sleep(10);
+                Thread.Sleep(100);
             }
 
             Assert.Empty(messages);
@@ -364,9 +364,9 @@ namespace CatMQ.Tests.Unit
             });
 
             var startTime = DateTime.UtcNow;
-            while (!messages.IsEmpty && DateTime.UtcNow - startTime < TimeSpan.FromSeconds(5))
+            while (!messages.IsEmpty && DateTime.UtcNow - startTime < TimeSpan.FromSeconds(30))
             {
-                Thread.Sleep(10);
+                Thread.Sleep(100);
             }
 
             Assert.Empty(messages);

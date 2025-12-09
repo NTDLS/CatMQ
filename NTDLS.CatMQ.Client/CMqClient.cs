@@ -131,37 +131,44 @@ namespace NTDLS.CatMQ.Client
 
         private void RmClient_OnDisconnected(RmContext context)
         {
-            OnDisconnected?.Invoke(this);
-
-            if (!_explicitDisconnect && _configuration.AutoReconnect)
+            try
             {
-                _ = Task.Run(() =>
-                {
-                    while (!_explicitDisconnect && !_rmClient.IsConnected)
-                    {
-                        try
-                        {
-                            if (_lastReconnectHost != null)
-                            {
-                                _rmClient.Connect(_lastReconnectHost, _lastReconnectPort);
-                            }
-                            else if (_lastReconnectIpAddress != null)
-                            {
-                                _rmClient.Connect(_lastReconnectIpAddress, _lastReconnectPort);
-                            }
-                            else
-                            {
-                                break; //What else can we do.
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            OnException?.Invoke(this, null, ex.GetBaseException());
-                        }
+                OnDisconnected?.Invoke(this);
 
-                        Thread.Sleep(1000);
-                    }
-                });
+                if (!_explicitDisconnect && _configuration.AutoReconnect)
+                {
+                    _ = Task.Run(() =>
+                    {
+                        while (!_explicitDisconnect && !_rmClient.IsConnected)
+                        {
+                            try
+                            {
+                                if (_lastReconnectHost != null)
+                                {
+                                    Connect(_lastReconnectHost, _lastReconnectPort);
+                                }
+                                else if (_lastReconnectIpAddress != null)
+                                {
+                                    Connect(_lastReconnectIpAddress, _lastReconnectPort);
+                                }
+                                else
+                                {
+                                    throw new Exception("Cannot reconnect because no previous connection information is available.");
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                OnException?.Invoke(this, null, ex.GetBaseException());
+                            }
+
+                            Thread.Sleep(1000);
+                        }
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                OnException?.Invoke(this, null, ex.GetBaseException());
             }
         }
 
@@ -213,6 +220,8 @@ namespace NTDLS.CatMQ.Client
         /// </summary>
         public void Connect(string hostName, int port)
         {
+            ResetBufferedMessagesAndSubscriptions();
+
             _lastReconnectHost = hostName;
             _lastReconnectIpAddress = null;
             _lastReconnectPort = port;
@@ -227,6 +236,8 @@ namespace NTDLS.CatMQ.Client
         /// </summary>
         public void Connect(IPAddress ipAddress, int port)
         {
+            ResetBufferedMessagesAndSubscriptions();
+
             _lastReconnectHost = null;
             _lastReconnectIpAddress = ipAddress;
             _lastReconnectPort = port;
@@ -486,24 +497,69 @@ namespace NTDLS.CatMQ.Client
 
         private void StartBufferedDeliveryTask()
         {
-            if (_bufferedDeliveryTask == null)
+            try
             {
-                lock (this)
+                if (_bufferedDeliveryTask == null)
                 {
-                    _bufferedDeliveryTask ??= Task.Run(BufferedDeliveryTaskProc);
+                    lock (this)
+                    {
+                        _bufferedDeliveryTask ??= Task.Run(BufferedDeliveryTaskProc);
+                    }
                 }
+            }
+            catch (Exception ex)
+            {
+                OnException?.Invoke(this, null, ex.GetBaseException());
             }
         }
 
         private void BufferedDeliveryTaskProc()
         {
-            while (!_explicitDisconnect)
+            try
             {
-                FlushBufferedMessages(false);
-                Thread.Sleep(1);
-            }
+                while (!_explicitDisconnect)
+                {
+                    FlushBufferedMessages(false);
+                    Thread.Sleep(1);
+                }
 
-            FlushBufferedMessages(true);
+                FlushBufferedMessages(true);
+            }
+            catch (Exception ex)
+            {
+                OnException?.Invoke(this, null, ex.GetBaseException());
+            }
+        }
+
+        private void ResetBufferedMessagesAndSubscriptions()
+        {
+            try
+            {
+                bool success;
+
+                do
+                {
+                    success = true;
+
+                    success = _messageBuffer.TryWrite(mb =>
+                    {
+                        if (mb.Count == 0)
+                        {
+                            return;
+                        }
+
+                        success = _subscriptions.TryWrite(s =>
+                        {
+                            s.Clear();
+                            mb.Clear();
+                        }) && success;
+                    }) && success;
+                } while (!success);
+            }
+            catch (Exception ex)
+            {
+                OnException?.Invoke(this, null, ex.GetBaseException());
+            }
         }
 
         /// <summary>
@@ -513,47 +569,54 @@ namespace NTDLS.CatMQ.Client
         /// We do this because we *typically* allow failure-to-lock to defer the event.</param>
         private void FlushBufferedMessages(bool ensureEmpty)
         {
-            bool success;
-
-            do
+            try
             {
-                success = true;
+                bool success;
 
-                success = _messageBuffer.TryWrite(mb =>
+                do
                 {
-                    if (mb.Count == 0)
-                    {
-                        return;
-                    }
+                    success = true;
 
-                    success = _subscriptions.TryRead(s =>
+                    success = _messageBuffer.TryWrite(mb =>
                     {
-                        foreach (var subscription in s.Values)
+                        if (mb.Count == 0)
                         {
-                            foreach (var messageBuffer in mb)
-                            {
-                                if (messageBuffer.Value.Count == 0)
-                                {
-                                    subscription.LastBufferFlushed = DateTime.UtcNow;
-                                }
-                                else if (messageBuffer.Value.Count >= subscription.BatchSize
-                                    || (subscription.AutoFlushInterval != TimeSpan.Zero
-                                    && (DateTime.UtcNow - subscription.LastBufferFlushed) >= subscription.AutoFlushInterval))
-                                {
-                                    if (messageBuffer.Key == subscription.Id)
-                                    {
-                                        var bufferedValueClone = messageBuffer.Value.ToList();
-                                        Task.Run(() => subscription.BatchDeliveryEvent?.Invoke(this, bufferedValueClone));
-                                        messageBuffer.Value.Clear();
-                                    }
+                            return;
+                        }
 
-                                    subscription.LastBufferFlushed = DateTime.UtcNow;
+                        success = _subscriptions.TryRead(s =>
+                        {
+                            foreach (var subscription in s.Values)
+                            {
+                                foreach (var messageBuffer in mb)
+                                {
+                                    if (messageBuffer.Value.Count == 0)
+                                    {
+                                        subscription.LastBufferFlushed = DateTime.UtcNow;
+                                    }
+                                    else if (messageBuffer.Value.Count >= subscription.BatchSize
+                                        || (subscription.AutoFlushInterval != TimeSpan.Zero
+                                        && (DateTime.UtcNow - subscription.LastBufferFlushed) >= subscription.AutoFlushInterval))
+                                    {
+                                        if (messageBuffer.Key == subscription.Id)
+                                        {
+                                            var bufferedValueClone = messageBuffer.Value.ToList();
+                                            Task.Run(() => subscription.BatchDeliveryEvent?.Invoke(this, bufferedValueClone));
+                                            messageBuffer.Value.Clear();
+                                        }
+
+                                        subscription.LastBufferFlushed = DateTime.UtcNow;
+                                    }
                                 }
                             }
-                        }
+                        }) && success;
                     }) && success;
-                }) && success;
-            } while (!success && ensureEmpty);
+                } while (!success && ensureEmpty);
+            }
+            catch (Exception ex)
+            {
+                OnException?.Invoke(this, null, ex.GetBaseException());
+            }
         }
 
         #endregion
