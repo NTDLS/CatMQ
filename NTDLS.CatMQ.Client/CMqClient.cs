@@ -543,11 +543,6 @@ namespace NTDLS.CatMQ.Client
 
                     success = _messageBuffer.TryWrite(mb =>
                     {
-                        if (mb.Count == 0)
-                        {
-                            return;
-                        }
-
                         success = _subscriptions.TryWrite(s =>
                         {
                             s.Clear();
