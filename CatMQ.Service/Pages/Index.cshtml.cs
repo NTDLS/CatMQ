@@ -134,27 +134,32 @@ namespace CatMQ.Service.Pages
                 new ChartSeriesDto
                 {
                     Label = "Receive/s",
-                    Values = receiveRates
+                    Values = receiveRates,
+                    YAxisId = "y"
                 },
                 new ChartSeriesDto
                 {
                     Label = "Delivered/s",
-                    Values = deliveryRates
+                    Values = deliveryRates,
+                    YAxisId = "y"
                 },
                 new ChartSeriesDto
                 {
                     Label = "Deferred/s",
-                    Values = deferredDeliveryRates
+                    Values = deferredDeliveryRates,
+                    YAxisId = "y"
                 },
                 new ChartSeriesDto
                 {
                     Label = "Depth",
-                    Values = queueDepths
+                    Values = queueDepths,
+                    YAxisId = "y1"
                 },
                 new ChartSeriesDto
                 {
                     Label = "Outstanding",
-                    Values = OutstandingDeliveries
+                    Values = OutstandingDeliveries,
+                    YAxisId = "y"
                 }
             };
 
@@ -175,6 +180,7 @@ namespace CatMQ.Service.Pages
 
         public class ChartSeriesDto
         {
+            public string YAxisId { get; set; } = string.Empty;
             public string Label { get; set; } = string.Empty;
             public IEnumerable<double> Values { get; set; } = Enumerable.Empty<double>();
         }

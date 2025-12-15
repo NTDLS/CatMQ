@@ -56,7 +56,10 @@ async function buildOrUpdateChart() {
                         backgroundColor: color.background,
                         borderWidth: 2,
                         tension: 0.3,
-                        fill: true
+                        fill: true,
+                        pointRadius: 0,
+                        pointHoverRadius: 0,
+                        hitRadius: 6
                     };
                 })
             },
@@ -71,7 +74,18 @@ async function buildOrUpdateChart() {
                     easing: "easeOutQuad"
                 },
                 scales: {
-                    y: { beginAtZero: true }
+                    // default two axes – can add more, but they seem to be auto-added.
+                    y: {
+                        type: "linear",
+                        position: "left",
+                        beginAtZero: true
+                    },
+                    y1: {
+                        type: "linear",
+                        position: "right",
+                        beginAtZero: true,
+                        grid: { drawOnChartArea: false } // don’t double-draw grid
+                    }
                 }
             }
         });
@@ -86,6 +100,7 @@ async function buildOrUpdateChart() {
         const ds = queueChart.data.datasets[index];
         ds.label = s.label;
         ds.data = s.values;
+        ds.yAxisID = s.yAxisId || "y";
     });
 
     queueChart.update();
