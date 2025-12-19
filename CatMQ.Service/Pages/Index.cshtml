@@ -49,6 +49,7 @@
                     <td><a href="/queue/${queue.queueName}">${queue.queueName}</a></td>
                     <td class="text-end">${queue.currentSubscriberCount}</td>
                     <td class="text-end"><a href="/messages/${queue.queueName}">${queue.queueDepth}</a></td>
+                    <td class="text-end">${queue.currentOutstandingDeliveries}</td>
                     <td class="text-end">${queue.receivedMessageCount}</td>
                     <td class="text-end">${queue.deliveredMessageCount}</td>
                     <td class="text-end">${queue.deferredDeliveryCount}</td>
@@ -128,7 +129,7 @@
                             <th class="text-end">Delivered</th>
                             <th class="text-end">Deferred</th>
                             <th class="text-end">Expired</th>
-                            <th class="text-end">Failures</th>
+                            <th class="text-end">Delivery Failures</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -160,11 +161,12 @@
                             <th>Name</th>
                             <th class="text-end">Subscribers</th>
                             <th class="text-end">Depth</th>
+                            <th class="text-end">Outstanding</th>
                             <th class="text-end">Received</th>
                             <th class="text-end">Delivered</th>
                             <th class="text-end">Deferred</th>
                             <th class="text-end">Expired</th>
-                            <th class="text-end">Failures</th>
+                            <th class="text-end">Delivery Failures</th>
                         </tr>
                     </thead>
                     <tbody id="queues-body">
