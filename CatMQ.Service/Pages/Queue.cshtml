@@ -200,6 +200,18 @@
 <div>
     <h6 class="display-6">@Model.QueueName</h6>
 
+    @if (string.IsNullOrEmpty(@Model.QueueErrorMessage) == false)
+    {
+        <div class="card shadow-lg mt-2 border-danger">
+            <div class="card-header text-danger">
+                <h5>Critical Queue Error</h5>
+            </div>
+            <div class="card-body d-flex align-items-center">
+                @Model.QueueErrorMessage
+            </div>
+        </div>
+    }
+
     <div class="card shadow-lg mt-2">
         <div class="card-header">
             <h5>Configuration</h5>

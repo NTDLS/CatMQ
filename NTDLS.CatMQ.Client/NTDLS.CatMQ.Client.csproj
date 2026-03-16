@@ -1,53 +1,53 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-    <TargetFrameworks>net8.0;net9.0;net10.0;</TargetFrameworks>
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
-    <Title>NTDLS.CatMQ.Client</Title>
-    <Copyright>Copyright © 2025 NetworkDLS</Copyright>
-    <Description>
-      A high-performance and reliable persistent message queue designed for efficient inter-process communication, task queuing, load balancing, and data buffering over TCP/IP.
-    </Description>
-    <PackageProjectUrl>https://github.com/NTDLS/NTDLS.CatMQ</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/NTDLS/NTDLS.CatMQ</RepositoryUrl>
-    <PackageTags>ipc;message-queue;inter-process-communication;tcp-ip;message-broker;mq;</PackageTags>
-    <PackageReleaseNotes>
-      Additional overloads async Enqueue methods.
-    </PackageReleaseNotes>
-    <RepositoryType>git</RepositoryType>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <Authors>NetworkDLS</Authors>
-    <Company>NetworkDLS</Company>
-    <version>2.6.5</version>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageIcon>Logo.png</PackageIcon>
-    <ApplicationIcon>Logo.ico</ApplicationIcon>
-    <IncludeSymbols>True</IncludeSymbols>
-    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
-  </PropertyGroup>
-  
-  <ItemGroup>
-    <Content Include="Logo.ico">
-      <Pack>False</Pack>
-    </Content>
-  </ItemGroup>
+	<PropertyGroup>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<TargetFrameworks>net8.0;net9.0;net10.0;</TargetFrameworks>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+		<Title>NTDLS.CatMQ.Client</Title>
+		<Copyright>Copyright © 2026 NetworkDLS</Copyright>
+		<Description>
+			A high-performance and reliable persistent message queue designed for efficient inter-process communication, task queuing, load balancing, and data buffering over TCP/IP.
+		</Description>
+		<PackageProjectUrl>https://github.com/NTDLS/NTDLS.CatMQ</PackageProjectUrl>
+		<RepositoryUrl>https://github.com/NTDLS/NTDLS.CatMQ</RepositoryUrl>
+		<PackageTags>ipc;message-queue;inter-process-communication;tcp-ip;message-broker;mq;</PackageTags>
+		<PackageReleaseNotes>
+			Improved stability and error reporting.
+		</PackageReleaseNotes>
+		<RepositoryType>git</RepositoryType>
+		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+		<Authors>NetworkDLS</Authors>
+		<Company>NetworkDLS</Company>
+		<version>2.6.6</version>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+		<PackageIcon>Logo.png</PackageIcon>
+		<ApplicationIcon>Logo.ico</ApplicationIcon>
+		<IncludeSymbols>True</IncludeSymbols>
+		<SymbolPackageFormat>snupkg</SymbolPackageFormat>
+	</PropertyGroup>
 
-  <ItemGroup>
-    <None Include="..\Images\Logo.png">
-      <Pack>True</Pack>
-      <PackagePath>\</PackagePath>
-    </None>
-    <None Include="..\README.md">
-      <Pack>True</Pack>
-      <PackagePath>\</PackagePath>
-    </None>
-  </ItemGroup>
+	<ItemGroup>
+		<Content Include="Logo.ico">
+			<Pack>False</Pack>
+		</Content>
+	</ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\NTDLS.CatMQ.Shared\NTDLS.CatMQ.Shared.csproj" />
-  </ItemGroup>
+	<ItemGroup>
+		<None Include="..\Images\Logo.png">
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</None>
+		<None Include="..\README.md">
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</None>
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\NTDLS.CatMQ.Shared\NTDLS.CatMQ.Shared.csproj" />
+	</ItemGroup>
 
 </Project>

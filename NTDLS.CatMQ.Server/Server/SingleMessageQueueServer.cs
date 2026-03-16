@@ -16,6 +16,16 @@ namespace NTDLS.CatMQ.Server.Server
         private Task? _deliveryTask;
         private bool _KeepRunning;
 
+        public bool IsInitialized { get; private set; }
+        public bool IsStarted { get; private set; }
+
+        /// <summary>
+        /// This property is set when there is an error that prevents the queue from functioning properly, such as a failure to initialize the persistent database.
+        /// When this property is set, the queue will not accept messages for delivery to subscribers and will not attempt to deliver messages to subscribers.
+        /// The presence of an error message in this property should be considered a critical failure of the queue.
+        /// </summary>
+        public string? ErrorMessage { get; private set; }
+
         internal AutoResetEvent DeliveryThreadWaitEvent = new(false);
 
         /// <summary>
@@ -52,6 +62,8 @@ namespace NTDLS.CatMQ.Server.Server
             bool attemptBufferRehydration = false;
 
             int threadYieldBurndown = CMqDefaults.QUEUE_THREAD_DELIVERY_BURNDOWN; //Just used to omit waiting. We want to spin fast when we are delivering messages.
+
+            IsStarted = true;
 
             while (_KeepRunning)
             {
@@ -482,56 +494,78 @@ namespace NTDLS.CatMQ.Server.Server
 
         public void InitializePersistentDatabase()
         {
-            if (Configuration.PersistenceScheme != CMqPersistenceScheme.Persistent)
+            try
             {
-                return;
+                if (Configuration.PersistenceScheme != CMqPersistenceScheme.Persistent)
+                {
+                    IsInitialized = true;
+                    return;
+                }
+
+                _queueServer.InvokeOnLog(CMqErrorLevel.Information, $"Creating persistent path for [{Configuration.QueueName}].");
+
+                var databasePath = Path.Join(_queueServer.Configuration.PersistencePath, "messages", Configuration.QueueName);
+                Directory.CreateDirectory(databasePath);
+
+                _queueServer.InvokeOnLog(CMqErrorLevel.Information, $"Instantiating persistent database for [{Configuration.QueueName}].");
+                var options = new DbOptions().SetCreateIfMissing(true);
+                var persistenceDatabase = RocksDb.Open(options, databasePath);
+
+                _queueServer.InvokeOnLog(CMqErrorLevel.Information, $"Loading persistent messages for [{Configuration.QueueName}].");
+
+                EnqueuedMessages.Write(m =>
+                {
+                    Statistics.SetQueueDepth(0);
+
+                    int messagesLoaded = 0;
+                    var lastSerialNumberBytes = BitConverter.GetBytes((ulong)0);
+
+                    using var iterator = persistenceDatabase.NewIterator();
+                    for (iterator.SeekToFirst(); iterator.Valid(); iterator.Next())
+                    {
+                        lastSerialNumberBytes = iterator.Key();
+                        messagesLoaded++;
+                    }
+
+                    if (BitConverter.IsLittleEndian)
+                    {
+                        Array.Reverse(lastSerialNumberBytes); // Convert back to little-endian.
+                    }
+                    var lastSerialNumber = BitConverter.ToUInt64(lastSerialNumberBytes);
+
+                    _queueServer.InvokeOnLog(CMqErrorLevel.Information, $"Loaded {messagesLoaded:n0} messages for [{Configuration.QueueName}] with serial number 0x{lastSerialNumber:x}.");
+
+                    Statistics.SetQueueDepth(messagesLoaded);
+                    Statistics.SetLastSerialNumber(lastSerialNumber);
+
+                    m.Database = persistenceDatabase;
+                });
+
+                IsInitialized = true;
             }
-
-            _queueServer.InvokeOnLog(CMqErrorLevel.Information, $"Creating persistent path for [{Configuration.QueueName}].");
-
-            var databasePath = Path.Join(_queueServer.Configuration.PersistencePath, "messages", Configuration.QueueName);
-            Directory.CreateDirectory(databasePath);
-
-            _queueServer.InvokeOnLog(CMqErrorLevel.Information, $"Instantiating persistent database for [{Configuration.QueueName}].");
-            var options = new DbOptions().SetCreateIfMissing(true);
-            var persistenceDatabase = RocksDb.Open(options, databasePath);
-
-            _queueServer.InvokeOnLog(CMqErrorLevel.Information, $"Loading persistent messages for [{Configuration.QueueName}].");
-
-            EnqueuedMessages.Write(m =>
+            catch (Exception ex)
             {
-                Statistics.SetQueueDepth(0);
-
-                int messagesLoaded = 0;
-                var lastSerialNumberBytes = BitConverter.GetBytes((ulong)0);
-
-                using var iterator = persistenceDatabase.NewIterator();
-                for (iterator.SeekToFirst(); iterator.Valid(); iterator.Next())
-                {
-                    lastSerialNumberBytes = iterator.Key();
-                    messagesLoaded++;
-                }
-
-                if (BitConverter.IsLittleEndian)
-                {
-                    Array.Reverse(lastSerialNumberBytes); // Convert back to little-endian.
-                }
-                var lastSerialNumber = BitConverter.ToUInt64(lastSerialNumberBytes);
-
-                _queueServer.InvokeOnLog(CMqErrorLevel.Information, $"Loaded {messagesLoaded:n0} messages for [{Configuration.QueueName}] with serial number 0x{lastSerialNumber:x}.");
-
-                Statistics.SetQueueDepth(messagesLoaded);
-                Statistics.SetLastSerialNumber(lastSerialNumber);
-
-                m.Database = persistenceDatabase;
-            });
+                ErrorMessage = $"Critical error occurred initializing persistence database for [{Configuration.QueueName}]. Exception: {ex.GetBaseException().Message}";
+                _queueServer.InvokeOnLog(CMqErrorLevel.Error, ErrorMessage);
+            }
         }
 
         public void Start()
         {
             _queueServer.InvokeOnLog(CMqErrorLevel.Information, $"Starting delivery thread for [{Configuration.QueueName}].");
             _KeepRunning = true;
-            _deliveryTask = Task.Run(() => DeliveryThreadProc());
+            _deliveryTask = Task.Run(async () =>
+            {
+                try
+                {
+                    await DeliveryThreadProc();
+                }
+                catch (Exception ex)
+                {
+                    ErrorMessage = $"Critical error occurred in delivery thread [{Configuration.QueueName}]. Exception: {ex.GetBaseException().Message}";
+                    _queueServer.InvokeOnLog(CMqErrorLevel.Error, ErrorMessage);
+                }
+            });
         }
 
         public void SignalShutdown()

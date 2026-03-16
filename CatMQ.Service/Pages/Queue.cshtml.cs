@@ -12,14 +12,17 @@ namespace CatMQ.Service.Pages
         [BindProperty(SupportsGet = true)]
         public string QueueName { get; set; } = string.Empty;
 
+        public string? QueueErrorMessage { get; set; } = string.Empty;
+
         private readonly ILogger<QueueModel> _logger = logger;
 
         public void OnGet()
         {
             try
             {
-                //Get the queue name (case insensitive) from the server to ensure it exists.
-                QueueName = mqServer.GetQueue(QueueName)?.QueueName ?? string.Empty;
+                var queue = mqServer.GetQueue(QueueName);
+                QueueName = queue?.QueueName ?? string.Empty;
+                QueueErrorMessage = queue?.ErrorMessage;
             }
             catch (Exception ex)
             {

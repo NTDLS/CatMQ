@@ -54,6 +54,7 @@ namespace CatMQ.Service.Pages
 
                 queueRecords.Add(new
                 {
+                    errorMessage = queue.ErrorMessage,
                     queueName = queue.QueueName,
                     currentSubscriberCount = queue.CurrentSubscriberCount.ToString("n0"),
                     queueDepth = queue.QueueDepth.ToString("n0"),

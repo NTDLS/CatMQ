@@ -6,7 +6,6 @@ using NTDLS.CatMQ.Server;
 namespace CatMQ.Service.Pages
 {
     [Authorize]
-
     public class QueuesModel(ILogger<QueuesModel> logger, CMqServer mqServer) : BasePageModel
     {
         private readonly ILogger<QueuesModel> _logger = logger;
@@ -33,7 +32,7 @@ namespace CatMQ.Service.Pages
             {
                 records.Add(new
                 {
-
+                    errorMessage = queue.ErrorMessage,
                     queueName = queue.QueueName,
                     currentSubscriberCount = queue.CurrentSubscriberCount.ToString("n0"),
                     queueDepth = queue.QueueDepth.ToString("n0"),

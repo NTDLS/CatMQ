@@ -1,11 +1,11 @@
-#define AppVersion "2.6.4"
+#define AppVersion "2.6.6"
 
 [Setup]
 ;-- Main Setup Information
  AppName                          = CatMQ
  AppVersion                       = {#AppVersion}
  AppVerName                       = CatMQ {#AppVersion}
- AppCopyright                     = Copyright © 1995-2025 NetworkDLS.
+ AppCopyright                     = Copyright © 1995-2026 NetworkDLS.
  DefaultDirName                   = {commonpf}\NetworkDLS\CatMQ
  DefaultGroupName                 = NetworkDLS\CatMQ
  UninstallDisplayIcon             = {app}\CatMQ.Service.exe

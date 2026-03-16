@@ -33,7 +33,7 @@
 
         function buildRow(queue) {
             return `
-                <tr>
+                <tr${queue.errorMessage ? ' class="table-danger"' : ''}>
                     <td><a href="/queue/${queue.queueName}">${queue.queueName}</a></td>
                     <td class="text-end">${queue.currentSubscriberCount}</td>
                     <td class="text-end"><a href="/messages/${queue.queueName}">${queue.queueDepth}</a></td>

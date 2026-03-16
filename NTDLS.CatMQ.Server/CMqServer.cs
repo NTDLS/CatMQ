@@ -210,6 +210,10 @@ namespace NTDLS.CatMQ.Server
                         {
                             result.Add(new CMqQueueDescriptor
                             {
+                                IsInitialized = mqKVP.Value.IsInitialized,
+                                IsStarted = mqKVP.Value.IsStarted,
+                                ErrorMessage = mqKVP.Value.ErrorMessage,
+
                                 ConsumptionScheme = mqKVP.Value.Configuration.ConsumptionScheme,
                                 DeliveryScheme = mqKVP.Value.Configuration.DeliveryScheme,
                                 DeliveryThrottle = mqKVP.Value.Configuration.DeliveryThrottle,
@@ -272,6 +276,10 @@ namespace NTDLS.CatMQ.Server
                         {
                             result = new CMqQueueDescriptor
                             {
+                                IsInitialized = queue.IsInitialized,
+                                IsStarted = queue.IsStarted,
+                                ErrorMessage = queue.ErrorMessage,
+
                                 ConsumptionScheme = queue.Configuration.ConsumptionScheme,
                                 DeliveryScheme = queue.Configuration.DeliveryScheme,
                                 DeliveryThrottle = queue.Configuration.DeliveryThrottle,
@@ -625,30 +633,38 @@ namespace NTDLS.CatMQ.Server
                        {
                            foreach (var queueMeta in queueMetas)
                            {
-                               var messageQueue = new SingleMessageQueueServer(this, queueMeta.Configuration)
+                               try
                                {
-                                   Statistics = queueMeta.Statistics
-                               };
-                               queuesToStart.Add(messageQueue);
+                                   var messageQueue = new SingleMessageQueueServer(this, queueMeta.Configuration)
+                                   {
+                                       Statistics = queueMeta.Statistics
+                                   };
+                                   queuesToStart.Add(messageQueue);
 
-                               if (messageQueue.Configuration.QueueName.EndsWith(".dlq"))
-                               {
-                                   deadLetterQueuesToLoad.Add(messageQueue);
-                               }
-                               else
-                               {
-                                   messageQueuesToLoad.Add(messageQueue);
-                               }
-                               mqd.Add(queueMeta.Configuration.QueueName.ToLowerInvariant(), messageQueue);
+                                   if (messageQueue.Configuration.QueueName.EndsWith(".dlq"))
+                                   {
+                                       deadLetterQueuesToLoad.Add(messageQueue);
+                                   }
+                                   else
+                                   {
+                                       messageQueuesToLoad.Add(messageQueue);
+                                   }
+                                   mqd.Add(queueMeta.Configuration.QueueName.ToLowerInvariant(), messageQueue);
 
-                               if (queueMeta.Configuration.DeadLetterConfiguration != null
-                                   && queueMeta.Configuration.DeadLetterConfiguration.PersistenceScheme == CMqPersistenceScheme.Ephemeral)
+                                   if (queueMeta.Configuration.DeadLetterConfiguration != null
+                                       && queueMeta.Configuration.DeadLetterConfiguration.PersistenceScheme == CMqPersistenceScheme.Ephemeral)
+                                   {
+                                       //Persistent DLQs are created by default, if the queue has an Ephemeral DLQ then we need to manually create it.
+                                       var dlqConfig = queueMeta.Configuration.DeadLetterConfiguration.ToConfiguration(queueMeta.Configuration.QueueName);
+                                       var dlq = new SingleMessageQueueServer(this, dlqConfig);
+                                       queuesToStart.Add(dlq);
+                                       mqd.Add(dlqConfig.QueueName.ToLowerInvariant(), dlq);
+                                   }
+                               }
+                               catch (Exception ex)
                                {
-                                   //Persistent DLQs are created by default, if the queue has an Ephemeral DLQ then we need to manually create it.
-                                   var dlqConfig = queueMeta.Configuration.DeadLetterConfiguration.ToConfiguration(queueMeta.Configuration.QueueName);
-                                   var dlq = new SingleMessageQueueServer(this, dlqConfig);
-                                   queuesToStart.Add(dlq);
-                                   mqd.Add(dlqConfig.QueueName.ToLowerInvariant(), dlq);
+                                   var exception = $"Critical error occurred while loading metadata for [{queueMeta.Configuration.QueueName}]. Exception: {ex.GetBaseException().Message}";
+                                   InvokeOnLog(CMqErrorLevel.Error, exception);
                                }
                            }
                        });
@@ -664,7 +680,7 @@ namespace NTDLS.CatMQ.Server
             Task.WaitAll(loadTasks);
 
             OnLog?.Invoke(this, CMqErrorLevel.Information, "Starting queues.");
-            foreach (var mq in queuesToStart)
+            foreach (var mq in queuesToStart.Where(o => o.IsInitialized == true))
             {
                 mq.Start();
             }

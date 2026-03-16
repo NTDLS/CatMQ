@@ -8,6 +8,21 @@ namespace NTDLS.CatMQ.Server.Management
     public class CMqQueueDescriptor()
     {
         /// <summary>
+        /// Returns true if the queue has been initialized. This does not mean that the queue is started.
+        /// </summary>
+        public bool IsInitialized { get; internal set; }
+
+        /// <summary>
+        /// Returns true if the queue is currently started and accepting messages for delivery to subscribers.
+        /// </summary>
+        public bool IsStarted { get; internal set; }
+
+        /// <summary>
+        /// Represent a critical error that prevents the queue from functioning.
+        /// </summary>
+        public string? ErrorMessage { get; set; }
+
+        /// <summary>
         /// The name of the queue.
         /// </summary>
         public string QueueName { get; internal set; } = string.Empty;
