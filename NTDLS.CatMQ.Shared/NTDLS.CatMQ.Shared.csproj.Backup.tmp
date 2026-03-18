@@ -7,7 +7,7 @@
     <GenerateDocumentationFile>True</GenerateDocumentationFile>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <Title>NTDLS.CatMQ.Shared</Title>
-    <Copyright>Copyright © 2025 NetworkDLS</Copyright>
+    <Copyright>Copyright © 2026 NetworkDLS</Copyright>
     <Description>
       Shared library for NTDLS.CatMQ.Client and NTDLS.CatMQ.Server. Versioned independently from the dependent packages.
     </Description>
