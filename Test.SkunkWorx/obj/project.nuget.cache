@@ -1,0 +1,20 @@
+{
+  "version": 2,
+  "dgSpecHash": "XYaG2BhYfC0=",
+  "success": true,
+  "projectFilePath": "C:\\NTDLS\\CatMQ\\Test.SkunkWorx\\Test.SkunkWorx.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\jpatterson\\.nuget\\packages\\microsoft.extensions.caching.abstractions\\10.0.0\\microsoft.extensions.caching.abstractions.10.0.0.nupkg.sha512",
+    "C:\\Users\\jpatterson\\.nuget\\packages\\microsoft.extensions.caching.memory\\10.0.0\\microsoft.extensions.caching.memory.10.0.0.nupkg.sha512",
+    "C:\\Users\\jpatterson\\.nuget\\packages\\microsoft.extensions.dependencyinjection.abstractions\\10.0.0\\microsoft.extensions.dependencyinjection.abstractions.10.0.0.nupkg.sha512",
+    "C:\\Users\\jpatterson\\.nuget\\packages\\microsoft.extensions.logging.abstractions\\10.0.0\\microsoft.extensions.logging.abstractions.10.0.0.nupkg.sha512",
+    "C:\\Users\\jpatterson\\.nuget\\packages\\microsoft.extensions.options\\10.0.0\\microsoft.extensions.options.10.0.0.nupkg.sha512",
+    "C:\\Users\\jpatterson\\.nuget\\packages\\microsoft.extensions.primitives\\10.0.0\\microsoft.extensions.primitives.10.0.0.nupkg.sha512",
+    "C:\\Users\\jpatterson\\.nuget\\packages\\ntdls.helpers\\1.3.19\\ntdls.helpers.1.3.19.nupkg.sha512",
+    "C:\\Users\\jpatterson\\.nuget\\packages\\ntdls.reliablemessaging\\3.3.1\\ntdls.reliablemessaging.3.3.1.nupkg.sha512",
+    "C:\\Users\\jpatterson\\.nuget\\packages\\ntdls.semaphore\\3.5.4\\ntdls.semaphore.3.5.4.nupkg.sha512",
+    "C:\\Users\\jpatterson\\.nuget\\packages\\protobuf-net\\3.2.56\\protobuf-net.3.2.56.nupkg.sha512",
+    "C:\\Users\\jpatterson\\.nuget\\packages\\protobuf-net.core\\3.2.56\\protobuf-net.core.3.2.56.nupkg.sha512"
+  ],
+  "logs": []
+}

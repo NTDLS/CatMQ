@@ -313,73 +313,49 @@ namespace NTDLS.CatMQ.Client
         /// Instructs the server to create a queue with the given name.
         /// </summary>
         public async Task CreateQueueAsync(string queueName)
-        {
-            var result = await _rmClient.QueryAsync(new CMqCreateQueueQuery(new CMqQueueConfiguration(queueName)));
-            result.ThrowIfFailed();
-        }
+            => (await _rmClient.QueryAsync(new CMqCreateQueueQuery(new CMqQueueConfiguration(queueName)))).ThrowIfFailed();
 
         /// <summary>
         /// Instructs the server to create a queue with the given name.
         /// </summary>
         public async Task CreateQueueAsync(CMqQueueConfiguration queueConfiguration)
-        {
-            var result = await _rmClient.QueryAsync(new CMqCreateQueueQuery(queueConfiguration));
-            result.ThrowIfFailed();
-        }
+            => (await _rmClient.QueryAsync(new CMqCreateQueueQuery(queueConfiguration))).ThrowIfFailed();
 
         /// <summary>
         /// Instructs the server to create a queue with the given name.
         /// </summary>
         public void CreateQueue(string queueName)
-        {
-            var result = _rmClient.Query(new CMqCreateQueueQuery(new CMqQueueConfiguration(queueName))).Result;
-            result.ThrowIfFailed();
-        }
+            => _rmClient.Query(new CMqCreateQueueQuery(new CMqQueueConfiguration(queueName))).ThrowIfFailed();
 
         /// <summary>
         /// Instructs the server to create a queue with the given name.
         /// </summary>
         public void CreateQueue(CMqQueueConfiguration queueConfiguration)
-        {
-            var result = _rmClient.Query(new CMqCreateQueueQuery(queueConfiguration)).Result;
-            result.ThrowIfFailed();
-        }
+            => _rmClient.Query(new CMqCreateQueueQuery(queueConfiguration)).ThrowIfFailed();
 
         /// <summary>
         /// Instructs the server to delete the queue with the given name.
         /// </summary>
         public async Task DeleteQueueAsync(string queueName)
-        {
-            var result = await _rmClient.QueryAsync(new CMqDeleteQueueQuery(queueName));
-            result.ThrowIfFailed();
-        }
+            => (await _rmClient.QueryAsync(new CMqDeleteQueueQuery(queueName))).ThrowIfFailed();
 
         /// <summary>
         /// Instructs the server to delete the queue with the given name.
         /// </summary>
         public void DeleteQueue(string queueName)
-        {
-            var result = _rmClient.Query(new CMqDeleteQueueQuery(queueName)).Result;
-            result.ThrowIfFailed();
-        }
+            => _rmClient.Query(new CMqDeleteQueueQuery(queueName)).ThrowIfFailed();
 
         /// <summary>
         /// Instructs the server to remove all messages from the queue with the given name.
         /// </summary>
         public async Task PurgeQueueAsync(string queueName)
-        {
-            var result = await _rmClient.QueryAsync(new CMqPurgeQueueQuery(queueName));
-            result.ThrowIfFailed();
-        }
+            => (await _rmClient.QueryAsync(new CMqPurgeQueueQuery(queueName))).ThrowIfFailed();
 
         /// <summary>
         /// Instructs the server to remove all messages from the queue with the given name.
         /// </summary>
         public void PurgeQueue(string queueName)
-        {
-            var result = _rmClient.Query(new CMqPurgeQueueQuery(queueName)).Result;
-            result.ThrowIfFailed();
-        }
+            => _rmClient.Query(new CMqPurgeQueueQuery(queueName)).ThrowIfFailed();
 
         /// <summary>
         /// Instructs the server to notify the client of messages sent to the given queue.
@@ -425,8 +401,7 @@ namespace NTDLS.CatMQ.Client
                 s[queueName] = subscription;
             });
 
-            var result = _rmClient.Query(new CMqSubscribeToQueueQuery(queueName)).Result;
-            result.ThrowIfFailed();
+            _rmClient.Query(new CMqSubscribeToQueueQuery(queueName)).ThrowIfFailed();
 
             return subscription;
         }
@@ -487,8 +462,7 @@ namespace NTDLS.CatMQ.Client
                 s[queueName] = subscription;
             });
 
-            var result = _rmClient.Query(new CMqSubscribeToQueueQuery(queueName)).Result;
-            result.ThrowIfFailed();
+            _rmClient.Query(new CMqSubscribeToQueueQuery(queueName)).ThrowIfFailed();
 
             StartBufferedDeliveryTask();
 
@@ -621,17 +595,15 @@ namespace NTDLS.CatMQ.Client
         /// </summary>
         public async Task UnsubscribeAsync(string queueName)
         {
-            var existingSubscription = _subscriptions.Write(s =>
+            var existingSubscription = _subscriptions.Read(s => s.ContainsKey(queueName));
+            if (existingSubscription == false)
             {
-                s.Remove(queueName, out var existingSubscription);
-                return existingSubscription;
-            }) ?? throw new Exception($"Client is not subscribed to queue [{queueName}].");
-
-            if (existingSubscription != null)
-            {
-                var result = await _rmClient.QueryAsync(new CMqUnsubscribeFromQueueQuery(queueName));
-                result.ThrowIfFailed();
+                throw new Exception($"Client is not subscribed to queue [{queueName}].");
             }
+
+            (await _rmClient.QueryAsync(new CMqUnsubscribeFromQueueQuery(queueName))).ThrowIfFailed();
+
+            _subscriptions.Write(s => s.Remove(queueName, out var existingSubscription));
         }
 
         /// <summary>
@@ -639,17 +611,15 @@ namespace NTDLS.CatMQ.Client
         /// </summary>
         public void Unsubscribe(string queueName)
         {
-            var existingSubscription = _subscriptions.Write(s =>
+            var existingSubscription = _subscriptions.Read(s => s.ContainsKey(queueName));
+            if (existingSubscription == false)
             {
-                s.Remove(queueName, out var existingSubscription);
-                return existingSubscription;
-            }) ?? throw new Exception($"Client is not subscribed to queue [{queueName}].");
-
-            if (existingSubscription != null)
-            {
-                var result = _rmClient.Query(new CMqUnsubscribeFromQueueQuery(queueName)).Result;
-                result.ThrowIfFailed();
+                throw new Exception($"Client is not subscribed to queue [{queueName}].");
             }
+
+            _rmClient.Query(new CMqUnsubscribeFromQueueQuery(queueName)).ThrowIfFailed();
+
+            _subscriptions.Write(s => s.Remove(queueName, out var existingSubscription));
         }
 
         /// <summary>
@@ -674,10 +644,8 @@ namespace NTDLS.CatMQ.Client
 
             var objectType = CMqSerialization.GetAssemblyQualifiedTypeName(message);
 
-            var result = await _rmClient.QueryAsync(new CMqEnqueueMessageToQueue(
-                queueName, options?.DeferDeliveryDuration, objectType, messageJson), options?.ServerDeliveryTimeout);
-
-            result.ThrowIfFailed();
+            (await _rmClient.QueryAsync(new CMqEnqueueMessageToQueue(queueName, options?.DeferDeliveryDuration,
+                objectType, messageJson), options?.ServerDeliveryTimeout)).ThrowIfFailed();
         }
 
         /// <summary>
@@ -689,10 +657,8 @@ namespace NTDLS.CatMQ.Client
         /// <param name="options">Options for message enqueuing.</param>
         public async Task EnqueueAsync(string queueName, string assemblyQualifiedName, string messageJson, CMqEnqueueOptions? options = null)
         {
-            var result = await _rmClient.QueryAsync(new CMqEnqueueMessageToQueue(
-                queueName, options?.DeferDeliveryDuration, assemblyQualifiedName, messageJson), options?.ServerDeliveryTimeout);
-
-            result.ThrowIfFailed();
+            (await _rmClient.QueryAsync(new CMqEnqueueMessageToQueue(queueName, options?.DeferDeliveryDuration,
+                assemblyQualifiedName, messageJson), options?.ServerDeliveryTimeout)).ThrowIfFailed();
         }
 
         /// <summary>
@@ -717,10 +683,8 @@ namespace NTDLS.CatMQ.Client
 
             var objectType = CMqSerialization.GetAssemblyQualifiedTypeName(message);
 
-            var result = _rmClient.Query(new CMqEnqueueMessageToQueue(
-                queueName, options?.DeferDeliveryDuration, objectType, messageJson), options?.ServerDeliveryTimeout).Result;
-
-            result.ThrowIfFailed();
+            _rmClient.Query(new CMqEnqueueMessageToQueue(queueName, options?.DeferDeliveryDuration,
+                objectType, messageJson), options?.ServerDeliveryTimeout).ThrowIfFailed();
         }
 
         /// <summary>
@@ -731,12 +695,8 @@ namespace NTDLS.CatMQ.Client
         /// <param name="messageJson">Json for payload message of type inheriting from ICMqMessage.</param>
         /// <param name="options">Options for message enqueuing.</param>
         public void Enqueue(string queueName, string assemblyQualifiedName, string messageJson, CMqEnqueueOptions? options = null)
-        {
-            var result = _rmClient.Query(new CMqEnqueueMessageToQueue(
-                queueName, options?.DeferDeliveryDuration, assemblyQualifiedName, messageJson), options?.ServerDeliveryTimeout).Result;
-
-            result.ThrowIfFailed();
-        }
+            => _rmClient.Query(new CMqEnqueueMessageToQueue(queueName, options?.DeferDeliveryDuration,
+                assemblyQualifiedName, messageJson), options?.ServerDeliveryTimeout).ThrowIfFailed();
 
         /// <summary>
         /// Disconnects the client from the queue server.
@@ -744,6 +704,7 @@ namespace NTDLS.CatMQ.Client
         /// </summary>
         public void Dispose()
         {
+            GC.SuppressFinalize(this);
             Disconnect();
         }
     }

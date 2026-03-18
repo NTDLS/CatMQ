@@ -89,9 +89,7 @@ namespace NTDLS.CatMQ.Server
         }
 
         private void RmServer_OnException(RmContext? context, Exception ex, IRmPayload? payload)
-        {
-            OnLog?.Invoke(this, CMqErrorLevel.Error, "Reliable messaging exception.", ex);
-        }
+            => OnLog?.Invoke(this, CMqErrorLevel.Error, "Reliable messaging exception.", ex);
 
         internal void InvokeOnLog(Exception ex)
         {
@@ -163,6 +161,15 @@ namespace NTDLS.CatMQ.Server
 
                 var queueMetas = mqd.Where(q => q.Value.Configuration.PersistenceScheme == CMqPersistenceScheme.Persistent)
                     .Select(q => new MessageQueueMetadata(q.Value.Configuration, q.Value.Statistics)).ToList();
+
+                try
+                {
+                    Directory.CreateDirectory(_configuration.PersistencePath);
+                }
+                catch
+                {
+                    throw new Exception($"Failed to create persistence database path: [{_configuration.PersistencePath}].");
+                }
 
                 var persistedQueuesJson = JsonSerializer.Serialize(queueMetas, _indentedJsonOptions);
                 File.WriteAllText(Path.Join(_configuration.PersistencePath, "queues.json"), persistedQueuesJson);
@@ -718,7 +725,7 @@ namespace NTDLS.CatMQ.Server
                         }
                         catch (Exception ex)
                         {
-                            OnLog?.Invoke(this, CMqErrorLevel.Error, "An error occured while touching HistoricalStatistics", ex);
+                            OnLog?.Invoke(this, CMqErrorLevel.Error, "An error occurred while touching HistoricalStatistics", ex);
                         }
                     }
 
@@ -732,7 +739,7 @@ namespace NTDLS.CatMQ.Server
                     }
                     catch (Exception ex)
                     {
-                        OnLog?.Invoke(this, CMqErrorLevel.Error, "An error occured in CheckpointPersistentMessageQueues", ex);
+                        OnLog?.Invoke(this, CMqErrorLevel.Error, "An error occurred in CheckpointPersistentMessageQueues", ex);
                     }
 
                     await Task.Delay(1000, token);
@@ -775,7 +782,7 @@ namespace NTDLS.CatMQ.Server
 
             foreach (var messageQueue in messageQueues)
             {
-                messageQueue.WaitForShutdown(); //We cant wait on the stop from within a lock. That'll deadlock.
+                messageQueue.WaitForShutdown(); //We cant wait on the stop from within a lock above. That'll deadlock.
             }
         }
 
@@ -783,7 +790,7 @@ namespace NTDLS.CatMQ.Server
 
         #region Message queue interactions.
 
-        internal void ShovelToDeadLetter(string sourceQueueName, EnqueuedMessage givenMessage)
+        internal void MoveMessageToDeadLetter(string sourceQueueName, EnqueuedMessage givenMessage)
         {
             OnLog?.Invoke(this, CMqErrorLevel.Verbose, $"Dead-lettering message for [{sourceQueueName}].");
 
@@ -979,18 +986,21 @@ namespace NTDLS.CatMQ.Server
                     if (waitOnStopMessageQueue != null)
                     {
                         waitOnStopMessageQueue.WaitForShutdown(); //We cant wait on the stop from within a lock. That'll deadlock.
-                        var databasePath = Path.Join(Configuration.PersistencePath, "messages", waitOnStopMessageQueue.Configuration.QueueName);
 
-                        try
+                        if (string.IsNullOrEmpty(_configuration.PersistencePath) == false)
                         {
-                            Directory.Delete(databasePath, true);
-                        }
-                        catch (Exception ex)
-                        {
-                            OnLog?.Invoke(this, CMqErrorLevel.Verbose, $"Failed to delete persisted queue messages for [{queueName}].", ex);
+                            var databasePath = Path.Join(Configuration.PersistencePath, "messages", waitOnStopMessageQueue.Configuration.QueueName);
+
+                            try
+                            {
+                                Directory.Delete(databasePath, true);
+                            }
+                            catch (Exception ex)
+                            {
+                                OnLog?.Invoke(this, CMqErrorLevel.Verbose, $"Failed to delete persisted queue messages for [{queueName}].", ex);
+                            }
                         }
                     }
-
 
                     return;
                 }

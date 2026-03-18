@@ -1,0 +1,1254 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>NTDLS.CatMQ.Shared</name>
+    </assembly>
+    <members>
+        <member name="M:NTDLS.CatMQ.Shared.CMqCompiledRegEx.TypeTagsRegex">
+            <remarks>
+            Pattern:<br/>
+            <code>(,?\\s*Version\\s*=\\s*[\\d.]+)|(,?\\s*Culture\\s*=\\s*[^,]+)|(,?\\s*PublicKeyToken\\s*=\\s*[^,\\]]+)</code><br/>
+            Explanation:<br/>
+            <code>
+            ○ Match with 3 alternative expressions, atomically.<br/>
+                ○ 1st capture group.<br/>
+                    ○ Match ',' atomically, optionally.<br/>
+                    ○ Match a whitespace character atomically any number of times.<br/>
+                    ○ Match the string "Version".<br/>
+                    ○ Match a whitespace character atomically any number of times.<br/>
+                    ○ Match '='.<br/>
+                    ○ Match a whitespace character greedily any number of times.<br/>
+                    ○ Match a character in the set [.\d] atomically at least once.<br/>
+                ○ 2nd capture group.<br/>
+                    ○ Match ',' atomically, optionally.<br/>
+                    ○ Match a whitespace character atomically any number of times.<br/>
+                    ○ Match the string "Culture".<br/>
+                    ○ Match a whitespace character atomically any number of times.<br/>
+                    ○ Match '='.<br/>
+                    ○ Match a whitespace character greedily any number of times.<br/>
+                    ○ Match a character other than ',' atomically at least once.<br/>
+                ○ 3rd capture group.<br/>
+                    ○ Match ',' atomically, optionally.<br/>
+                    ○ Match a whitespace character atomically any number of times.<br/>
+                    ○ Match the string "PublicKeyToken".<br/>
+                    ○ Match a whitespace character atomically any number of times.<br/>
+                    ○ Match '='.<br/>
+                    ○ Match a whitespace character greedily any number of times.<br/>
+                    ○ Match a character in the set [^,]] atomically at least once.<br/>
+            </code>
+            </remarks>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.CMqCompiledRegEx.TypeCleanupRegex">
+            <remarks>
+            Pattern:<br/>
+            <code>\\s*,\\s*</code><br/>
+            Explanation:<br/>
+            <code>
+            ○ Match a whitespace character atomically any number of times.<br/>
+            ○ Match ','.<br/>
+            ○ Match a whitespace character atomically any number of times.<br/>
+            </code>
+            </remarks>
+        </member>
+        <member name="T:NTDLS.CatMQ.Shared.CMqConsumeResult">
+            <summary>
+            Result of subscriber receiving a message from a server queue.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.CMqConsumeResult.Disposition">
+            <summary>
+            Denotes if and how the message is marked as delivered.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.CMqConsumeResult.DeferDuration">
+            <summary>
+            When the consumption disposition is deferred, this is the amount of time to delay the redelivery of the message.
+            </summary>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.CMqConsumeResult.#ctor(NTDLS.CatMQ.Shared.CMqConsumptionDisposition)">
+            <summary>
+            Represents the result of a message consumption operation, including its disposition.
+            </summary>
+            <param name="disposition">The disposition of the consumed message, indicating the outcome of the consumption process.</param>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.CMqConsumeResult.Consumed">
+            <summary>
+            Shortcut function that returns a CMqConsumeResult with the Consumed disposition.
+            </summary>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.CMqConsumeResult.NotConsumed">
+            <summary>
+            Shortcut function that returns a CMqConsumeResult with the NotConsumed disposition.
+            </summary>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.CMqConsumeResult.NotInterested">
+            <summary>
+            Shortcut function that returns a CMqConsumeResult with the NotConsumed disposition.
+            </summary>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.CMqConsumeResult.DeadLetter">
+            <summary>
+            Shortcut function that returns a CMqConsumeResult with the DeadLetter disposition.
+            </summary>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.CMqConsumeResult.Drop">
+            <summary>
+            Shortcut function that returns a CMqConsumeResult with the Drop disposition.
+            </summary>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.CMqConsumeResult.Defer(System.TimeSpan)">
+            <summary>
+            Shortcut function that returns a CMqConsumeResult with the Defer disposition.
+            </summary>
+        </member>
+        <member name="T:NTDLS.CatMQ.Shared.CMqDeadLetterQueueConfiguration">
+            <summary>
+            Defines a dead-letter queue configuration.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.CMqDeadLetterQueueConfiguration.DeliveryThrottle">
+            <summary>
+            The amount of time to wait between sending individual messages to subscribers.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.CMqDeadLetterQueueConfiguration.MaxDeliveryAttempts">
+            <summary>
+            The maximum number of times the server will attempt to deliver any message to a subscriber before giving up. 0 = infinite.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.CMqDeadLetterQueueConfiguration.MaxMessageAge">
+            <summary>
+            The maximum time that a message item can remain in the queue without being delivered before being removed. 0 = infinite.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.CMqDeadLetterQueueConfiguration.ConsumptionScheme">
+            <summary>
+            Determines when to remove messages from the queue as they are distributed to subscribers.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.CMqDeadLetterQueueConfiguration.DeliveryScheme">
+            <summary>
+            Determines how messages are distributed to subscribers.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.CMqDeadLetterQueueConfiguration.PersistenceScheme">
+            <summary>
+            Whether the queue is persisted or ephemeral.
+            </summary>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.CMqDeadLetterQueueConfiguration.#ctor">
+            <summary>
+            Instantiates a new instance of CMqQueueConfiguration.
+            </summary>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.CMqDeadLetterQueueConfiguration.ToConfiguration(System.String)">
+            <summary>
+            Converts the current queue settings into a <see cref="T:NTDLS.CatMQ.Shared.CMqQueueConfiguration"/> instance configured as a
+            dead-letter queue.
+            </summary>
+            <remarks>The generated dead-letter queue configuration uses the parent queue name to derive
+            its name by appending ".dlq". The configuration is tailored for handling undeliverable messages, with
+            properties such as <see cref="P:NTDLS.CatMQ.Shared.CMqQueueConfiguration.IsDeadLetter"/> set to <see langword="true"/>.</remarks>
+            <param name="parentQueueName">The name of the parent queue. This value is used to generate the name of the dead-letter queue.</param>
+            <returns>A <see cref="T:NTDLS.CatMQ.Shared.CMqQueueConfiguration"/> instance representing the dead-letter queue configuration. The
+            returned configuration includes properties such as <see cref="P:NTDLS.CatMQ.Shared.CMqQueueConfiguration.IsDeadLetter"/>, <see
+            cref="P:NTDLS.CatMQ.Shared.CMqQueueConfiguration.MaxMessageAge"/>, and <see cref="P:NTDLS.CatMQ.Shared.CMqQueueConfiguration.MaxDeliveryAttempts"/>.</returns>
+        </member>
+        <member name="T:NTDLS.CatMQ.Shared.CMqDefaults">
+            <summary>
+            Provides default configuration values for a message queue system.
+            </summary>
+            <remarks>This class contains constants that define default settings for various aspects of the message
+            queue system, such as buffer sizes, timeout durations, and delivery thread behavior. These values are intended
+            to be used as sensible defaults but can be overridden in specific implementations if needed.</remarks>
+        </member>
+        <member name="F:NTDLS.CatMQ.Shared.CMqDefaults.QUEUE_THREAD_DELIVERY_BURNDOWN">
+            <summary>
+            the number of delivery cycle attempts to perform before yielding a queues delivery thread.
+            </summary>
+        </member>
+        <member name="F:NTDLS.CatMQ.Shared.CMqDefaults.DEFAULT_PERSISTENT_MESSAGES_BUFFER_SIZE">
+            <summary>
+            The number of messages to load from a persistence database when hydrating the message buffer.
+            </summary>
+        </member>
+        <member name="F:NTDLS.CatMQ.Shared.CMqDefaults.DEFAULT_PERSISTENT_MESSAGES_MIN_BUFFER">
+            <summary>
+            The minimum number of messages to keep in memory for persistent queues.
+            </summary>
+        </member>
+        <member name="F:NTDLS.CatMQ.Shared.CMqDefaults.DEFAULT_DEADLOCK_AVOIDANCE_WAIT_MS">
+            <summary>
+            The amount of time to wait when performing deadlock avoidance locks.
+            </summary>
+        </member>
+        <member name="F:NTDLS.CatMQ.Shared.CMqDefaults.DEFAULT_TRY_WAIT_MS">
+            <summary>
+            The amount of time to wait when attempting to acquire a lock.
+            </summary>
+        </member>
+        <member name="F:NTDLS.CatMQ.Shared.CMqDefaults.DEFAULT_INITIAL_BUFFER_SIZE">
+            <summary>
+            The initial size in bytes of the buffer. If the buffer ever gets full while receiving
+            data it will be automatically resized by a factor of BUFFER_GROWTH_RATE up to MAX_BUFFER_SIZE.
+            </summary>
+        </member>
+        <member name="F:NTDLS.CatMQ.Shared.CMqDefaults.DEFAULT_MAX_BUFFER_SIZE">
+            <summary>
+            The maximum size in bytes of the buffer. If the buffer ever gets full while receiving
+            data it will be automatically resized by a factor of BUFFER_GROWTH_RATE up to MAX_BUFFER_SIZE.
+            </summary>
+        </member>
+        <member name="F:NTDLS.CatMQ.Shared.CMqDefaults.DEFAULT_BUFFER_GROWTH_RATE">
+             <summary>
+            The growth rate for auto-resizing the buffer. Expressed in decimal percentages.
+             </summary>
+        </member>
+        <member name="F:NTDLS.CatMQ.Shared.CMqDefaults.DEFAULT_ACK_TIMEOUT_SECONDS">
+            <summary>
+            The default amount of time to wait for a query to reply before throwing a timeout exception.
+            </summary>
+        </member>
+        <member name="F:NTDLS.CatMQ.Shared.CMqDefaults.DEFAULT_LISTEN_PORT">
+            <summary>
+            The port which the queue service will listen on.
+            </summary>
+        </member>
+        <member name="F:NTDLS.CatMQ.Shared.CMqDefaults.DEFAULT_AUTO_RECONNECT">
+            <summary>
+            Whether or not the client should attempt to reconnect when unexpectedly disconnected.
+            </summary>
+        </member>
+        <member name="F:NTDLS.CatMQ.Shared.CMqDefaults.DEFAULT_ENABLE_HISTORICAL_STATISTICS">
+            <summary>
+            Gets or sets a value indicating whether historical statistics are enabled for data collection or analysis.
+            </summary>
+        </member>
+        <member name="F:NTDLS.CatMQ.Shared.CMqDefaults.DEFAULT_MAX_HISTORICAL_STATISTICS_DATAPOINTS">
+            <summary>
+            The number historical datapoints to retain per queue.
+            </summary>
+        </member>
+        <member name="T:NTDLS.CatMQ.Shared.CMqQueueConfiguration">
+            <summary>
+            Defines a queue configuration.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.CMqQueueConfiguration.QueueName">
+            <summary>
+            The name of the queue.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.CMqQueueConfiguration.AsycnronousDelivery">
+            <summary>
+            Whether messages are delivered to subscribers asynchronously.
+            Messages are still delivered in order per subscriber, but multiple messages can be in-flight to different subscribers at the same time.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.CMqQueueConfiguration.MaxOutstandingDeliveries">
+            <summary>
+            The maximum number of simultaneously outstanding asynchronous deliveries.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.CMqQueueConfiguration.DeliveryThrottle">
+            <summary>
+            The amount of time to wait between sending individual messages to subscribers.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.CMqQueueConfiguration.IsDeadLetter">
+            <summary>
+            Denotes whether this is a dead-letter queue.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.CMqQueueConfiguration.MaxDeliveryAttempts">
+            <summary>
+            The maximum number of times the server will attempt to deliver any message to a subscriber before giving up, this includes deferred deliveries. 0 = infinite.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.CMqQueueConfiguration.MaxMessageAge">
+            <summary>
+            The maximum time that a message item can remain in the queue without being delivered before being removed. 0 = infinite.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.CMqQueueConfiguration.ConsumptionScheme">
+            <summary>
+            Determines when to remove messages from the queue as they are distributed to subscribers.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.CMqQueueConfiguration.DeliveryScheme">
+            <summary>
+            Determines how messages are distributed to subscribers.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.CMqQueueConfiguration.PersistenceScheme">
+            <summary>
+            Whether the queue is persisted or ephemeral.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.CMqQueueConfiguration.DeadLetterConfiguration">
+            <summary>
+            Optional configuration for companion queue which contains expired messages or failed deliveries.
+            </summary>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.CMqQueueConfiguration.#ctor">
+            <summary>
+            Instantiates a new instance of CMqQueueConfiguration.
+            </summary>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.CMqQueueConfiguration.#ctor(System.String)">
+            <summary>
+            Instantiates a new instance of CMqQueueConfiguration.
+            </summary>
+        </member>
+        <member name="T:NTDLS.CatMQ.Shared.CMqReceivedMessage">
+            <summary>
+            A message received by the server.
+            </summary>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.CMqReceivedMessage.#ctor(System.String,System.UInt64,System.String,System.String)">
+            <summary>
+            A message received by the server.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.CMqReceivedMessage.SerializationProvider">
+            <summary>
+            Provides access to the custom serialization provider, if configured.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.CMqReceivedMessage.QueueName">
+            <summary>
+            The name of the queue which this message came from.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.CMqReceivedMessage.AssemblyQualifiedTypeName">
+            <summary>
+            The assembly qualified type name of the object stored in MessageJson.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.CMqReceivedMessage.MessageJson">
+            <summary>
+            Json serialized object of type denoted by ObjectType.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.CMqReceivedMessage.SerialNumber">
+            <summary>
+            The unique ID of the message per queue.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.CMqReceivedMessage.Timestamp">
+            <summary>
+            The UTC date and time when the message was enqueued.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.CMqReceivedMessage.DeferredCount">
+            <summary>
+            The number of times this message has been delivered and the subscriber requested that delivery be deferred.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.CMqReceivedMessage.DeferDuration">
+            <summary>
+            The amount of time to wait before delivering this message.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.CMqReceivedMessage.SubscriberDeliveryCount">
+            <summary>
+            The number of subscribers that this message has been successfully delivered to.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.CMqReceivedMessage.SatisfiedSubscriberCount">
+            <summary>
+            The number of subscribers that have responded to the delivery of this message.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.CMqReceivedMessage.FailedSubscriberCount">
+            <summary>
+            The number of subscribers deliveries that have failed.
+            </summary>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.CMqReceivedMessage.Deserialize">
+            <summary>
+            Deserializes the received message to its original type.
+            </summary>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.CMqReceivedMessage.Deserialize``1">
+            <summary>
+            Deserializes the received message to its original type, casted to the given type.
+            </summary>
+        </member>
+        <member name="T:NTDLS.CatMQ.Shared.CMqSerialization">
+            <summary>
+            Provides methods for serializing and deserializing objects to and from JSON,  as well as utilities for working
+            with assembly-qualified type names.
+            </summary>
+            <remarks>This class includes functionality for deserializing JSON into objects of specific types, 
+            either directly or using a custom serialization provider. It also provides methods for  retrieving
+            assembly-qualified type names, which are used to identify types during deserialization.</remarks>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.CMqSerialization.MqDeserializeToObject``1(System.String,NTDLS.CatMQ.Shared.ICMqSerializationProvider)">
+            <summary>
+            Deserialization function called from MessageDeliveryQuery via reflection.
+            </summary>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.CMqSerialization.GetAssemblyQualifiedTypeName(System.Object)">
+            <summary>
+            Retrieves the assembly-qualified name of the type of the specified object.
+            </summary>
+            <param name="obj">The object whose type's assembly-qualified name is to be retrieved. Cannot be <see langword="null"/>.</param>
+            <returns>The assembly-qualified name of the object's type.</returns>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.CMqSerialization.GetAssemblyQualifiedTypeName(System.Type)">
+            <summary>
+            Retrieves the assembly-qualified name of the specified <see cref="T:System.Type"/>.
+            </summary>
+            <remarks>This method handles both generic and non-generic types. For generic types, the
+            assembly-qualified name is constructed using the type definition and assembly name. Additional cleanup is
+            applied to remove unnecessary tags and formatting.</remarks>
+            <param name="type">The <see cref="T:System.Type"/> for which to retrieve the assembly-qualified name. Cannot be <see langword="null"/>.</param>
+            <returns>A string representing the assembly-qualified name of the specified type, with additional formatting applied.</returns>
+            <exception cref="T:System.Exception">Thrown if the type's name or assembly information is unavailable, or if the operation fails to generate the
+            assembly-qualified name.</exception>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.CMqSerialization.Deserialize(NTDLS.CatMQ.Shared.CMqReceivedMessage)">
+            <summary>
+            Deserializes the received message to its original type.
+            </summary>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.CMqSerialization.DeserializeAs``1(System.String,NTDLS.CatMQ.Shared.ICMqSerializationProvider)">
+            <summary>
+            Deserializes JSON to an object of type T using its assembly-qualified name.
+            </summary>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.CMqSerialization.DeserializeAs(System.String,System.String,NTDLS.CatMQ.Shared.ICMqSerializationProvider)">
+            <summary>
+            Deserializes JSON to an object of the given type string.
+            </summary>
+        </member>
+        <member name="T:NTDLS.CatMQ.Shared.CMqMessageState">
+            <summary>
+            Represents the state of a message in the message queue.
+            </summary>
+            <remarks>This enumeration defines the various states a message can be in during its lifecycle within
+            the message queue. The state indicates whether the message is ready for delivery, actively being delivered, or
+            requires special handling.</remarks>
+        </member>
+        <member name="F:NTDLS.CatMQ.Shared.CMqMessageState.Ready">
+            <summary>
+            Message is ready for delivery.
+            </summary>
+        </member>
+        <member name="F:NTDLS.CatMQ.Shared.CMqMessageState.OutForDelivery">
+            <summary>
+            Message is currently being delivered to subscribers.
+            </summary>
+        </member>
+        <member name="F:NTDLS.CatMQ.Shared.CMqMessageState.DeadLetter">
+            <summary>
+            Message should be dead lettered.
+            </summary>
+        </member>
+        <member name="F:NTDLS.CatMQ.Shared.CMqMessageState.Drop">
+            <summary>
+            Message should be dropped.
+            </summary>
+        </member>
+        <member name="F:NTDLS.CatMQ.Shared.CMqMessageState.Shutdown">
+            <summary>
+            The message queue was shutting down and delivery was aborted.
+            </summary>
+        </member>
+        <member name="T:NTDLS.CatMQ.Shared.CMqConsumptionDisposition">
+            <summary>
+            Represents the possible dispositions for a message after being processed by a subscriber.
+            </summary>
+            <remarks>This enumeration defines how a subscriber can indicate the outcome of processing a message.
+            The disposition affects whether the message is re-delivered, deferred, or removed from the queue.</remarks>
+        </member>
+        <member name="F:NTDLS.CatMQ.Shared.CMqConsumptionDisposition.NotInterested">
+            <summary>
+            The message was not consumed by the subscriber and delivery will not be re-attempted to this subscriber.
+            </summary>
+        </member>
+        <member name="F:NTDLS.CatMQ.Shared.CMqConsumptionDisposition.NotConsumed">
+            <summary>
+            The message was not consumed by the subscriber and delivery will be re-attempted to this subscriber.
+            </summary>
+        </member>
+        <member name="F:NTDLS.CatMQ.Shared.CMqConsumptionDisposition.Consumed">
+            <summary>
+            The message was consumed by the subscriber.
+            </summary>
+        </member>
+        <member name="F:NTDLS.CatMQ.Shared.CMqConsumptionDisposition.Defer">
+            <summary>
+            Subscriber requesting that the message be delivered at a later time.
+            </summary>
+        </member>
+        <member name="F:NTDLS.CatMQ.Shared.CMqConsumptionDisposition.DeadLetter">
+            <summary>
+            Subscriber requesting that the message be immediately sent to the dead-letter queue, if any. Otherwise the message is dropped.
+            Note that the dead-letter queue expiration times are also respected.
+            </summary>
+        </member>
+        <member name="F:NTDLS.CatMQ.Shared.CMqConsumptionDisposition.Drop">
+            <summary>
+            Subscriber requesting that the message be immediately dropped from the queue and cache.
+            </summary>
+        </member>
+        <member name="F:NTDLS.CatMQ.Shared.CMqConsumptionDisposition.Exception">
+            <summary>
+            An exception occurred while delivering or processing the message.
+            </summary>
+        </member>
+        <member name="T:NTDLS.CatMQ.Shared.CMqConsumptionScheme">
+            <summary>
+            Determines when to remove messages from the queue as they are distributed to subscribers.
+            </summary>
+        </member>
+        <member name="F:NTDLS.CatMQ.Shared.CMqConsumptionScheme.AllSubscribersSatisfied">
+            <summary>
+            The messages are delivered to each subscriber, the message is removed once it is delivered to all subscribers and they have consumed or explicitly rejected it.
+            </summary>
+        </member>
+        <member name="F:NTDLS.CatMQ.Shared.CMqConsumptionScheme.FirstConsumedSubscriber">
+            <summary>
+            The messages are delivered to subscribers, but is removed and delivery is stopped when any one of the subscribers consumes the message.
+            </summary>
+        </member>
+        <member name="T:NTDLS.CatMQ.Shared.CMqDeliveryScheme">
+            <summary>
+            Determines how messages are distributed to subscribers.
+            </summary>
+        </member>
+        <member name="F:NTDLS.CatMQ.Shared.CMqDeliveryScheme.Balanced">
+            <summary>
+            Messages are delivered to the subscribers based on the attempted delivery count to each subscriber.
+            </summary>
+        </member>
+        <member name="F:NTDLS.CatMQ.Shared.CMqDeliveryScheme.Random">
+            <summary>
+            Messages are delivered to subscribers in a random order.
+            </summary>
+        </member>
+        <member name="T:NTDLS.CatMQ.Shared.CMqPersistenceScheme">
+            <summary>
+            Whether the queue is persisted or ephemeral.
+            </summary>
+        </member>
+        <member name="F:NTDLS.CatMQ.Shared.CMqPersistenceScheme.Ephemeral">
+            <summary>
+            Undelivered messages are lost when the the service stops.
+            </summary>
+        </member>
+        <member name="F:NTDLS.CatMQ.Shared.CMqPersistenceScheme.Persistent">
+            <summary>
+            Messages are stored on disk and survive service restarts.
+            </summary>
+        </member>
+        <member name="T:NTDLS.CatMQ.Shared.CMqErrorLevel">
+            <summary>
+            Used for message and error logging.
+            </summary>
+        </member>
+        <member name="F:NTDLS.CatMQ.Shared.CMqErrorLevel.Verbose">
+            <summary>
+            Use for detailed diagnostic information.
+            </summary>
+        </member>
+        <member name="F:NTDLS.CatMQ.Shared.CMqErrorLevel.Debug">
+            <summary>
+            Use for debugging information.
+            </summary>
+        </member>
+        <member name="F:NTDLS.CatMQ.Shared.CMqErrorLevel.Information">
+            <summary>
+            Use for general informational messages.
+            </summary>
+        </member>
+        <member name="F:NTDLS.CatMQ.Shared.CMqErrorLevel.Warning">
+            <summary>
+            Use for potentially harmful situations.
+            </summary>
+        </member>
+        <member name="F:NTDLS.CatMQ.Shared.CMqErrorLevel.Error">
+             <summary>
+            Use for errors that prevent the execution of a specific part of the application.    
+             </summary>
+        </member>
+        <member name="F:NTDLS.CatMQ.Shared.CMqErrorLevel.Fatal">
+            <summary>
+            Use for critical errors that cause the application to crash or terminate.
+            </summary>
+        </member>
+        <member name="T:NTDLS.CatMQ.Shared.ICMqMessage">
+            <summary>
+            Any message that is dispatched should inherit from IMqMessage.
+            </summary>
+        </member>
+        <member name="T:NTDLS.CatMQ.Shared.ICMqSerializationProvider">
+            <summary>
+            Use to provide custom payload serialization.
+            </summary>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.ICMqSerializationProvider.SerializeToText``1(``0)">
+            <summary>
+            Serialize the frame payload to text before it is compressed, encrypted and sent.
+            </summary>
+            <returns>Return the altered bytes.</returns>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.ICMqSerializationProvider.DeserializeToObject``1(System.String)">
+            <summary>
+            Deserialize the frame payload text to an object after it is received, decrypted and decompressed.
+            </summary>
+            <returns>Return the altered bytes.</returns>
+        </member>
+        <member name="T:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqCreateQueueQuery">
+            <summary>
+            Represents a query for creating a message queue with the specified configuration.
+            </summary>
+            <remarks>This query is used to define the configuration of a message queue to be created. The
+            configuration is specified using the <see cref="T:NTDLS.CatMQ.Shared.CMqQueueConfiguration"/> object.</remarks>
+            <param name="queueConfiguration"></param>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqCreateQueueQuery.#ctor(NTDLS.CatMQ.Shared.CMqQueueConfiguration)">
+            <summary>
+            Represents a query for creating a message queue with the specified configuration.
+            </summary>
+            <remarks>This query is used to define the configuration of a message queue to be created. The
+            configuration is specified using the <see cref="T:NTDLS.CatMQ.Shared.CMqQueueConfiguration"/> object.</remarks>
+            <param name="queueConfiguration"></param>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqCreateQueueQuery.QueueConfiguration">
+            <summary>
+            Gets or sets the configuration settings for the message queue.
+            </summary>
+        </member>
+        <member name="T:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqCreateQueueQueryReply">
+            <summary>
+            Represents the reply to a queue creation query, indicating success or failure.
+            </summary>
+            <remarks>This class provides information about the outcome of a queue creation operation, including
+            whether the operation  succeeded and, if applicable, an error message describing the failure.</remarks>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqCreateQueueQueryReply.IsSuccess">
+            <summary>
+            Gets or sets a value indicating whether the operation was successful.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqCreateQueueQueryReply.ErrorMessage">
+            <summary>
+            Gets or sets the error message associated with the current operation.
+            </summary>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqCreateQueueQueryReply.#ctor(System.Exception)">
+            <summary>
+            Initializes a new instance of the <see cref="T:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqCreateQueueQueryReply"/> class, representing a failed queue
+            creation operation.
+            </summary>
+            <remarks>This constructor sets the <see cref="P:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqCreateQueueQueryReply.IsSuccess"/> property to <see langword="false"/>
+            and populates the <see cref="P:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqCreateQueueQueryReply.ErrorMessage"/> property with the message from the provided <paramref
+            name="exception"/>.</remarks>
+            <param name="exception">The exception that caused the failure. Cannot be <see langword="null"/>.</param>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqCreateQueueQueryReply.#ctor(System.Boolean)">
+            <summary>
+            Initializes a new instance of the <see cref="T:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqCreateQueueQueryReply"/> class.
+            </summary>
+            <param name="isSuccess">A value indicating whether the queue creation query was successful. <see langword="true"/> if the query
+            succeeded; otherwise, <see langword="false"/>.</param>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqCreateQueueQueryReply.#ctor">
+            <summary>
+            Initializes a new instance of the <see cref="T:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqCreateQueueQueryReply"/> class.
+            </summary>
+            <remarks>This constructor creates an instance of the <see cref="T:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqCreateQueueQueryReply"/>
+            class. Use this class to represent the reply to a queue creation query in the messaging system.</remarks>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqCreateQueueQueryReply.ThrowIfFailed">
+            <summary>
+            Throws an exception if the current operation did not succeed.
+            </summary>
+            <remarks>Use this method to enforce that the operation completed successfully. If the
+            operation failed, an exception is thrown to indicate the error condition.</remarks>
+            <exception cref="T:System.Exception">Thrown if the operation has failed. The exception message contains the associated error message.</exception>
+        </member>
+        <member name="T:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqDeleteQueueQuery">
+            <summary>
+            Represents a query to delete a message queue.
+            </summary>
+            <remarks>This query is used to request the deletion of a specific message queue identified by its
+            name. Ensure that the queue name provided exists and is valid within the context of the system.</remarks>
+            <param name="queueName">The name of the message queue to be deleted. Cannot be null or empty.</param>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqDeleteQueueQuery.#ctor(System.String)">
+            <summary>
+            Represents a query to delete a message queue.
+            </summary>
+            <remarks>This query is used to request the deletion of a specific message queue identified by its
+            name. Ensure that the queue name provided exists and is valid within the context of the system.</remarks>
+            <param name="queueName">The name of the message queue to be deleted. Cannot be null or empty.</param>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqDeleteQueueQuery.QueueName">
+            <summary>
+            Gets or sets the name of the queue.
+            </summary>
+        </member>
+        <member name="T:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqDeleteQueueQueryReply">
+            <summary>
+            Represents the reply to a delete queue operation, providing information about the success or failure of the
+            operation.
+            </summary>
+            <remarks>This class encapsulates the result of a delete queue operation, including whether the
+            operation succeeded and any associated error message. Instances of this class can be initialized with success
+            status or an exception to provide detailed error information.</remarks>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqDeleteQueueQueryReply.IsSuccess">
+            <summary>
+            Gets or sets a value indicating whether the operation was successful.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqDeleteQueueQueryReply.ErrorMessage">
+            <summary>
+            Gets or sets the error message associated with the current operation.
+            </summary>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqDeleteQueueQueryReply.#ctor(System.Exception)">
+            <summary>
+            Initializes a new instance of the <see cref="T:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqDeleteQueueQueryReply"/> class, representing a failed queue
+            deletion operation.
+            </summary>
+            <remarks>This constructor sets the <see cref="P:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqDeleteQueueQueryReply.IsSuccess"/> property to <see langword="false"/>
+            and populates the <see cref="P:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqDeleteQueueQueryReply.ErrorMessage"/> property with the message from the provided
+            exception.</remarks>
+            <param name="exception">The exception that caused the operation to fail. Cannot be <see langword="null"/>.</param>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqDeleteQueueQueryReply.#ctor(System.Boolean)">
+            <summary>
+            Represents the reply to a delete queue query operation.
+            </summary>
+            <param name="isSuccess">A value indicating whether the delete queue operation was successful. <see langword="true"/> if the
+            operation succeeded; otherwise, <see langword="false"/>.</param>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqDeleteQueueQueryReply.#ctor">
+            <summary>
+            Represents the reply to a query for deleting a message queue.
+            </summary>
+            <remarks>This class is used to encapsulate the response details when a delete queue query is
+            executed. It does not perform any operations itself but serves as a container for the query reply.</remarks>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqDeleteQueueQueryReply.ThrowIfFailed">
+            <summary>
+            Throws an exception if the current operation did not succeed.
+            </summary>
+            <remarks>Use this method to enforce that the operation completed successfully. If the
+            operation failed, an exception is thrown to indicate the error condition.</remarks>
+            <exception cref="T:System.Exception">Thrown if the operation has failed. The exception message contains the associated error message.</exception>
+        </member>
+        <member name="T:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqEnqueueMessageToQueue">
+            <summary>
+            Represents a request to enqueue a message into a specified queue, with optional deferred delivery and type
+            metadata.
+            </summary>
+            <remarks>This class is used to encapsulate the details of a message being enqueued into a queue,
+            including the queue name,  optional delivery delay, the type of the message object, and the serialized message
+            content.</remarks>
+            <param name="queueName"></param>
+            <param name="deferDeliveryDuration"></param>
+            <param name="objectType"></param>
+            <param name="messageJson"></param>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqEnqueueMessageToQueue.#ctor(System.String,System.Nullable{System.TimeSpan},System.String,System.String)">
+            <summary>
+            Represents a request to enqueue a message into a specified queue, with optional deferred delivery and type
+            metadata.
+            </summary>
+            <remarks>This class is used to encapsulate the details of a message being enqueued into a queue,
+            including the queue name,  optional delivery delay, the type of the message object, and the serialized message
+            content.</remarks>
+            <param name="queueName"></param>
+            <param name="deferDeliveryDuration"></param>
+            <param name="objectType"></param>
+            <param name="messageJson"></param>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqEnqueueMessageToQueue.QueueName">
+            <summary>
+            Gets or sets the name of the queue.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqEnqueueMessageToQueue.DeferDeliveryDuration">
+            <summary>
+            The amount of time, when if set, in which the server will delay delivery of the message.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqEnqueueMessageToQueue.ObjectType">
+            <summary>
+            The full assembly qualified name of the type of MessageJson.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqEnqueueMessageToQueue.MessageJson">
+            <summary>
+            Gets or sets the JSON representation of the message.
+            </summary>
+        </member>
+        <member name="T:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqEnqueueMessageToQueueReply">
+            <summary>
+            Represents the reply to an enqueue message operation in a message queue.
+            </summary>
+            <remarks>This class provides information about the result of an enqueue operation, including whether
+            the operation  was successful and any associated error message. It can be used to inspect the outcome of the
+            operation  and handle errors accordingly.</remarks>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqEnqueueMessageToQueueReply.IsSuccess">
+            <summary>
+            Gets or sets a value indicating whether the operation was successful.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqEnqueueMessageToQueueReply.ErrorMessage">
+            <summary>
+            Gets or sets the error message associated with the current operation.
+            </summary>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqEnqueueMessageToQueueReply.#ctor(System.Exception)">
+            <summary>
+            Initializes a new instance of the <see cref="T:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqEnqueueMessageToQueueReply"/> class,  representing a failed
+            enqueue operation with the specified exception details.
+            </summary>
+            <param name="exception">The exception that caused the enqueue operation to fail.  The <see cref="P:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqEnqueueMessageToQueueReply.ErrorMessage"/> property will be
+            populated with the exception's message.</param>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqEnqueueMessageToQueueReply.#ctor(System.Boolean)">
+            <summary>
+            Represents the reply received after attempting to enqueue a message to a queue.
+            </summary>
+            <param name="isSuccess">A value indicating whether the enqueue operation was successful.  <see langword="true"/> if the operation
+            succeeded; otherwise, <see langword="false"/>.</param>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqEnqueueMessageToQueueReply.#ctor">
+            <summary>
+            Initializes a new instance of the <see cref="T:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqEnqueueMessageToQueueReply"/> class.
+            </summary>
+            <remarks>This constructor creates an instance of the <see
+            cref="T:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqEnqueueMessageToQueueReply"/> class. Use this class to represent the reply or response after a
+            message is enqueued to a queue.</remarks>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqEnqueueMessageToQueueReply.ThrowIfFailed">
+            <summary>
+            Throws an exception if the current operation did not succeed.
+            </summary>
+            <remarks>Use this method to enforce that the operation completed successfully. If the
+            operation failed, an exception is thrown to indicate the error condition.</remarks>
+            <exception cref="T:System.Exception">Thrown if the operation has failed. The exception message contains the associated error message.</exception>
+        </member>
+        <member name="T:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqPurgeQueueQuery">
+            <summary>
+            Represents a query to purge all messages from a specified message queue.
+            </summary>
+            <remarks>This query is used to remove all messages from the specified queue. It is typically used in
+            scenarios where the queue needs to be cleared before processing new messages or when the existing messages are
+            no longer needed.</remarks>
+            <param name="queueName">The name of the queue to be purged. Cannot be null or empty.</param>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqPurgeQueueQuery.#ctor(System.String)">
+            <summary>
+            Represents a query to purge all messages from a specified message queue.
+            </summary>
+            <remarks>This query is used to remove all messages from the specified queue. It is typically used in
+            scenarios where the queue needs to be cleared before processing new messages or when the existing messages are
+            no longer needed.</remarks>
+            <param name="queueName">The name of the queue to be purged. Cannot be null or empty.</param>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqPurgeQueueQuery.QueueName">
+            <summary>
+            Gets or sets the name of the queue.
+            </summary>
+        </member>
+        <member name="T:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqPurgeQueueQueryReply">
+            <summary>
+            Represents the reply to a purge queue query operation, providing information about the success or failure of the
+            operation.
+            </summary>
+            <remarks>This class encapsulates the result of a purge queue query operation, including whether the
+            operation succeeded and any associated error message. Instances of this class can be initialized with specific
+            success states or exception details.</remarks>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqPurgeQueueQueryReply.IsSuccess">
+            <summary>
+            Gets or sets a value indicating whether the operation was successful.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqPurgeQueueQueryReply.ErrorMessage">
+            <summary>
+            Gets or sets the error message associated with the current operation.
+            </summary>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqPurgeQueueQueryReply.#ctor(System.Exception)">
+            <summary>
+            Initializes a new instance of the <see cref="T:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqPurgeQueueQueryReply"/> class, representing a failed
+            operation.
+            </summary>
+            <remarks>This constructor sets the <see cref="P:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqPurgeQueueQueryReply.IsSuccess"/> property to <see langword="false"/>
+            and populates the <see cref="P:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqPurgeQueueQueryReply.ErrorMessage"/> property with the message from the provided <paramref
+            name="exception"/>.</remarks>
+            <param name="exception">The exception that caused the operation to fail. Cannot be <see langword="null"/>.</param>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqPurgeQueueQueryReply.#ctor(System.Boolean)">
+            <summary>
+            Represents the reply to a purge queue query operation.
+            </summary>
+            <param name="isSuccess">A value indicating whether the purge queue query operation was successful.</param>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqPurgeQueueQueryReply.#ctor">
+            <summary>
+            Represents a reply to a purge queue query in the messaging system.
+            </summary>
+            <remarks>This class is used to encapsulate the response data for a query that purges a queue.
+            It provides a structured way to handle the reply from the messaging system.</remarks>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqPurgeQueueQueryReply.ThrowIfFailed">
+            <summary>
+            Throws an exception if the current operation did not succeed.
+            </summary>
+            <remarks>Use this method to enforce that the operation completed successfully. If the
+            operation failed, an exception is thrown to indicate the error condition.</remarks>
+            <exception cref="T:System.Exception">Thrown if the operation has failed. The exception message contains the associated error message.</exception>
+        </member>
+        <member name="T:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqSubscribeToQueueQuery">
+            <summary>
+            Represents a query to subscribe to a message queue for processing.
+            </summary>
+            <remarks>This query is used to initiate a subscription to a specific message queue. The subscription
+            allows the caller to process messages from the specified queue.</remarks>
+            <param name="queueName"></param>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqSubscribeToQueueQuery.#ctor(System.String)">
+            <summary>
+            Represents a query to subscribe to a message queue for processing.
+            </summary>
+            <remarks>This query is used to initiate a subscription to a specific message queue. The subscription
+            allows the caller to process messages from the specified queue.</remarks>
+            <param name="queueName"></param>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqSubscribeToQueueQuery.QueueName">
+            <summary>
+            Gets or sets the name of the queue used for message processing.
+            </summary>
+        </member>
+        <member name="T:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqSubscribeToQueueQueryReply">
+            <summary>
+            
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqSubscribeToQueueQueryReply.IsSuccess">
+            <summary>
+            Gets or sets a value indicating whether the operation was successful.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqSubscribeToQueueQueryReply.ErrorMessage">
+            <summary>
+            Gets or sets the error message associated with the current operation.
+            </summary>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqSubscribeToQueueQueryReply.#ctor(System.Exception)">
+            <summary>
+            Initializes a new instance of the <see cref="T:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqSubscribeToQueueQueryReply"/> class,  representing a failed
+            subscription attempt to a message queue.
+            </summary>
+            <param name="exception">The exception that caused the subscription attempt to fail.  The exception's message is used to populate the
+            <see cref="P:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqSubscribeToQueueQueryReply.ErrorMessage"/> property.</param>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqSubscribeToQueueQueryReply.#ctor(System.Boolean)">
+            <summary>
+            Initializes a new instance of the <see cref="T:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqSubscribeToQueueQueryReply"/> class.
+            </summary>
+            <param name="isSuccess">A value indicating whether the subscription to the queue query was successful. <see langword="true"/> if the
+            subscription succeeded; otherwise, <see langword="false"/>.</param>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqSubscribeToQueueQueryReply.#ctor">
+            <summary>
+            Initializes a new instance of the <see cref="T:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqSubscribeToQueueQueryReply"/> class.
+            </summary>
+            <remarks>This constructor creates an instance of the <see
+            cref="T:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqSubscribeToQueueQueryReply"/> class. Use this class to handle replies for queue subscription
+            queries in a message queue system.</remarks>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqSubscribeToQueueQueryReply.ThrowIfFailed">
+            <summary>
+            Throws an exception if the current operation did not succeed.
+            </summary>
+            <remarks>Use this method to enforce that the operation completed successfully. If the
+            operation failed, an exception is thrown to indicate the error condition.</remarks>
+            <exception cref="T:System.Exception">Thrown if the operation has failed. The exception message contains the associated error message.</exception>
+        </member>
+        <member name="T:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqUnsubscribeFromQueueQuery">
+            <summary>
+            Represents a query to unsubscribe from a message queue.
+            </summary>
+            <remarks>This query is used to request the removal of a subscription to a specific message queue. The
+            <see cref="P:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqUnsubscribeFromQueueQuery.QueueName"/> property specifies the name of the queue to unsubscribe from.</remarks>
+            <param name="queueName">The name of the message queue to unsubscribe from. Cannot be null or empty.</param>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqUnsubscribeFromQueueQuery.#ctor(System.String)">
+            <summary>
+            Represents a query to unsubscribe from a message queue.
+            </summary>
+            <remarks>This query is used to request the removal of a subscription to a specific message queue. The
+            <see cref="P:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqUnsubscribeFromQueueQuery.QueueName"/> property specifies the name of the queue to unsubscribe from.</remarks>
+            <param name="queueName">The name of the message queue to unsubscribe from. Cannot be null or empty.</param>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqUnsubscribeFromQueueQuery.QueueName">
+            <summary>
+            Gets or sets the name of the queue.
+            </summary>
+        </member>
+        <member name="T:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqUnsubscribeFromQueueQueryReply">
+            <summary>
+            Represents the reply to an unsubscribe operation from a message queue.
+            </summary>
+            <remarks>This class encapsulates the result of an attempt to unsubscribe from a message queue, 
+            including whether the operation was successful and any associated error message.</remarks>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqUnsubscribeFromQueueQueryReply.IsSuccess">
+            <summary>
+            Gets or sets a value indicating whether the operation was successful.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqUnsubscribeFromQueueQueryReply.ErrorMessage">
+            <summary>
+            Gets or sets the error message associated with the current operation.
+            </summary>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqUnsubscribeFromQueueQueryReply.#ctor(System.Exception)">
+            <summary>
+            Initializes a new instance of the <see cref="T:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqUnsubscribeFromQueueQueryReply"/> class,  representing a
+            failed attempt to unsubscribe from a queue.
+            </summary>
+            <remarks>This constructor sets the <see cref="P:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqUnsubscribeFromQueueQueryReply.IsSuccess"/> property to <see langword="false"/>
+            and  populates the <see cref="P:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqUnsubscribeFromQueueQueryReply.ErrorMessage"/> property with the message from the provided
+            exception.</remarks>
+            <param name="exception">The exception that occurred during the unsubscribe operation.</param>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqUnsubscribeFromQueueQueryReply.#ctor(System.Boolean)">
+            <summary>
+            Represents the reply to a query for unsubscribing from a message queue.
+            </summary>
+            <param name="isSuccess">A value indicating whether the unsubscription operation was successful.</param>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqUnsubscribeFromQueueQueryReply.#ctor">
+            <summary>
+            Initializes a new instance of the <see cref="T:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqUnsubscribeFromQueueQueryReply"/> class.
+            </summary>
+            <remarks>This constructor creates an instance of the <see
+            cref="T:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqUnsubscribeFromQueueQueryReply"/> class. Use this class to handle replies for unsubscribe queries
+            in a message queue system.</remarks>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.Payload.ClientToServer.CMqUnsubscribeFromQueueQueryReply.ThrowIfFailed">
+            <summary>
+            Throws an exception if the current operation did not succeed.
+            </summary>
+            <remarks>Use this method to enforce that the operation completed successfully. If the
+            operation failed, an exception is thrown to indicate the error condition.</remarks>
+            <exception cref="T:System.Exception">Thrown if the operation has failed. The exception message contains the associated error message.</exception>
+        </member>
+        <member name="T:NTDLS.CatMQ.Shared.Payload.ServerToClient.CMqMessageDeliveryQuery">
+            <summary>
+            Represents a query for delivering a message from a queue, including metadata about the message and its delivery
+            status.
+            </summary>
+            <remarks>This class encapsulates information about a message being delivered from a queue, such as its
+            unique identifier,  serialized content, type information, and delivery statistics. It is used to track the
+            delivery progress and manage  deferred delivery requests.</remarks>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.Payload.ServerToClient.CMqMessageDeliveryQuery.#ctor(System.String,System.UInt64,System.String,System.String)">
+            <summary>
+            Represents a query for delivering a message from a queue, including metadata about the message and its delivery
+            status.
+            </summary>
+            <remarks>This class encapsulates information about a message being delivered from a queue, such as its
+            unique identifier,  serialized content, type information, and delivery statistics. It is used to track the
+            delivery progress and manage  deferred delivery requests.</remarks>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.Payload.ServerToClient.CMqMessageDeliveryQuery.QueueName">
+            <summary>
+            The name of the queue from which this message is being delivered.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.Payload.ServerToClient.CMqMessageDeliveryQuery.AssemblyQualifiedTypeName">
+            <summary>
+            The full assembly qualified name of the type of MessageJson.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.Payload.ServerToClient.CMqMessageDeliveryQuery.MessageJson">
+            <summary>
+            Json serialized object of type denoted by ObjectType.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.Payload.ServerToClient.CMqMessageDeliveryQuery.SerialNumber">
+            <summary>
+            The unique ID of the message per queue.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.Payload.ServerToClient.CMqMessageDeliveryQuery.Timestamp">
+            <summary>
+            The UTC date and time when the message was enqueued.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.Payload.ServerToClient.CMqMessageDeliveryQuery.DeferredCount">
+            <summary>
+            The number of times this message has been delivered and the subscriber requested that delivery be deferred.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.Payload.ServerToClient.CMqMessageDeliveryQuery.DeferDuration">
+            <summary>
+            The amount of time to wait before delivering this message.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.Payload.ServerToClient.CMqMessageDeliveryQuery.SubscriberDeliveryCount">
+            <summary>
+            The number of subscribers that this message has been successfully delivered to.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.Payload.ServerToClient.CMqMessageDeliveryQuery.SatisfiedSubscriberCount">
+            <summary>
+            The number of subscribers that have responded to the delivery of this message.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.Payload.ServerToClient.CMqMessageDeliveryQuery.FailedSubscriberCount">
+            <summary>
+            The number of subscribers deliveries that have failed.
+            </summary>
+        </member>
+        <member name="T:NTDLS.CatMQ.Shared.Payload.ServerToClient.CMqMessageDeliveryQueryReply">
+            <summary>
+            Represents the reply to a message delivery query, providing information about the consumption status of the
+            message and any associated error details.
+            </summary>
+            <remarks>This class is used to encapsulate the result of a message delivery query, including whether
+            the message was consumed by the client and any error messages that occurred during processing. The message
+            remains at the top of the queue until it is consumed by all subscribers, expires, or is dead-lettered.</remarks>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.Payload.ServerToClient.CMqMessageDeliveryQueryReply.ConsumeResult">
+            <summary>
+            Denotes whether the client which received the delivery notification consumed
+            the message. The message will not leave the top of the queue until it has been
+            consumed by all subscribers (or the message expires or is dead-lettered).
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.Payload.ServerToClient.CMqMessageDeliveryQueryReply.IsSuccess">
+            <summary>
+            Gets or sets a value indicating whether the operation was successful.
+            </summary>
+        </member>
+        <member name="P:NTDLS.CatMQ.Shared.Payload.ServerToClient.CMqMessageDeliveryQueryReply.ErrorMessage">
+            <summary>
+            Gets or sets the error message associated with the current operation.
+            </summary>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.Payload.ServerToClient.CMqMessageDeliveryQueryReply.#ctor(System.Exception)">
+            <summary>
+            Initializes a new instance of the <see cref="T:NTDLS.CatMQ.Shared.Payload.ServerToClient.CMqMessageDeliveryQueryReply"/> class,  representing a reply to
+            a message delivery query with an error condition.
+            </summary>
+            <param name="exception">The exception that caused the message delivery query to fail.  The exception's message is used to populate
+            the <see cref="P:NTDLS.CatMQ.Shared.Payload.ServerToClient.CMqMessageDeliveryQueryReply.ErrorMessage"/> property.</param>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.Payload.ServerToClient.CMqMessageDeliveryQueryReply.#ctor(NTDLS.CatMQ.Shared.CMqConsumeResult)">
+            <summary>
+            Represents a reply to a message delivery query, containing the result of a message consumption operation.
+            </summary>
+            <param name="consumeResult">The result of the message consumption operation. Cannot be null.</param>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.Payload.ServerToClient.CMqMessageDeliveryQueryReply.#ctor">
+            <summary>
+            Initializes a new instance of the <see cref="T:NTDLS.CatMQ.Shared.Payload.ServerToClient.CMqMessageDeliveryQueryReply"/> class.
+            </summary>
+            <remarks>This constructor sets the <see cref="P:NTDLS.CatMQ.Shared.Payload.ServerToClient.CMqMessageDeliveryQueryReply.ConsumeResult"/> property to a default value
+            indicating that the message has not been consumed.</remarks>
+        </member>
+        <member name="M:NTDLS.CatMQ.Shared.Payload.ServerToClient.CMqMessageDeliveryQueryReply.ThrowIfFailed">
+            <summary>
+            Throws an exception if the current operation did not succeed.
+            </summary>
+            <remarks>Use this method to enforce that the operation completed successfully. If the
+            operation failed, an exception is thrown to indicate the error condition.</remarks>
+            <exception cref="T:System.Exception">Thrown if the operation has failed. The exception message contains the associated error message.</exception>
+        </member>
+        <member name="T:System.Text.RegularExpressions.Generated.TypeTagsRegex_0">
+            <summary>Custom <see cref="T:System.Text.RegularExpressions.Regex"/>-derived type for the TypeTagsRegex method.</summary>
+        </member>
+        <member name="F:System.Text.RegularExpressions.Generated.TypeTagsRegex_0.Instance">
+            <summary>Cached, thread-safe singleton instance.</summary>
+        </member>
+        <member name="M:System.Text.RegularExpressions.Generated.TypeTagsRegex_0.#ctor">
+            <summary>Initializes the instance.</summary>
+        </member>
+        <member name="T:System.Text.RegularExpressions.Generated.TypeTagsRegex_0.RunnerFactory">
+            <summary>Provides a factory for creating <see cref="T:System.Text.RegularExpressions.RegexRunner"/> instances to be used by methods on <see cref="T:System.Text.RegularExpressions.Regex"/>.</summary>
+        </member>
+        <member name="M:System.Text.RegularExpressions.Generated.TypeTagsRegex_0.RunnerFactory.CreateInstance">
+            <summary>Creates an instance of a <see cref="T:System.Text.RegularExpressions.RegexRunner"/> used by methods on <see cref="T:System.Text.RegularExpressions.Regex"/>.</summary>
+        </member>
+        <member name="T:System.Text.RegularExpressions.Generated.TypeTagsRegex_0.RunnerFactory.Runner">
+            <summary>Provides the runner that contains the custom logic implementing the specified regular expression.</summary>
+        </member>
+        <member name="M:System.Text.RegularExpressions.Generated.TypeTagsRegex_0.RunnerFactory.Runner.Scan(System.ReadOnlySpan{System.Char})">
+            <summary>Scan the <paramref name="inputSpan"/> starting from base.runtextstart for the next match.</summary>
+            <param name="inputSpan">The text being scanned by the regular expression.</param>
+        </member>
+        <member name="M:System.Text.RegularExpressions.Generated.TypeTagsRegex_0.RunnerFactory.Runner.TryFindNextPossibleStartingPosition(System.ReadOnlySpan{System.Char})">
+            <summary>Search <paramref name="inputSpan"/> starting from base.runtextpos for the next location a match could possibly start.</summary>
+            <param name="inputSpan">The text being scanned by the regular expression.</param>
+            <returns>true if a possible match was found; false if no more matches are possible.</returns>
+        </member>
+        <member name="M:System.Text.RegularExpressions.Generated.TypeTagsRegex_0.RunnerFactory.Runner.TryMatchAtCurrentPosition(System.ReadOnlySpan{System.Char})">
+            <summary>Determine whether <paramref name="inputSpan"/> at base.runtextpos is a match for the regular expression.</summary>
+            <param name="inputSpan">The text being scanned by the regular expression.</param>
+            <returns>true if the regular expression matches at the current position; otherwise, false.</returns>
+        </member>
+        <member name="T:System.Text.RegularExpressions.Generated.TypeCleanupRegex_1">
+            <summary>Custom <see cref="T:System.Text.RegularExpressions.Regex"/>-derived type for the TypeCleanupRegex method.</summary>
+        </member>
+        <member name="F:System.Text.RegularExpressions.Generated.TypeCleanupRegex_1.Instance">
+            <summary>Cached, thread-safe singleton instance.</summary>
+        </member>
+        <member name="M:System.Text.RegularExpressions.Generated.TypeCleanupRegex_1.#ctor">
+            <summary>Initializes the instance.</summary>
+        </member>
+        <member name="T:System.Text.RegularExpressions.Generated.TypeCleanupRegex_1.RunnerFactory">
+            <summary>Provides a factory for creating <see cref="T:System.Text.RegularExpressions.RegexRunner"/> instances to be used by methods on <see cref="T:System.Text.RegularExpressions.Regex"/>.</summary>
+        </member>
+        <member name="M:System.Text.RegularExpressions.Generated.TypeCleanupRegex_1.RunnerFactory.CreateInstance">
+            <summary>Creates an instance of a <see cref="T:System.Text.RegularExpressions.RegexRunner"/> used by methods on <see cref="T:System.Text.RegularExpressions.Regex"/>.</summary>
+        </member>
+        <member name="T:System.Text.RegularExpressions.Generated.TypeCleanupRegex_1.RunnerFactory.Runner">
+            <summary>Provides the runner that contains the custom logic implementing the specified regular expression.</summary>
+        </member>
+        <member name="M:System.Text.RegularExpressions.Generated.TypeCleanupRegex_1.RunnerFactory.Runner.Scan(System.ReadOnlySpan{System.Char})">
+            <summary>Scan the <paramref name="inputSpan"/> starting from base.runtextstart for the next match.</summary>
+            <param name="inputSpan">The text being scanned by the regular expression.</param>
+        </member>
+        <member name="M:System.Text.RegularExpressions.Generated.TypeCleanupRegex_1.RunnerFactory.Runner.TryFindNextPossibleStartingPosition(System.ReadOnlySpan{System.Char})">
+            <summary>Search <paramref name="inputSpan"/> starting from base.runtextpos for the next location a match could possibly start.</summary>
+            <param name="inputSpan">The text being scanned by the regular expression.</param>
+            <returns>true if a possible match was found; false if no more matches are possible.</returns>
+        </member>
+        <member name="M:System.Text.RegularExpressions.Generated.TypeCleanupRegex_1.RunnerFactory.Runner.TryMatchAtCurrentPosition(System.ReadOnlySpan{System.Char})">
+            <summary>Determine whether <paramref name="inputSpan"/> at base.runtextpos is a match for the regular expression.</summary>
+            <param name="inputSpan">The text being scanned by the regular expression.</param>
+            <returns>true if the regular expression matches at the current position; otherwise, false.</returns>
+        </member>
+        <member name="T:System.Text.RegularExpressions.Generated.Utilities">
+            <summary>Helper methods used by generated <see cref="T:System.Text.RegularExpressions.Regex"/>-derived implementations.</summary>
+        </member>
+        <member name="F:System.Text.RegularExpressions.Generated.Utilities.s_defaultTimeout">
+            <summary>Default timeout value set in <see cref="T:System.AppContext"/>, or <see cref="F:System.Text.RegularExpressions.Regex.InfiniteMatchTimeout"/> if none was set.</summary>
+        </member>
+        <member name="F:System.Text.RegularExpressions.Generated.Utilities.s_hasTimeout">
+            <summary>Whether <see cref="F:System.Text.RegularExpressions.Generated.Utilities.s_defaultTimeout"/> is non-infinite.</summary>
+        </member>
+        <member name="M:System.Text.RegularExpressions.Generated.Utilities.IndexOfNonAsciiOrAny_C3EFF60EFB90345ACA3E92B6B5687EAB438B5A477C961D95EEA66204D9E64CFB(System.ReadOnlySpan{System.Char})">
+            <summary>Finds the next index of any character that matches a character in the set [,CPV\s\s\s].</summary>
+        </member>
+        <member name="F:System.Text.RegularExpressions.Generated.Utilities.s_ascii_FFC1FFFFFEEFFFFFF7FFBEFFFFFFFFFF">
+            <summary>Supports searching for characters in or not in "\0\u0001\u0002\u0003\u0004\u0005\u0006\a\b\u000e\u000f\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001a\u001b\u001c\u001d\u001e\u001f!\"#$%&amp;'()*+-./0123456789:;&lt;=&gt;?@ABDEFGHIJKLMNOQRSTUWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\u007f".</summary>
+        </member>
+    </members>
+</doc>

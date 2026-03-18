@@ -199,7 +199,7 @@ namespace NTDLS.CatMQ.Server.Server
                                         {
                                             if (Configuration.DeadLetterConfiguration != null)
                                             {
-                                                _queueServer.ShovelToDeadLetter(Configuration.QueueName, message);
+                                                _queueServer.MoveMessageToDeadLetter(Configuration.QueueName, message);
                                             }
 
                                             //Remove the message from the queue and cache.
