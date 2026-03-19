@@ -194,21 +194,22 @@
         }
 
     </script>
-    <script src="~/js/queueChart.js"></script>
+    <script src="~/lib/chartjs/queueChart.js" asp-append-version="true"></script>
 }
 
 <div>
-    <h6 class="display-6">@Model.QueueName</h6>
+    <h5 class="display-6">
+        @Model.QueueName
+        <a href="/Queues" class="btn btn-outline-secondary" title="Back to queues">
+            <i class="bi bi-arrow-up"></i>
+        </a>
+    </h5>
 
-    @if (string.IsNullOrEmpty(@Model.QueueErrorMessage) == false)
+    @if (Model.ErrorMessage != null)
     {
-        <div class="card shadow-lg mt-2 border-danger">
-            <div class="card-header text-danger">
-                <h5>Critical Queue Error</h5>
-            </div>
-            <div class="card-body d-flex align-items-center">
-                @Model.QueueErrorMessage
-            </div>
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <p class="fw-bold">@Html.Raw(Model.ErrorMessage)</p>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
     }
 
@@ -219,16 +220,40 @@
         <div class="card-body">
             <div class="table-responsive">
                 <table class="table table-striped table-bordered">
-                    <thead class="table-light">
+                    <thead>
                         <tr>
-                            <th>Persistence</th>
-                            <th>Consumption</th>
-                            <th>Delivery</th>
-                            <th class="text-end">Max. Outstanding</th>
-                            <th class="text-end">Throttle</th>
-                            <th class="text-end">Retries</th>
-                            <th class="text-end">Expiration</th>
-                            <th class="text-end">Action</th>
+                            <th>Persistence
+                                <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
+                                   title="Persistence Scheme defines whether the messages are persisted or ephemeral, where persisted messages survive service restarts and ephemeral queues lose all messages when the service is restarted."></i>
+                            </th>
+                            <th>Consumption
+                                <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
+                                   title="Consumption Scheme defines how the queue will considered a message delivered. Such as 'First Consumed Subscriber' where the message is removed once any subscriber consumes the message where 'All Subscribers Satisfied' would require that all subscribers either consume the message or indicate that they are not interested in the message."></i>
+                            </th>
+                            <th>Delivery
+                                <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
+                                   title="Delivery Scheme defines the manner in which messages are distributed to subscribers where 'Balanced' attempts to balance the number of deliveries between subscribers and 'Random' delivers to the subscribers in a random order."></i>
+                            </th>
+                            <th class="text-end">Max. Outstanding
+                                <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
+                                   title="Maximum Outstanding Deliveries defines the maximum number of concurrent parallel deliveries that will be allowed. When the number of messages that are out-for-delivery reaches the limit, no further deliveries will be attempted until dispositions are returned by the subscriber or a failure occurs."></i>
+                            </th>
+                            <th class="text-end">Throttle
+                                <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
+                                   title="Delivery Throttle defines the amount of time to delay between delivering messages from the queue. This applies to all subscribers of the queue."></i>
+                            </th>
+                            <th class="text-end">Retries
+                                <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
+                                   title="Retries or Maximum Delivery Attempts defines the number of attempts that will be made to subscribers where the result is not consumption disposition, before the message is considered for purging or dead-lettering (depending on configuration)."></i>
+                            </th>
+                            <th class="text-end">Expiration
+                                <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
+                                   title="Expiration defines the amount of time that any message can remain in the queue before the message is considered expired and wither purged or moved to the dead-letter-queue (depending on configuration)"></i>
+                            </th>
+                            <th class="text-end">Action
+                                <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
+                                   title="Actions that can be performed on the queue."></i>
+                            </th>
                         </tr>
                     </thead>
                     <tbody>
@@ -252,23 +277,59 @@
 
     <div class="card shadow-lg mt-2">
         <div class="card-header">
-            <h5>Statistics</h5>
+            <h5>Queue Statistics</h5>
         </div>
         <div class="card-body">
             <canvas id="queueChart" height="50"></canvas>
             <div class="table-responsive">
                 <table class="table table-striped table-bordered mt-1">
-                    <thead class="table-light">
+                    <thead>
                         <tr>
-                            <th class="text-end">Subscribers</th>
-                            <th class="text-end">Depth</th>
-                            <th class="text-end">Outstanding</th>
-                            <th class="text-end">Received</th>
-                            <th class="text-end">Delivered</th>
-                            <th class="text-end">Deferred</th>
-                            <th class="text-end">Expired</th>
-                            <th class="text-end">Delivery Failures</th>
-                            <th class="text-end">Action</th>
+                            <th class="text-end">
+                                Subscribers
+                                <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
+                                   title="Current number of subscribers to the queue."></i>
+                            </th>
+                            <th class="text-end">
+                                Depth
+                                <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
+                                   title="Current number of messages in the queue."></i>
+                            </th>
+                            <th class="text-end">
+                                Outstanding
+                                <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
+                                   title="Current number of messages that are out-for-delivery. These messages have been dispatched and are awaiting a disposition from a subscriber."></i>
+                            </th>
+                            <th class="text-end">
+                                Received
+                                <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
+                                   title="Cumulative number of messages that have been received into the queue."></i>
+                            </th>
+                            <th class="text-end">
+                                Delivered
+                                <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
+                                   title="Cumulative number of messages that have been delivered to subscribers from the queue."></i>
+                            </th>
+                            <th class="text-end">
+                                Deferred
+                                <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
+                                   title="Cumulative number of messages that have been delivered to subscribers where the subscriber requested that the message be redelivered at a later time."></i>
+                            </th>
+                            <th class="text-end">
+                                Expired
+                                <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
+                                   title="Cumulative number of messages that have expired while waiting to be delivered. Depending on the configuration, these messages are either discarded or moved to the dead-letter-queue."></i>
+                            </th>
+                            <th class="text-end">
+                                Delivery Failures
+                                <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
+                                   title="Cumulative number of messages where delivery attempts resulted in an exception."></i>
+                            </th>
+
+                            <th class="text-end">Action
+                                <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
+                                   title="Actions that can be performed on the queue messages."></i>
+                            </th>
                         </tr>
                     </thead>
                     <tbody>
@@ -298,16 +359,37 @@
         <div class="card-body">
             <div class="table-responsive">
                 <table class="table table-striped table-bordered">
-                    <thead class="table-light">
+                    <thead>
                         <tr>
-                            <th>SubscriberId</th>
+                            <th>SubscriberId
+                                <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
+                                   title="Unique identifier associated with the subscriber. This id changes each time the subscriber resubscribes to the queue."></i>
+                            </th>
                             <th>Address</th>
-                            <th class="text-end">Attempts</th>
-                            <th class="text-end">Successful</th>
-                            <th class="text-end">Deferred</th>
-                            <th class="text-end">Consumed</th>
-                            <th class="text-end">Delivery Failures</th>
-                            <th class="text-end">Action</th>
+                            <th class="text-end">Attempts
+                                <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
+                                   title="Cumulative number of attempts that have been made to deliver messages to this subscriber."></i>
+                            </th>
+                            <th class="text-end">Successful
+                                <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
+                                   title="Cumulative number of successful delivery attempts that have been made to this subscriber."></i>
+                            </th>
+                            <th class="text-end">Deferred
+                                <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
+                                   title="Cumulative number of deliveries that have been made to this subscriber where the subscriber requested that the message be redelivered at a later time."></i>
+                            </th>
+                            <th class="text-end">Consumed
+                                <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
+                                   title="Cumulative number of deliveries that have been made to this subscriber that resulted in a consumption of the message."></i>
+                            </th>
+                            <th class="text-end">Delivery Failures
+                                <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
+                                   title="Cumulative number of delivery attempts that have been made to this subscriber that resulted in an exception."></i>
+                            </th>
+                            <th class="text-end">Action
+                                <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
+                                   title="Actions that can be performed on the subscriber."></i>
+                            </th>
                         </tr>
                     </thead>
                     <tbody id="subscribers-body">

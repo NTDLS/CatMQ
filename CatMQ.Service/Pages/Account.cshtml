@@ -65,6 +65,52 @@
  }
 
 <div>
+    <div class="d-flex justify-content-between align-items-center mx-0 my-0">
+        <div>
+            @* Left-aligned "toolbar" controls *@
+            <h5 class="display-6">
+                Account
+            </h5>
+        </div>
+
+        <div>
+            @* Right-aligned "toolbar" controls  *@
+            <a class="btn btn-danger" href="javascript:void(0)" onclick="onDeleteAccount('@Model.AccountId', '@Model.Account.Username')">Delete</a>
+        </div>
+    </div>
+
+    @if (Model.ErrorMessage != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <p class="fw-bold">@Html.Raw(Model.ErrorMessage)</p>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    @if (Model.SuccessMessage != null)
+    {
+        <div id="success-alert" class="alert alert-success alert-dismissible fade show" role="alert">
+            <p class="fw-bold">@Html.Raw(Model.SuccessMessage)</p>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+
+        <script>
+                document.addEventListener("DOMContentLoaded", function () {
+                    setTimeout(function () {
+                        let alertElement = document.getElementById('success-alert');
+                        if (alertElement) {
+                            // Add fade-out effect
+                            alertElement.classList.remove('show');
+                            alertElement.classList.add('fade');
+
+                            // Remove the alert completely after the fade-out animation
+                            setTimeout(() => alertElement.remove(), 300);
+                        }
+                    }, 5000);
+                });
+        </script>
+    }
+
     <form method="post" asp-page-handler="SaveAccount">
         <div class="card shadow-lg">
             <div class="card-header">
@@ -99,8 +145,6 @@
                 </div>
 
                 <button type="submit" class="btn btn-primary">Save</button>
-
-                <a class="btn btn-danger" href="javascript:void(0)" onclick="onDeleteAccount('@Model.AccountId', '@Model.Account.Username')">Delete</a>
             </div>
         </div>
         <br />
@@ -115,7 +159,7 @@
                 @if (Model.Account.ApiKeys.Count > 0)
                 {
                     <table class="table table-striped table-bordered">
-                        <thead class="table-light">
+                        <thead>
                             <tr>
                                 <th>Key</th>
                                 <th>Description</th>

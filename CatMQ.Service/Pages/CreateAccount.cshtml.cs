@@ -1,14 +1,14 @@
 using CatMQ.Service.Models.Data;
-using CatMQ.Service.Models.Page;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace CatMQ.Service.Pages
 {
     [Authorize]
-    public class CreateAccountModel(ILogger<CreateAccountModel> logger) : BasePageModel
+    public class CreateAccountModel(ILogger<CreateAccountModel> logger)
+        : PageModel
     {
-        private readonly ILogger<CreateAccountModel> _logger = logger;
 
         [BindProperty]
         public Account Account { get; set; } = new();
@@ -17,6 +17,7 @@ namespace CatMQ.Service.Pages
 
         [BindProperty]
         public string? Password { get; set; }
+        public string? ErrorMessage { get; set; }
 
 
         #region Confirm Action.
@@ -55,7 +56,7 @@ namespace CatMQ.Service.Pages
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex.Message);
+                logger.LogError(ex, "Error creating account");
                 ErrorMessage = ex.Message;
             }
 
@@ -75,7 +76,7 @@ namespace CatMQ.Service.Pages
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex.Message);
+                logger.LogError(ex, "Error getting account for creation");
                 ErrorMessage = ex.Message;
             }
         }

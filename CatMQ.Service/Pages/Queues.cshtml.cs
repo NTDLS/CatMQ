@@ -1,14 +1,15 @@
-using CatMQ.Service.Models.Page;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
 using NTDLS.CatMQ.Server;
 
 namespace CatMQ.Service.Pages
 {
     [Authorize]
-    public class QueuesModel(ILogger<QueuesModel> logger, CMqServer mqServer) : BasePageModel
+    public class QueuesModel(ILogger<QueuesModel> logger, CMqServer mqServer)
+        : PageModel
     {
-        private readonly ILogger<QueuesModel> _logger = logger;
+        public string? ErrorMessage { get; set; }
 
         public void OnGet()
         {
@@ -17,7 +18,7 @@ namespace CatMQ.Service.Pages
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex.Message);
+                logger.LogError(ex, "Error fetching queues data");
                 ErrorMessage = ex.Message;
             }
         }
@@ -39,6 +40,7 @@ namespace CatMQ.Service.Pages
                     currentOutstandingDeliveries = queue.CurrentOutstandingDeliveries.ToString("n0"),
                     receivedMessageCount = queue.ReceivedMessageCount.ToString("n0"),
                     deliveredMessageCount = queue.DeliveredMessageCount.ToString("n0"),
+                    deferredDeliveryCount = queue.DeferredDeliveryCount.ToString("N0"),
                     expiredMessageCount = queue.ExpiredMessageCount.ToString("n0"),
                     failedDeliveryCount = queue.FailedDeliveryCount.ToString("n0"),
                 });

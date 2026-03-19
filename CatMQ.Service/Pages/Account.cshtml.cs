@@ -1,17 +1,16 @@
 using CatMQ.Service.Models.Data;
-using CatMQ.Service.Models.Page;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
 using System.Security.Cryptography;
 using System.Text;
 
 namespace CatMQ.Service.Pages
 {
     [Authorize]
-    public class AccountModel(ILogger<AccountModel> logger) : BasePageModel
+    public class AccountModel(ILogger<AccountModel> logger)
+        : PageModel
     {
-        private readonly ILogger<AccountModel> _logger = logger;
-
         [BindProperty(SupportsGet = true)]
         public Guid AccountId { get; set; }
 
@@ -25,6 +24,8 @@ namespace CatMQ.Service.Pages
 
         [BindProperty]
         public Guid? ApiKeyId { get; set; }
+        public string? ErrorMessage { get; set; }
+        public string? SuccessMessage { get; set; }
 
         #region Confirm Action.
 
@@ -71,7 +72,7 @@ namespace CatMQ.Service.Pages
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex.Message);
+                logger.LogError(ex, "Error saving account");
                 ErrorMessage = ex.Message;
             }
 
@@ -108,7 +109,7 @@ namespace CatMQ.Service.Pages
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex.Message);
+                logger.LogError(ex, "Error creating API key");
                 ErrorMessage = ex.Message;
             }
 
@@ -120,12 +121,11 @@ namespace CatMQ.Service.Pages
             try
             {
                 TimeZones = TimeZoneItem.GetAll();
-
                 Account = Configs.GetAccounts().Where(o => o.Id.Equals(AccountId)).Single();
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex.Message);
+                logger.LogError(ex, "Error getting account");
                 ErrorMessage = ex.Message;
             }
         }

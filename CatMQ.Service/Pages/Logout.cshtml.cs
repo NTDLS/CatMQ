@@ -1,14 +1,15 @@
-using CatMQ.Service.Models.Page;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace CatMQ.Service.Pages
 {
     [AllowAnonymous]
-    public class LogoutModel(ILogger<LogoutModel> logger) : BasePageModel
+    public class LogoutModel(ILogger<LogoutModel> logger)
+        : PageModel
     {
-        private readonly ILogger<LogoutModel> _logger = logger;
+        public string? ErrorMessage { get; set; }
 
         public async Task<IActionResult> OnGetAsync()
         {
@@ -18,7 +19,7 @@ namespace CatMQ.Service.Pages
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex.Message);
+                logger.LogError(ex, "Error during logout");
                 ErrorMessage = ex.Message;
             }
             return RedirectToPage("/Login");

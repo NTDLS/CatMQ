@@ -4,7 +4,19 @@
     ViewData["Title"] = "Logout";
 }
 
-<div class="container d-flex justify-content-center align-items-center">
+<div>
+    <h5 class="display-6">
+        BLAH
+    </h5>
+
+    @if (Model.ErrorMessage != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <p class="fw-bold">@Html.Raw(Model.ErrorMessage)</p>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
     <div class="card shadow-lg" style="width: 400px;">
         <div class="card-body">
             <h2 class="card-title text-center">Login</h2>

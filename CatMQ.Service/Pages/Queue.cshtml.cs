@@ -1,20 +1,18 @@
-using CatMQ.Service.Models.Page;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
 using NTDLS.CatMQ.Server;
 using NTDLS.Helpers;
 
 namespace CatMQ.Service.Pages
 {
     [Authorize]
-    public class QueueModel(ILogger<QueueModel> logger, CMqServer mqServer) : BasePageModel
+    public class QueueModel(ILogger<QueueModel> logger, CMqServer mqServer)
+        : PageModel
     {
         [BindProperty(SupportsGet = true)]
         public string QueueName { get; set; } = string.Empty;
-
-        public string? QueueErrorMessage { get; set; } = string.Empty;
-
-        private readonly ILogger<QueueModel> _logger = logger;
+        public string? ErrorMessage { get; set; }
 
         public void OnGet()
         {
@@ -22,11 +20,11 @@ namespace CatMQ.Service.Pages
             {
                 var queue = mqServer.GetQueue(QueueName);
                 QueueName = queue?.QueueName ?? string.Empty;
-                QueueErrorMessage = queue?.ErrorMessage;
+                ErrorMessage = queue?.ErrorMessage;
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex.Message);
+                logger.LogError(ex, "Error fetching queue data");
                 ErrorMessage = ex.Message;
             }
         }

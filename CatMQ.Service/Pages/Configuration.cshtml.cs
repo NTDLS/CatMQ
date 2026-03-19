@@ -1,16 +1,17 @@
-using CatMQ.Service.Models.Page;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace CatMQ.Service.Pages
 {
     [Authorize]
-    public class ConfigurationModel(ILogger<ConfigurationModel> logger) : BasePageModel
+    public class ConfigurationModel(ILogger<ConfigurationModel> logger)
+        : PageModel
     {
-        private readonly ILogger<ConfigurationModel> _logger = logger;
-
         [BindProperty]
         public ServiceConfiguration ServerConfig { get; set; } = new();
+        public string? ErrorMessage { get; set; }
+        public string? SuccessMessage { get; set; }
 
         public IActionResult OnPost()
         {
@@ -19,12 +20,12 @@ namespace CatMQ.Service.Pages
                 if (ModelState.IsValid)
                 {
                     Configs.PutServiceConfig(ServerConfig);
-                    SuccessMessage = "Saved!<br />You will need to restart the service for these changes to take affect.";
+                    SuccessMessage = "Configuration has been saved.<br />You will need to restart the service for these changes to take affect.";
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex.Message);
+                logger.LogError(ex, "Error saving configuration");
                 ErrorMessage = ex.Message;
             }
 
@@ -39,7 +40,7 @@ namespace CatMQ.Service.Pages
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex.Message);
+                logger.LogError(ex, "Error getting configuration");
                 ErrorMessage = ex.Message;
             }
         }

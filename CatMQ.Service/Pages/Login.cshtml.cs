@@ -1,9 +1,9 @@
 using CatMQ.Service.Models.Data;
-using CatMQ.Service.Models.Page;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
@@ -11,10 +11,9 @@ using System.Text;
 namespace CatMQ.Service.Pages
 {
     [AllowAnonymous]
-    public class LoginModel(ILogger<LoginModel> logger) : BasePageModel
+    public class LoginModel(ILogger<LoginModel> logger)
+        : PageModel
     {
-        private readonly ILogger<LoginModel> _logger = logger;
-
         [BindProperty]
         public string? Username { get; set; }
 
@@ -22,6 +21,7 @@ namespace CatMQ.Service.Pages
         public string? Password { get; set; }
 
         public bool IsDefaultPassword { get; set; } = false;
+        public string? ErrorMessage { get; set; }
 
         public void OnGet()
         {
@@ -46,11 +46,11 @@ namespace CatMQ.Service.Pages
                 var accounts = Configs.GetAccounts();
 
                 IsDefaultPassword = accounts.Any(o => o.Username.Equals("admin", StringComparison.OrdinalIgnoreCase)
-                                        && o.PasswordHash == Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("password"))).ToLower());
+                    && o.PasswordHash?.Equals(Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("password"))), StringComparison.CurrentCultureIgnoreCase) == true);
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex.Message);
+                logger.LogError(ex, "Error during login");
                 ErrorMessage = ex.Message;
             }
         }
@@ -80,11 +80,11 @@ namespace CatMQ.Service.Pages
                     return RedirectToPage("/Index");
                 }
 
-                WarningMessage = "Invalid username or password";
+                ErrorMessage = "Invalid username or password";
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex.Message);
+                logger.LogError(ex, "Error during login");
                 ErrorMessage = ex.Message;
             }
             return Page();

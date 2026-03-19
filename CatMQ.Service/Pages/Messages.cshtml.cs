@@ -1,11 +1,12 @@
-using CatMQ.Service.Models.Page;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
 using NTDLS.CatMQ.Server;
 using NTDLS.CatMQ.Server.Management;
 
 namespace CatMQ.Service.Pages
 {
-    public class MessagesModel(ILogger<MessagesModel> logger, CMqServer mqServer) : BasePageModel
+    public class MessagesModel(ILogger<MessagesModel> logger, CMqServer mqServer)
+        : PageModel
     {
         const int PageSize = 20;
 
@@ -15,8 +16,8 @@ namespace CatMQ.Service.Pages
         public int PageNumber { get; set; } = 0;
         public int TotalPages { get; set; } = 0;
 
-        private readonly ILogger<MessagesModel> _logger = logger;
         public List<CMqEnqueuedMessageDescriptor> Messages { get; set; } = new();
+        public string? ErrorMessage { get; set; }
 
         public void OnGet()
         {
@@ -29,7 +30,7 @@ namespace CatMQ.Service.Pages
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex.Message);
+                logger.LogError(ex, "Error fetching messages");
                 ErrorMessage = ex.Message;
             }
         }

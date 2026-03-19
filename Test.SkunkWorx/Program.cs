@@ -99,7 +99,7 @@ namespace Test.SkunkWorx
                 {
                     _client.Unsubscribe(queueName);
                 }
-                catch (Exception ex)
+                catch
                 {
                 }
             }

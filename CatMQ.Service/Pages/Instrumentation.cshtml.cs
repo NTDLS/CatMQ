@@ -1,31 +1,36 @@
-using CatMQ.Service.Models.Page;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
 using NTDLS.CatMQ.Server;
 
 namespace CatMQ.Service.Pages
 {
     [Authorize]
-    public class InstrumentationModel(ILogger<QueuesModel> logger, CMqServer mqServer) : BasePageModel
+    public class InstrumentationModel(ILogger<QueuesModel> logger, CMqServer mqServer)
+        : PageModel
     {
-        private readonly ILogger<QueuesModel> _logger = logger;
-
-        public void OnGet()
-        {
-            try
-            {
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex.Message);
-                ErrorMessage = ex.Message;
-            }
-        }
+        public string? ErrorMessage { get; set; }
 
         public JsonResult OnGetInstrumentation()
         {
-            var instrumentation = mqServer.InstrumentationSnapshot();
-            return new JsonResult(instrumentation);
+            try
+            {
+                var instrumentation = mqServer.InstrumentationSnapshot();
+                return new JsonResult(instrumentation);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error fetching instrumentation data.");
+
+                return new JsonResult(new
+                {
+                    error = true,
+                    message = ex.Message
+                })
+                {
+                    StatusCode = 500
+                };
+            }
         }
     }
 }

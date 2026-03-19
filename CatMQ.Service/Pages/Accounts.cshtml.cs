@@ -1,14 +1,15 @@
 using CatMQ.Service.Models.Data;
-using CatMQ.Service.Models.Page;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace CatMQ.Service.Pages
 {
     [Authorize]
-    public class AccountsModel(ILogger<AccountsModel> logger) : BasePageModel
+    public class AccountsModel(ILogger<AccountsModel> logger)
+        : PageModel
     {
-        private readonly ILogger<AccountsModel> _logger = logger;
         public List<Account> Accounts { get; set; } = new();
+        public string? ErrorMessage { get; set; }
 
         public void OnGet()
         {
@@ -18,7 +19,7 @@ namespace CatMQ.Service.Pages
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex.Message);
+                logger.LogError(ex, "Error getting accounts");
                 ErrorMessage = ex.Message;
             }
         }

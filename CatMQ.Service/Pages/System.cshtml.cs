@@ -1,5 +1,5 @@
-using CatMQ.Service.Models.Page;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc.RazorPages;
 using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -7,12 +7,13 @@ using System.Runtime.InteropServices;
 namespace CatMQ.Service.Pages
 {
     [Authorize]
-    public class SystemModel(ILogger<SystemModel> logger) : BasePageModel
+    public class SystemModel(ILogger<SystemModel> logger)
+        : PageModel
     {
-        private readonly ILogger<SystemModel> _logger = logger;
         public ProcessInfoViewModel ProcessInfo { get; private set; } = new();
         public string ApplicationVersion { get; private set; } = string.Empty;
         public List<ModuleInfo> Modules { get; set; } = new();
+        public string? ErrorMessage { get; set; }
 
         public void OnGet()
         {
@@ -57,7 +58,7 @@ namespace CatMQ.Service.Pages
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex.Message);
+                logger.LogError(ex, "Error fetching system data");
                 ErrorMessage = ex.Message;
             }
         }

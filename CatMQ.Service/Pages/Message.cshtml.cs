@@ -1,19 +1,21 @@
-using CatMQ.Service.Models.Page;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
 using NTDLS.CatMQ.Server;
 using NTDLS.CatMQ.Server.Management;
 
 namespace CatMQ.Service.Pages
 {
-    public class MessageModel(ILogger<MessageModel> logger, CMqServer mqServer) : BasePageModel
+    public class MessageModel(ILogger<MessageModel> logger, CMqServer mqServer)
+        : PageModel
     {
         [BindProperty(SupportsGet = true)]
         public string QueueName { get; set; } = string.Empty;
+
         [BindProperty(SupportsGet = true)]
         public ulong SerialNumber { get; set; }
 
-        private readonly ILogger<MessageModel> _logger = logger;
         public CMqEnqueuedMessageDescriptor? Message { get; set; }
+        public string? ErrorMessage { get; set; }
 
         public void OnGet()
         {
@@ -23,7 +25,7 @@ namespace CatMQ.Service.Pages
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex.Message);
+                logger.LogError(ex, "Error fetching message");
                 ErrorMessage = ex.Message;
             }
         }

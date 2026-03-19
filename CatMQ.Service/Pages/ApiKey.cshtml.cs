@@ -1,15 +1,14 @@
 using CatMQ.Service.Models.Data;
-using CatMQ.Service.Models.Page;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace CatMQ.Service.Pages
 {
     [Authorize]
-    public class ApiKeyModel(ILogger<ApiKeyModel> logger) : BasePageModel
+    public class ApiKeyModel(ILogger<ApiKeyModel> logger)
+        : PageModel
     {
-        private readonly ILogger<ApiKeyModel> _logger = logger;
-
         [BindProperty]
         public AccountApiKey AccountApiKey { get; set; } = new();
 
@@ -18,6 +17,8 @@ namespace CatMQ.Service.Pages
 
         [BindProperty(SupportsGet = true)]
         public Guid? AccountId { get; set; }
+        public string? ErrorMessage { get; set; }
+        public string? SuccessMessage { get; set; }
 
 
         public IActionResult OnPost()
@@ -42,7 +43,7 @@ namespace CatMQ.Service.Pages
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex.Message);
+                logger.LogError(ex, "Error saving API key");
                 ErrorMessage = ex.Message;
             }
 
@@ -59,7 +60,7 @@ namespace CatMQ.Service.Pages
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex.Message);
+                logger.LogError(ex, "Error getting API key");
                 ErrorMessage = ex.Message;
             }
         }

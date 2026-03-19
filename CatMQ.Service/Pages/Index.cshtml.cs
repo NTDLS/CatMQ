@@ -1,89 +1,90 @@
-using CatMQ.Service.Models.Page;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
 using NTDLS.CatMQ.Server;
-using NTDLS.CatMQ.Server.Management;
 
 namespace CatMQ.Service.Pages
 {
     [Authorize]
-    public class IndexModel(ILogger<IndexModel> logger, CMqServer mqServer) : BasePageModel
+    public class IndexModel(ILogger<IndexModel> logger, CMqServer mqServer)
+        : PageModel
     {
-        private readonly ILogger<IndexModel> _logger = logger;
-        public CMqServerDescriptor ServerConfig = new();
-
-        public void OnGet()
-        {
-
-            try
-            {
-                ServerConfig = mqServer.GetConfiguration();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex.Message);
-                ErrorMessage = ex.Message;
-            }
-        }
+        public string? ErrorMessage { get; set; }
 
         public JsonResult OnGetQueues()
         {
-            var queues = mqServer.GetQueues()?.OrderBy(o => o.QueueName)?.ToList() ?? new();
-
-            List<object> queueRecords = new();
-
-            long totalSubscribers = 0;
-            long totalDepth = 0;
-            long totalOutstanding = 0;
-            ulong totalReceived = 0;
-            ulong totalDelivered = 0;
-            ulong totalExpired = 0;
-            ulong totalFailed = 0;
-            ulong totalDeferred = 0;
-
-            foreach (var queue in queues)
+            try
             {
-                totalSubscribers += queue.CurrentSubscriberCount;
-                totalDepth += queue.QueueDepth;
-                totalOutstanding += queue.CurrentOutstandingDeliveries;
-                totalReceived += queue.ReceivedMessageCount;
-                totalDelivered += queue.DeliveredMessageCount;
-                totalExpired += queue.ExpiredMessageCount;
-                totalFailed += queue.FailedDeliveryCount;
-                totalDeferred += queue.DeferredDeliveryCount;
+                var queues = mqServer.GetQueues()?.OrderBy(o => o.QueueName)?.ToList() ?? new();
 
-                queueRecords.Add(new
+                List<object> queueRecords = new();
+
+                long totalSubscribers = 0;
+                long totalDepth = 0;
+                long totalOutstanding = 0;
+                ulong totalReceived = 0;
+                ulong totalDelivered = 0;
+                ulong totalExpired = 0;
+                ulong totalFailed = 0;
+                ulong totalDeferred = 0;
+
+                foreach (var queue in queues)
                 {
-                    errorMessage = queue.ErrorMessage,
-                    queueName = queue.QueueName,
-                    currentSubscriberCount = queue.CurrentSubscriberCount.ToString("n0"),
-                    queueDepth = queue.QueueDepth.ToString("n0"),
-                    currentOutstandingDeliveries = queue.CurrentOutstandingDeliveries.ToString("n0"),
-                    receivedMessageCount = queue.ReceivedMessageCount.ToString("n0"),
-                    deliveredMessageCount = queue.DeliveredMessageCount.ToString("n0"),
-                    expiredMessageCount = queue.ExpiredMessageCount.ToString("n0"),
-                    failedDeliveryCount = queue.FailedDeliveryCount.ToString("n0"),
-                    deferredDeliveryCount = queue.DeferredDeliveryCount.ToString("n0")
+                    totalSubscribers += queue.CurrentSubscriberCount;
+                    totalDepth += queue.QueueDepth;
+                    totalOutstanding += queue.CurrentOutstandingDeliveries;
+                    totalReceived += queue.ReceivedMessageCount;
+                    totalDelivered += queue.DeliveredMessageCount;
+                    totalExpired += queue.ExpiredMessageCount;
+                    totalFailed += queue.FailedDeliveryCount;
+                    totalDeferred += queue.DeferredDeliveryCount;
+
+                    queueRecords.Add(new
+                    {
+                        errorMessage = queue.ErrorMessage,
+                        queueName = queue.QueueName,
+                        currentSubscriberCount = queue.CurrentSubscriberCount.ToString("n0"),
+                        queueDepth = queue.QueueDepth.ToString("n0"),
+                        currentOutstandingDeliveries = queue.CurrentOutstandingDeliveries.ToString("n0"),
+                        receivedMessageCount = queue.ReceivedMessageCount.ToString("n0"),
+                        deliveredMessageCount = queue.DeliveredMessageCount.ToString("n0"),
+                        expiredMessageCount = queue.ExpiredMessageCount.ToString("n0"),
+                        failedDeliveryCount = queue.FailedDeliveryCount.ToString("n0"),
+                        deferredDeliveryCount = queue.DeferredDeliveryCount.ToString("n0")
+                    });
+                }
+
+                var totals = new
+                {
+                    currentSubscriberCount = totalSubscribers.ToString("n0"),
+                    queueDepth = totalDepth.ToString("n0"),
+                    currentOutstandingDeliveries = totalOutstanding.ToString("n0"),
+                    receivedMessageCount = totalReceived.ToString("n0"),
+                    deliveredMessageCount = totalDelivered.ToString("n0"),
+                    expiredMessageCount = totalExpired.ToString("n0"),
+                    failedDeliveryCount = totalFailed.ToString("n0"),
+                    deferredDeliveryCount = totalDeferred.ToString("n0"),
+                };
+
+                return new JsonResult(new
+                {
+                    queues = queueRecords,
+                    totals = totals
                 });
             }
-
-            var totals = new
+            catch (Exception ex)
             {
-                currentSubscriberCount = totalSubscribers.ToString("n0"),
-                queueDepth = totalDepth.ToString("n0"),
-                currentOutstandingDeliveries = totalOutstanding.ToString("n0"),
-                receivedMessageCount = totalReceived.ToString("n0"),
-                deliveredMessageCount = totalDelivered.ToString("n0"),
-                expiredMessageCount = totalExpired.ToString("n0"),
-                failedDeliveryCount = totalFailed.ToString("n0"),
-                deferredDeliveryCount = totalDeferred.ToString("n0"),
-            };
+                logger.LogError(ex, "Error fetching queue data");
 
-            return new JsonResult(new
-            {
-                queues = queueRecords,
-                totals = totals
-            });
+                return new JsonResult(new
+                {
+                    error = true,
+                    message = ex.Message
+                })
+                {
+                    StatusCode = 500
+                };
+            }
         }
 
         #region Chart Data.

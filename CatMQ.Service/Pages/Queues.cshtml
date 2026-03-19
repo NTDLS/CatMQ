@@ -40,6 +40,7 @@
                     <td class="text-end">${queue.currentOutstandingDeliveries}</td>
                     <td class="text-end">${queue.receivedMessageCount}</td>
                     <td class="text-end">${queue.deliveredMessageCount}</td>
+                    <td class="text-end">${queue.deferredDeliveryCount}</td>
                     <td class="text-end">${queue.expiredMessageCount}</td>
                     <td class="text-end">${queue.failedDeliveryCount}</td>
                 </tr>`;
@@ -67,31 +68,76 @@
 }
 
 <div>
-    <div class="card shadow-lg mt-2">
-        <div class="card-header">
-            <h5>Queues</h5>
-        </div>
-        <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-striped table-bordered">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Name</th>
-                            <th class="text-end">Subscribers</th>
-                            <th class="text-end">Depth</th>
-                            <th class="text-end">Outstanding</th>
-                            <th class="text-end">Received</th>
-                            <th class="text-end">Delivered</th>
-                            <th class="text-end">Expired</th>
-                            <th class="text-end">Delivery Failures</th>
-                        </tr>
-                    </thead>
+    <h5 class="display-6">
+        Queues
+        <a href="/" class="btn btn-outline-secondary" title="Back to home">
+            <i class="bi bi-arrow-up"></i>
+        </a>
+    </h5>
 
-                    <tbody id="queues-body">
-                        <!-- Filled by JS -->
-                    </tbody>
-                </table>
-            </div>
+    @if (Model.ErrorMessage != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <p class="fw-bold">@Html.Raw(Model.ErrorMessage)</p>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
+    }
+
+    <div class="table-responsive shadow-lg">
+        <table class="table table-striped table-bordered mx-0 my-0">
+            <thead>
+                <tr>
+                    <th class="text-start">
+                        Name
+                        <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
+                           title="Name of the queue."></i>
+                    </th>
+                    <th class="text-end">
+                        Subscribers
+                        <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
+                           title="Current number of subscribers to the queue."></i>
+                    </th>
+                    <th class="text-end">
+                        Depth
+                        <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
+                           title="Current number of messages in the queue."></i>
+                    </th>
+                    <th class="text-end">
+                        Outstanding
+                        <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
+                           title="Current number of messages that are out-for-delivery. These messages have been dispatched and are awaiting a disposition from a subscriber."></i>
+                    </th>
+                    <th class="text-end">
+                        Received
+                        <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
+                           title="Cumulative number of messages that have been received into the queue."></i>
+                    </th>
+                    <th class="text-end">
+                        Delivered
+                        <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
+                           title="Cumulative number of messages that have been delivered to subscribers from the queue."></i>
+                    </th>
+                    <th class="text-end">
+                        Deferred
+                        <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
+                           title="Cumulative number of messages that have been delivered to subscribers where the subscriber requested that the message be redelivered at a later time."></i>
+                    </th>
+                    <th class="text-end">
+                        Expired
+                        <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
+                           title="Cumulative number of messages that have expired while waiting to be delivered. Depending on the configuration, these messages are either discarded or moved to the dead-letter-queue."></i>
+                    </th>
+                    <th class="text-end">
+                        Delivery Failures
+                        <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
+                           title="Cumulative number of messages where delivery attempts resulted in an exception."></i>
+                    </th>
+                </tr>
+            </thead>
+
+            <tbody id="queues-body">
+                <!-- Filled by JS -->
+            </tbody>
+        </table>
     </div>
 </div>

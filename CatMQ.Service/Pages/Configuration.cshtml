@@ -7,6 +7,52 @@
 
 <div>
     <form method="post">
+    <div class="d-flex justify-content-between align-items-center mx-0 my-0">
+        <div>
+            @* Left-aligned "toolbar" controls *@
+            <h5 class="display-6">
+                Configuration
+            </h5>
+        </div>
+
+        <div>
+            @* Right-aligned "toolbar" controls  *@
+                <button type="submit" class="btn btn-primary mt-2">Save</button>
+        </div>
+    </div>
+
+
+    @if (Model.ErrorMessage != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <p class="fw-bold">@Html.Raw(Model.ErrorMessage)</p>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    @if (Model.SuccessMessage != null)
+    {
+        <div id="success-alert" class="alert alert-success alert-dismissible fade show" role="alert">
+            <p class="fw-bold">@Html.Raw(Model.SuccessMessage)</p>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+
+        <script>
+                document.addEventListener("DOMContentLoaded", function () {
+                    setTimeout(function () {
+                        let alertElement = document.getElementById('success-alert');
+                        if (alertElement) {
+                            // Add fade-out effect
+                            alertElement.classList.remove('show');
+                            alertElement.classList.add('fade');
+
+                            // Remove the alert completely after the fade-out animation
+                            setTimeout(() => alertElement.remove(), 300);
+                        }
+                    }, 5000);
+                });
+        </script>
+    }
         <div class="card shadow-lg">
             <div class="card-header">
                 <h5>Web Administration</h5>
@@ -92,7 +138,5 @@
 
             </div>
         </div>
-
-        <button type="submit" class="btn btn-primary mt-2">Save</button>
     </form>
 </div>
