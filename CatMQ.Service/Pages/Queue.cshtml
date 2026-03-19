@@ -198,12 +198,21 @@
 }
 
 <div>
-    <h5 class="display-6">
-        @Model.QueueName
-        <a href="/Queues" class="btn btn-outline-secondary" title="Back to queues">
-            <i class="bi bi-arrow-up"></i>
-        </a>
-    </h5>
+    <div class="d-flex justify-content-between align-items-center mx-0 my-0">
+        <div>
+            @* Left-aligned "toolbar" controls *@
+            <h5 class="display-6">
+                @Model.QueueName
+            </h5>
+        </div>
+
+        <div>
+            @* Right-aligned "toolbar" controls  *@
+            <a href="/Queues" class="btn btn-outline-secondary" title="Back to queues">
+                <i class="bi bi-arrow-up"></i>
+            </a>
+        </div>
+    </div>
 
     @if (Model.ErrorMessage != null)
     {
@@ -213,13 +222,13 @@
         </div>
     }
 
-    <div class="card shadow-lg mt-2">
+    <div class="card shadow-lg">
         <div class="card-header">
             <h5>Configuration</h5>
         </div>
         <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-striped table-bordered">
+            <div class="table-responsive shadow-lg">
+                <table class="table table-striped table-bordered my-0 mx-0">
                     <thead>
                         <tr>
                             <th>Persistence
@@ -281,8 +290,8 @@
         </div>
         <div class="card-body">
             <canvas id="queueChart" height="50"></canvas>
-            <div class="table-responsive">
-                <table class="table table-striped table-bordered mt-1">
+            <div class="table-responsive shadow-lg">
+                <table class="table table-striped table-bordered my-0 mx-0">
                     <thead>
                         <tr>
                             <th class="text-end">
@@ -357,8 +366,8 @@
             <h5>Subscribers</h5>
         </div>
         <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-striped table-bordered">
+            <div class="table-responsive shadow-lg">
+                <table class="table table-striped table-bordered my-0 mx-0">
                     <thead>
                         <tr>
                             <th>SubscriberId

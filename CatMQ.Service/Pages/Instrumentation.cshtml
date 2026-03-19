@@ -76,9 +76,18 @@
 }
 
 <div>
-    <h5 class="display-6">
-        Instrumentation
-    </h5>
+    <div class="d-flex justify-content-between align-items-center mx-0 my-0">
+        <div>
+            @* Left-aligned "toolbar" controls *@
+            <h5 class="display-6">
+                Instrumentation
+            </h5>
+        </div>
+
+        <div>
+            @* Right-aligned "toolbar" controls  *@
+        </div>
+    </div>
 
     @if (Model.ErrorMessage != null)
     {

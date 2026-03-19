@@ -68,12 +68,21 @@
 }
 
 <div>
-    <h5 class="display-6">
-        Queues
-        <a href="/" class="btn btn-outline-secondary" title="Back to home">
-            <i class="bi bi-arrow-up"></i>
-        </a>
-    </h5>
+    <div class="d-flex justify-content-between align-items-center mx-0 my-0">
+        <div>
+            @* Left-aligned "toolbar" controls *@
+            <h5 class="display-6">
+                Queues
+            </h5>
+        </div>
+
+        <div>
+            @* Right-aligned "toolbar" controls  *@
+            <a href="/" class="btn btn-outline-secondary" title="Back to home">
+                <i class="bi bi-arrow-up"></i>
+            </a>
+        </div>
+    </div>
 
     @if (Model.ErrorMessage != null)
     {

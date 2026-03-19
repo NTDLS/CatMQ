@@ -35,7 +35,7 @@ namespace CatMQ.Service.Pages
         {
             var subscribers = mqServer.GetSubscribers(queueName)?.OrderBy(o => o.SubscriberId)?.ToList() ?? new();
 
-            List<object> records = new();
+            var records = new List<object>();
 
             foreach (var subscriber in subscribers)
             {
