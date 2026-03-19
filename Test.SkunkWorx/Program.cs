@@ -28,7 +28,12 @@ namespace Test.SkunkWorx
 
         public static void Main(string[] args)
         {
-            _client = new CMqClient();
+            var clientConfig = new CMqClientConfiguration()
+            {
+                QueryTimeout = TimeSpan.FromSeconds(600)
+            };
+
+            _client = new CMqClient(clientConfig);
 
             _client.Connect("localhost", CMqDefaults.DEFAULT_LISTEN_PORT);
 
@@ -66,7 +71,7 @@ namespace Test.SkunkWorx
                         //  appearing to be duplicated. Additionally, if this test process exits before the "Consumed" response
                         //  is received by the server, then the message will actually be duplicated. That is by design as it is
                         //  exactly what this application is asking the server to do.
-                        _client.Enqueue(queueName, message.Deserialize());
+                        _client.EnqueueExpedient(queueName, message.Deserialize());
                         return CMqConsumeResult.Consumed();
                     });
                 }
@@ -74,16 +79,15 @@ namespace Test.SkunkWorx
 
             Console.WriteLine("Press any key to enqueue messages...");
             _ = Console.ReadLine();
-
-            for (int i = 0; i < 1000; i++)
+            for (int i = 0; i < 100000; i++)
             {
                 int queueNumber = Random.Shared.Next(0, queueCount);
                 string queueName = $"{baseQueueName}{queueNumber}";
 
                 var message = new TestMessage($"Hello world {i}");
-                _client.Enqueue(queueName, message);
+                _client.EnqueueExpedient(queueName, message);
             }
-
+            Console.WriteLine("Complete!");
 
             Console.WriteLine("Press any key to unsubscribe...");
             _ = Console.ReadLine();
@@ -99,6 +103,8 @@ namespace Test.SkunkWorx
                 {
                 }
             }
+            Console.WriteLine("Complete!");
+
         }
     }
 }

@@ -79,7 +79,10 @@ namespace NTDLS.CatMQ.Server.Server
                             {
                                 //While the RockDB WAL logs data, it’s a good idea to flush the MemTable to disk periodically for additional safety.
                                 _queueServer.InvokeOnLog(CMqErrorLevel.Verbose, $"Checkpoint persistent database for [{Configuration.QueueName}].");
+
+                                var ticketPersistenceCheckpoint = _queueServer.Instrumentation?.CreateTicket(CMqInstrumentationEventType.PersistenceCheckpoint);
                                 o.Database.Flush(new FlushOptions());
+                                ticketPersistenceCheckpoint?.Accumulate();
                             }
                         });
                     }
@@ -94,13 +97,21 @@ namespace NTDLS.CatMQ.Server.Server
                     if (attemptBufferRehydration)
                     {
                         attemptBufferRehydration = false;
+
+                        var ticketMessageBufferHydration = _queueServer.Instrumentation?.CreateTicket(CMqInstrumentationEventType.MessageBufferHydration);
                         HydrateMessageBuffer(CMqDefaults.DEFAULT_PERSISTENT_MESSAGES_BUFFER_SIZE);
+                        ticketMessageBufferHydration?.Accumulate();
                     }
 
-                    EnqueuedMessages.TryReadAll([Subscribers], CMqDefaults.DEFAULT_TRY_WAIT_MS, m =>
+                    var ticketDeliveryMessageLock = _queueServer.Instrumentation?.CreateTicket(CMqInstrumentationEventType.DeliveryMessageLock);
+                    if (EnqueuedMessages.TryReadAll([Subscribers], CMqDefaults.DEFAULT_TRY_WAIT_MS, m =>
                     {
+                        ticketDeliveryMessageLock?.Accumulate();
+
                         if (Configuration.MaxMessageAge != null)
                         {
+                            var ticketExpirationCheck = _queueServer.Instrumentation?.CreateTicket(CMqInstrumentationEventType.ExpirationCheck);
+
                             //Look for and flag expired messages.
                             //We do this here so that we can process expired messages even when there are no subscribers.
                             var expiredMessages = m.MessageBuffer.Where(o =>
@@ -130,12 +141,18 @@ namespace NTDLS.CatMQ.Server.Server
 
                                 Statistics.IncrementExpiredMessageCount();
                             }
+
+                            ticketExpirationCheck?.Accumulate();
                         }
 
                         if (Statistics.OutstandingDeliveries < Configuration.MaxOutstandingDeliveries)
                         {
+                            var ticketDeliverySubscribersLock = _queueServer.Instrumentation?.CreateTicket(CMqInstrumentationEventType.DeliverySubscribersLock);
+
                             Subscribers.Read(s => //This lock is already held.
                             {
+                                ticketDeliverySubscribersLock?.Accumulate();
+
                                 //We only process a queue if it has subscribers so that we do not
                                 //  discard messages as delivered for queues with no subscribers.
                                 if (s.Count > 0)
@@ -150,7 +167,8 @@ namespace NTDLS.CatMQ.Server.Server
                                         //  get a top-message or we are under the minimum buffer size. We have to check for the NULL
                                         //  top-message because it could be that we do not have any qualified messages in the buffer
                                         //  (because all of them are deferred) even though we do have messages in the buffer.
-                                        if (Statistics.QueueDepth > m.MessageBuffer.Count && (topMessage == null || m.MessageBuffer.Count < CMqDefaults.DEFAULT_PERSISTENT_MESSAGES_MIN_BUFFER))
+                                        if (Statistics.QueueDepth > m.MessageBuffer.Count
+                                            && (topMessage == null || m.MessageBuffer.Count < CMqDefaults.DEFAULT_PERSISTENT_MESSAGES_MIN_BUFFER))
                                         {
                                             //If we have more items in the queue than we have in the buffer, then trigger a rehydrate.
                                             attemptBufferRehydration = (Statistics.QueueDepth > m.MessageBuffer.Count);
@@ -159,7 +177,10 @@ namespace NTDLS.CatMQ.Server.Server
                                 }
                             });
                         }
-                    });
+                    }) == false)
+                    {
+                        ticketDeliveryMessageLock?.Accumulate();
+                    }
 
                     if (topMessage != null)
                     {
@@ -199,16 +220,18 @@ namespace NTDLS.CatMQ.Server.Server
                                         {
                                             if (Configuration.DeadLetterConfiguration != null)
                                             {
+                                                var ticketDeadLetter = _queueServer.Instrumentation?.CreateTicket(CMqInstrumentationEventType.DeadLetter);
                                                 _queueServer.MoveMessageToDeadLetter(Configuration.QueueName, message);
+                                                ticketDeadLetter?.Accumulate();
                                             }
 
                                             //Remove the message from the queue and cache.
-                                            m.RemoveFromBufferAndDatabase(message);
+                                            m.RemoveFromBufferAndDatabase(_queueServer, message);
                                             Statistics.DecrementQueueDepth();
                                         }
                                         break;
                                     case CMqMessageState.Drop:
-                                        m.RemoveFromBufferAndDatabase(message);
+                                        m.RemoveFromBufferAndDatabase(_queueServer, message);
                                         Statistics.DecrementQueueDepth();
                                         break;
                                 }
@@ -245,7 +268,10 @@ namespace NTDLS.CatMQ.Server.Server
                 if (threadYieldBurndown >= CMqDefaults.QUEUE_THREAD_DELIVERY_BURNDOWN && _KeepRunning)
                 {
                     threadYieldBurndown = CMqDefaults.QUEUE_THREAD_DELIVERY_BURNDOWN;
+
+                    var ticketDeliveryYield = _queueServer.Instrumentation?.CreateTicket(CMqInstrumentationEventType.DeliveryYield);
                     DeliveryThreadWaitEvent.WaitOne(10);
+                    ticketDeliveryYield?.Accumulate();
                 }
             }
         }
@@ -362,8 +388,16 @@ namespace NTDLS.CatMQ.Server.Server
                         subscriber.IncrementDeferredDeliveryCount();
                         Statistics.IncrementDeferredDeliveryCount();
 
+                        var ticketDeferReadLock = _queueServer.Instrumentation?.CreateTicket(CMqInstrumentationEventType.DeferReadLock);
                         //The rocksdb database can handle concurrent writes, so we really only need to obtain the object - not lock it.
-                        EnqueuedMessages.Read(messages => messages.Database.Store(message));
+                        EnqueuedMessages.Read(messages =>
+                        {
+                            ticketDeferReadLock?.Accumulate();
+
+                            var ticketDeferStore = _queueServer.Instrumentation?.CreateTicket(CMqInstrumentationEventType.DeferStore);
+                            messages.Database.Store(message);
+                            ticketDeferStore?.Accumulate();
+                        });
 
                         //We return "Ready" so that the message can be re-delivered later and we do not deliver it to any other subscribers.
                         return CMqMessageState.Ready;
@@ -458,8 +492,11 @@ namespace NTDLS.CatMQ.Server.Server
 
             _queueServer.InvokeOnLog(CMqErrorLevel.Verbose, $"Re-hydrating message buffer for [{Configuration.QueueName}].");
 
-            return EnqueuedMessages.TryWrite(m =>
+            var ticketMessageBufferHydrationWriteLock = _queueServer.Instrumentation?.CreateTicket(CMqInstrumentationEventType.MessageBufferHydrationWriteLock);
+            bool result = EnqueuedMessages.TryWrite(m =>
             {
+                ticketMessageBufferHydrationWriteLock?.Accumulate();
+
                 if (m.Database == null)
                 {
                     throw new Exception($"Persistence database has not been initialized for [{Configuration.QueueName}].");
@@ -490,14 +527,24 @@ namespace NTDLS.CatMQ.Server.Server
                     }
                 }
             });
+
+            if (result == false)
+            {
+                ticketMessageBufferHydrationWriteLock?.Accumulate();
+            }
+
+            return result;
         }
 
         public void InitializePersistentDatabase()
         {
+            var ticketPersistentInitialization = _queueServer.Instrumentation?.CreateTicket(CMqInstrumentationEventType.PersistentInitialization);
+
             try
             {
                 if (Configuration.PersistenceScheme != CMqPersistenceScheme.Persistent)
                 {
+                    ticketPersistentInitialization?.Accumulate();
                     IsInitialized = true;
                     return;
                 }
@@ -548,6 +595,8 @@ namespace NTDLS.CatMQ.Server.Server
                 ErrorMessage = $"Critical error occurred initializing persistence database for [{Configuration.QueueName}]. Exception: {ex.GetBaseException().Message}";
                 _queueServer.InvokeOnLog(CMqErrorLevel.Error, ErrorMessage);
             }
+
+            ticketPersistentInitialization?.Accumulate();
         }
 
         public void Start()

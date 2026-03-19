@@ -52,6 +52,14 @@
                     <span asp-validation-for="ServerConfig.DataPath" class="text-danger"></span>
                     <input type="text" id="dataPath" class="form-control" placeholder="Enter file path" asp-for="ServerConfig.DataPath">
                 </div>
+                <div class="mb-3">
+                    <label for="EnableWebUI" class="form-label fw-bold">Enable Instrumentation</label>
+                    <span asp-validation-for="ServerConfig.EnableInstrumentation" class="text-danger"></span>
+                    <select id="enableInstrumentation" asp-for="ServerConfig.EnableInstrumentation" class="form-select">
+                        <option value="true">True</option>
+                        <option value="false">False</option>
+                    </select>
+                </div>
             </div>
         </div>
 

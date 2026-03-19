@@ -1,6 +1,95 @@
 ﻿namespace NTDLS.CatMQ.Shared
 {
     /// <summary>
+    /// Specifies the types of instrumentation events that can occur in the message queue system.
+    /// </summary>
+    /// <remarks>Use this enumeration to identify and categorize events for monitoring or logging purposes
+    /// within the message queue infrastructure. Additional event types may be added in future versions.</remarks>
+    public enum CMqInstrumentationEventType
+    {
+        /// <summary>
+        /// Total time take to enqueue messages.
+        /// </summary>
+        EnqueueMessage,
+        /// <summary>
+        /// Time taken to acquire read lock on message queues collection during message enqueue.
+        /// </summary>
+        EnqueueMessageReadLock,
+        /// <summary>
+        /// Time taken to acquire read lock on message container for persisted storage during message enqueue.
+        /// </summary>
+        EnqueueMessagePersistenceReadLock,
+        /// <summary>
+        /// Time taken to acquire write lock on message container for Ephemeral storage during message enqueue.
+        /// </summary>
+        EnqueueMessageEphemeralWriteLock,
+        /// <summary>
+        /// Time taken writing a message to the persistence store during message enqueue.
+        /// </summary>
+        PersistenceStore,
+        /// <summary>
+        /// Time taken to deliver messages and receive consumption dispositions from subscribers.
+        /// </summary>
+        DeliverMessageWithResult,
+        /// <summary>
+        /// Time taken for periodic checkpointing of the message queue persisted data.
+        /// </summary>
+        PersistenceCheckpoint,
+        /// <summary>
+        /// Time taken to acquire locks on messages for delivery.
+        /// </summary>
+        DeliveryMessageLock,
+        /// <summary>
+        /// Time taken to check for expired messages and handle them accordingly.
+        /// </summary>
+        ExpirationCheck,
+        /// <summary>
+        /// Time taken to acquire locks on subscribers for delivery.
+        /// </summary>
+        DeliverySubscribersLock,
+        /// <summary>
+        /// Time yielding delivery due to message buffer being empty.
+        /// </summary>
+        DeliveryYield,
+        /// <summary>
+        /// Time taken to move messages for dead-lettering.
+        /// </summary>
+        DeadLetter,
+        /// <summary>
+        /// Time taken to move removed messages from the persistence store.
+        /// </summary>
+        PersistenceRemove,
+        /// <summary>
+        /// Time taken to move removed messages from the message delivery buffer store.
+        /// </summary>
+        BufferRemove,
+        /// <summary>
+        /// Time taken to store persistent messages for deferment.
+        /// </summary>
+        DeferStore,
+        /// <summary>
+        /// Time taken to acquire lock on messages for deferment.
+        /// </summary>
+        DeferReadLock,
+        /// <summary>
+        /// Time taken to acquire write lock on message buffer for hydration from persistence.
+        /// </summary>
+        MessageBufferHydrationWriteLock,
+        /// <summary>
+        /// Time taken to fill message buffer for hydration from persistence.
+        /// </summary>
+        MessageBufferHydration,
+        /// <summary>
+        /// Time taken to initialize persistent storage during queue startup.
+        /// </summary>
+        PersistentInitialization,
+        /// <summary>
+        /// Time taken yielding lock time to avoid deadlocks with other operations such as enqueuing, message expiration, and checkpointing.
+        /// </summary>
+        DeadlockAvoidance
+    }
+
+    /// <summary>
     /// Represents the state of a message in the message queue.
     /// </summary>
     /// <remarks>This enumeration defines the various states a message can be in during its lifecycle within

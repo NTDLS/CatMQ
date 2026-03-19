@@ -15,6 +15,11 @@ namespace CatMQ.Service
         public bool EnableWebApi { get; set; } = true;
 
         /// <summary>
+        /// Gets or sets a value indicating whether instrumentation is enabled.
+        /// </summary>
+        public bool EnableInstrumentation { get; set; } = false;
+
+        /// <summary>
         /// Whether or not the web UI is enabled.
         /// </summary>
         public bool EnableWebUI { get; set; } = true;

@@ -20,14 +20,14 @@
                 });
 
                 if (!response.ok) {
-                    console.error('Failed to load subscribers. HTTP', response.status);
+                    console.error('Failed to load queues. HTTP', response.status);
                     return;
                 }
 
                 const data = await response.json();
                 renderQueues(data);
             } catch (err) {
-                console.error('Error loading subscribers:', err);
+                console.error('Error loading queues:', err);
             }
         }
 
@@ -45,11 +45,11 @@
                 </tr>`;
         }
 
-        function renderQueues(subscribers) {
+        function renderQueues(queues) {
             const tbody = document.getElementById('queues-body');
             if (!tbody) return;
 
-            if (!Array.isArray(subscribers) || subscribers.length === 0) {
+            if (!Array.isArray(queues) || queues.length === 0) {
                 tbody.innerHTML = `
                     <tr>
                         <td colspan="8" class="text-center text-muted">
@@ -59,7 +59,7 @@
                 return;
             }
 
-            const rowsHtml = subscribers.map(buildRow).join('');
+            const rowsHtml = queues.map(buildRow).join('');
             tbody.innerHTML = rowsHtml;
         }
 

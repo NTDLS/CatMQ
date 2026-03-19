@@ -2,6 +2,7 @@
 using NTDLS.CatMQ.Server.Server;
 using NTDLS.CatMQ.Server.Server.QueryHandlers;
 using NTDLS.CatMQ.Shared;
+using NTDLS.CatMQ.Shared.Instrumentation;
 using NTDLS.CatMQ.Shared.Payload.ServerToClient;
 using NTDLS.ReliableMessaging;
 using NTDLS.Semaphore;
@@ -37,6 +38,14 @@ namespace NTDLS.CatMQ.Server
         public event OnLogEvent? OnLog;
 
         /// <summary>
+        /// Gets the instrumentation metrics and monitoring data for the message queue instance.
+        /// </summary>
+        /// <remarks>Use this property to access runtime statistics and diagnostic information related to
+        /// the message queue's operation. The returned object provides metrics that can assist with monitoring,
+        /// troubleshooting, and performance analysis.</remarks>
+        internal CMqInstrumentation? Instrumentation { get; private set; }
+
+        /// <summary>
         /// Creates a new instance of the queue service.
         /// </summary>
         public CMqServer(CMqServerConfiguration configuration)
@@ -47,6 +56,11 @@ namespace NTDLS.CatMQ.Server
             CancelContext.Cancel();
 
             _configuration = configuration;
+
+            if (_configuration.EnableInstrumentation)
+            {
+                Instrumentation = new();
+            }
 
             var rmConfiguration = new RmConfiguration()
             {
@@ -72,6 +86,11 @@ namespace NTDLS.CatMQ.Server
             CancelContext.Cancel();
 
             _configuration = new CMqServerConfiguration();
+
+            if (_configuration.EnableInstrumentation)
+            {
+                Instrumentation = new();
+            }
 
             var rmConfiguration = new RmConfiguration()
             {
@@ -139,11 +158,25 @@ namespace NTDLS.CatMQ.Server
                 {
                     return;
                 }
+                var ticketDeadlockAvoidance = Instrumentation?.CreateTicket(CMqInstrumentationEventType.DeadlockAvoidance);
                 Thread.Sleep(CMqDefaults.DEFAULT_DEADLOCK_AVOIDANCE_WAIT_MS);
+                ticketDeadlockAvoidance?.Accumulate();
             }
         }
 
         #region Management.
+
+        /// <summary>
+        /// Returns a snapshot of the current instrumentation events, if available.
+        /// </summary>
+        /// <remarks>The returned snapshot represents the state of instrumentation events at the time of
+        /// the call. Subsequent changes to instrumentation data are not reflected in the returned dictionary.</remarks>
+        /// <returns>A concurrent dictionary containing the current set of instrumentation events, keyed by event type; or null
+        /// if instrumentation is not enabled.</returns>
+        public List<KeyValuePair<CMqInstrumentationEventType, CMqInstrumentationEvent>>? InstrumentationSnapshot()
+            => Instrumentation?.Snapshot()
+                .OrderBy(kvp => kvp.Key.ToString())
+                .ToList();
 
         /// <summary>
         /// Saves persistent message queues and their statistics to disk.
@@ -258,7 +291,9 @@ namespace NTDLS.CatMQ.Server
                     return new ReadOnlyCollection<CMqQueueDescriptor>(result);
                 }
 
-                Thread.Sleep(CMqDefaults.DEFAULT_DEADLOCK_AVOIDANCE_WAIT_MS); //Failed to lock, sleep then try again.
+                var ticketDeadlockAvoidance = Instrumentation?.CreateTicket(CMqInstrumentationEventType.DeadlockAvoidance);
+                Thread.Sleep(CMqDefaults.DEFAULT_DEADLOCK_AVOIDANCE_WAIT_MS);
+                ticketDeadlockAvoidance?.Accumulate();
             }
 
             return null;
@@ -327,7 +362,9 @@ namespace NTDLS.CatMQ.Server
                     return result;
                 }
 
-                Thread.Sleep(CMqDefaults.DEFAULT_DEADLOCK_AVOIDANCE_WAIT_MS); //Failed to lock, sleep then try again.
+                var ticketDeadlockAvoidance = Instrumentation?.CreateTicket(CMqInstrumentationEventType.DeadlockAvoidance);
+                Thread.Sleep(CMqDefaults.DEFAULT_DEADLOCK_AVOIDANCE_WAIT_MS);
+                ticketDeadlockAvoidance?.Accumulate();
             }
 
             return null;
@@ -366,7 +403,9 @@ namespace NTDLS.CatMQ.Server
                     return new ReadOnlyCollection<CMqSubscriberDescriptor>(result);
                 }
 
-                Thread.Sleep(CMqDefaults.DEFAULT_DEADLOCK_AVOIDANCE_WAIT_MS); //Failed to lock, sleep then try again.
+                var ticketDeadlockAvoidance = Instrumentation?.CreateTicket(CMqInstrumentationEventType.DeadlockAvoidance);
+                Thread.Sleep(CMqDefaults.DEFAULT_DEADLOCK_AVOIDANCE_WAIT_MS);
+                ticketDeadlockAvoidance?.Accumulate();
             }
 
             return null;
@@ -513,7 +552,9 @@ namespace NTDLS.CatMQ.Server
                     };
                 }
 
-                Thread.Sleep(CMqDefaults.DEFAULT_DEADLOCK_AVOIDANCE_WAIT_MS); //Failed to lock, sleep then try again.
+                var ticketDeadlockAvoidance = Instrumentation?.CreateTicket(CMqInstrumentationEventType.DeadlockAvoidance);
+                Thread.Sleep(CMqDefaults.DEFAULT_DEADLOCK_AVOIDANCE_WAIT_MS);
+                ticketDeadlockAvoidance?.Accumulate();
             }
 
             return null;
@@ -632,49 +673,52 @@ namespace NTDLS.CatMQ.Server
                     OnLog?.Invoke(this, CMqErrorLevel.Information, "Loading persistent queues.");
 
                     var persistedQueuesJson = File.ReadAllText(persistedQueuesFile);
-                    var queueMetas = JsonSerializer.Deserialize<List<MessageQueueMetadata>>(persistedQueuesJson);
-
-                    if (queueMetas != null)
+                    if (string.IsNullOrWhiteSpace(persistedQueuesJson) == false)
                     {
-                        _messageQueues.Write(mqd =>
-                       {
-                           foreach (var queueMeta in queueMetas)
+                        var queueMetas = JsonSerializer.Deserialize<List<MessageQueueMetadata>>(persistedQueuesJson);
+
+                        if (queueMetas != null)
+                        {
+                            _messageQueues.Write(mqd =>
                            {
-                               try
+                               foreach (var queueMeta in queueMetas)
                                {
-                                   var messageQueue = new SingleMessageQueueServer(this, queueMeta.Configuration)
+                                   try
                                    {
-                                       Statistics = queueMeta.Statistics
-                                   };
-                                   queuesToStart.Add(messageQueue);
+                                       var messageQueue = new SingleMessageQueueServer(this, queueMeta.Configuration)
+                                       {
+                                           Statistics = queueMeta.Statistics
+                                       };
+                                       queuesToStart.Add(messageQueue);
 
-                                   if (messageQueue.Configuration.QueueName.EndsWith(".dlq"))
-                                   {
-                                       deadLetterQueuesToLoad.Add(messageQueue);
-                                   }
-                                   else
-                                   {
-                                       messageQueuesToLoad.Add(messageQueue);
-                                   }
-                                   mqd.Add(queueMeta.Configuration.QueueName.ToLowerInvariant(), messageQueue);
+                                       if (messageQueue.Configuration.QueueName.EndsWith(".dlq"))
+                                       {
+                                           deadLetterQueuesToLoad.Add(messageQueue);
+                                       }
+                                       else
+                                       {
+                                           messageQueuesToLoad.Add(messageQueue);
+                                       }
+                                       mqd.Add(queueMeta.Configuration.QueueName.ToLowerInvariant(), messageQueue);
 
-                                   if (queueMeta.Configuration.DeadLetterConfiguration != null
-                                       && queueMeta.Configuration.DeadLetterConfiguration.PersistenceScheme == CMqPersistenceScheme.Ephemeral)
+                                       if (queueMeta.Configuration.DeadLetterConfiguration != null
+                                           && queueMeta.Configuration.DeadLetterConfiguration.PersistenceScheme == CMqPersistenceScheme.Ephemeral)
+                                       {
+                                           //Persistent DLQs are created by default, if the queue has an Ephemeral DLQ then we need to manually create it.
+                                           var dlqConfig = queueMeta.Configuration.DeadLetterConfiguration.ToConfiguration(queueMeta.Configuration.QueueName);
+                                           var dlq = new SingleMessageQueueServer(this, dlqConfig);
+                                           queuesToStart.Add(dlq);
+                                           mqd.Add(dlqConfig.QueueName.ToLowerInvariant(), dlq);
+                                       }
+                                   }
+                                   catch (Exception ex)
                                    {
-                                       //Persistent DLQs are created by default, if the queue has an Ephemeral DLQ then we need to manually create it.
-                                       var dlqConfig = queueMeta.Configuration.DeadLetterConfiguration.ToConfiguration(queueMeta.Configuration.QueueName);
-                                       var dlq = new SingleMessageQueueServer(this, dlqConfig);
-                                       queuesToStart.Add(dlq);
-                                       mqd.Add(dlqConfig.QueueName.ToLowerInvariant(), dlq);
+                                       var exception = $"Critical error occurred while loading metadata for [{queueMeta.Configuration.QueueName}]. Exception: {ex.GetBaseException().Message}";
+                                       InvokeOnLog(CMqErrorLevel.Error, exception);
                                    }
                                }
-                               catch (Exception ex)
-                               {
-                                   var exception = $"Critical error occurred while loading metadata for [{queueMeta.Configuration.QueueName}]. Exception: {ex.GetBaseException().Message}";
-                                   InvokeOnLog(CMqErrorLevel.Error, exception);
-                               }
-                           }
-                       });
+                           });
+                        }
                     }
                 }
             }
@@ -855,7 +899,9 @@ namespace NTDLS.CatMQ.Server
                 {
                     return;
                 }
+                var ticketDeadlockAvoidance = Instrumentation?.CreateTicket(CMqInstrumentationEventType.DeadlockAvoidance);
                 Thread.Sleep(CMqDefaults.DEFAULT_DEADLOCK_AVOIDANCE_WAIT_MS);
+                ticketDeadlockAvoidance?.Accumulate();
             }
         }
 
@@ -875,7 +921,10 @@ namespace NTDLS.CatMQ.Server
                 FailedSubscriberCount = enqueuedMessage.DeliveryLimitReachedSubscriberIDs.Count
             };
 
+            var ticketDeliverMessageWithResult = Instrumentation?.CreateTicket(CMqInstrumentationEventType.DeliverMessageWithResult);
             var result = await _rmServer.QueryAsync(subscriberId, message);
+            ticketDeliverMessageWithResult?.Accumulate();
+
             result.ThrowIfFailed();
             return result.ConsumeResult;
         }
@@ -1004,7 +1053,9 @@ namespace NTDLS.CatMQ.Server
 
                     return;
                 }
+                var ticketDeadlockAvoidance = Instrumentation?.CreateTicket(CMqInstrumentationEventType.DeadlockAvoidance);
                 Thread.Sleep(CMqDefaults.DEFAULT_DEADLOCK_AVOIDANCE_WAIT_MS);
+                ticketDeadlockAvoidance?.Accumulate();
             }
         }
 
@@ -1049,7 +1100,9 @@ namespace NTDLS.CatMQ.Server
                 {
                     return;
                 }
+                var ticketDeadlockAvoidance = Instrumentation?.CreateTicket(CMqInstrumentationEventType.DeadlockAvoidance);
                 Thread.Sleep(CMqDefaults.DEFAULT_DEADLOCK_AVOIDANCE_WAIT_MS);
+                ticketDeadlockAvoidance?.Accumulate();
             }
         }
 
@@ -1081,7 +1134,9 @@ namespace NTDLS.CatMQ.Server
                 {
                     return;
                 }
+                var ticketDeadlockAvoidance = Instrumentation?.CreateTicket(CMqInstrumentationEventType.DeadlockAvoidance);
                 Thread.Sleep(CMqDefaults.DEFAULT_DEADLOCK_AVOIDANCE_WAIT_MS);
+                ticketDeadlockAvoidance?.Accumulate();
             }
         }
 
@@ -1094,18 +1149,27 @@ namespace NTDLS.CatMQ.Server
 
             string queueKey = queueName.ToLowerInvariant();
 
+            var ticketEnqueueMessage = Instrumentation?.CreateTicket(CMqInstrumentationEventType.EnqueueMessage);
+
             while (!CancelContext.IsCancellationRequested)
             {
                 bool success = true;
 
+                var ticketEnqueueMessageReadLock = Instrumentation?.CreateTicket(CMqInstrumentationEventType.EnqueueMessageReadLock);
+
                 _messageQueues.Read(mqd =>
                 {
+                    ticketEnqueueMessageReadLock?.Accumulate();
+
                     if (mqd.TryGetValue(queueKey, out var messageQueue))
                     {
                         if (messageQueue.Configuration.PersistenceScheme == CMqPersistenceScheme.Persistent)
                         {
+                            var ticketEnqueueMessagePersistenceReadLock = Instrumentation?.CreateTicket(CMqInstrumentationEventType.EnqueueMessagePersistenceReadLock);
                             success = messageQueue.EnqueuedMessages.TryRead(CMqDefaults.DEFAULT_TRY_WAIT_MS, messages =>
                             {
+                                ticketEnqueueMessagePersistenceReadLock?.Accumulate();
+
                                 if (messages.Database == null)
                                 {
                                     throw new Exception($"Persistence database has not been initialized for [{queueName}].");
@@ -1120,17 +1184,28 @@ namespace NTDLS.CatMQ.Server
                                     DeferredUntil = deferDeliveryDuration == null ? null : DateTime.UtcNow + deferDeliveryDuration
                                 };
 
+                                var ticketDatabaseStore = Instrumentation?.CreateTicket(CMqInstrumentationEventType.PersistenceStore);
                                 //For persistent queues, the messages are only loaded into the database.
                                 //They will be buffered into the message buffer by the message queue delivery thread.
                                 messages.Database.Store(message);
+                                ticketDatabaseStore?.Accumulate();
 
                                 messageQueue.DeliveryThreadWaitEvent.Set();
                             }) && success;
+
+                            if (!success)
+                            {
+                                ticketEnqueueMessagePersistenceReadLock?.Accumulate();
+                            }
                         }
                         else
                         {
+                            var ticketEnqueueMessageEphemeralWriteLock = Instrumentation?.CreateTicket(CMqInstrumentationEventType.EnqueueMessageEphemeralWriteLock);
+
                             success = messageQueue.EnqueuedMessages.TryWrite(CMqDefaults.DEFAULT_TRY_WAIT_MS, messages =>
                             {
+                                ticketEnqueueMessageEphemeralWriteLock?.Accumulate();
+
                                 messageQueue.Statistics.IncrementReceivedMessageCount();
                                 messageQueue.Statistics.IncrementQueueDepth();
 
@@ -1145,6 +1220,11 @@ namespace NTDLS.CatMQ.Server
 
                                 messageQueue.DeliveryThreadWaitEvent.Set();
                             }) && success;
+
+                            if (!success)
+                            {
+                                ticketEnqueueMessageEphemeralWriteLock?.Accumulate();
+                            }
                         }
                     }
                     else
@@ -1155,9 +1235,13 @@ namespace NTDLS.CatMQ.Server
 
                 if (success)
                 {
+                    ticketEnqueueMessage?.Accumulate();
                     return;
                 }
+
+                var ticketDeadlockAvoidance = Instrumentation?.CreateTicket(CMqInstrumentationEventType.DeadlockAvoidance);
                 Thread.Sleep(CMqDefaults.DEFAULT_DEADLOCK_AVOIDANCE_WAIT_MS);
+                ticketDeadlockAvoidance?.Accumulate();
             }
         }
 

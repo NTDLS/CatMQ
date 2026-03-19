@@ -13,8 +13,8 @@ namespace NTDLS.CatMQ.Shared.Payload.ClientToServer
     /// <param name="deferDeliveryDuration"></param>
     /// <param name="objectType"></param>
     /// <param name="messageJson"></param>
-    public class CMqEnqueueMessageToQueue(string queueName, TimeSpan? deferDeliveryDuration, string objectType, string messageJson)
-        : IRmQuery<CMqEnqueueMessageToQueueReply>
+    public class CMqEnqueueMessageToQueueWithConfirmation(string queueName, TimeSpan? deferDeliveryDuration, string objectType, string messageJson)
+        : IRmQuery<CMqEnqueueMessageToQueueWithConfirmationReply>
     {
         /// <summary>
         /// Gets or sets the name of the queue.
@@ -43,7 +43,7 @@ namespace NTDLS.CatMQ.Shared.Payload.ClientToServer
     /// <remarks>This class provides information about the result of an enqueue operation, including whether
     /// the operation  was successful and any associated error message. It can be used to inspect the outcome of the
     /// operation  and handle errors accordingly.</remarks>
-    public class CMqEnqueueMessageToQueueReply
+    public class CMqEnqueueMessageToQueueWithConfirmationReply
         : IRmQueryReply
     {
         /// <summary>
@@ -57,12 +57,12 @@ namespace NTDLS.CatMQ.Shared.Payload.ClientToServer
         public string? ErrorMessage { get; set; }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="CMqEnqueueMessageToQueueReply"/> class,  representing a failed
+        /// Initializes a new instance of the <see cref="CMqEnqueueMessageToQueueWithConfirmationReply"/> class,  representing a failed
         /// enqueue operation with the specified exception details.
         /// </summary>
         /// <param name="exception">The exception that caused the enqueue operation to fail.  The <see cref="ErrorMessage"/> property will be
         /// populated with the exception's message.</param>
-        public CMqEnqueueMessageToQueueReply(Exception exception)
+        public CMqEnqueueMessageToQueueWithConfirmationReply(Exception exception)
         {
             IsSuccess = false;
             ErrorMessage = exception.Message;
@@ -73,18 +73,18 @@ namespace NTDLS.CatMQ.Shared.Payload.ClientToServer
         /// </summary>
         /// <param name="isSuccess">A value indicating whether the enqueue operation was successful.  <see langword="true"/> if the operation
         /// succeeded; otherwise, <see langword="false"/>.</param>
-        public CMqEnqueueMessageToQueueReply(bool isSuccess)
+        public CMqEnqueueMessageToQueueWithConfirmationReply(bool isSuccess)
         {
             IsSuccess = isSuccess;
         }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="CMqEnqueueMessageToQueueReply"/> class.
+        /// Initializes a new instance of the <see cref="CMqEnqueueMessageToQueueWithConfirmationReply"/> class.
         /// </summary>
         /// <remarks>This constructor creates an instance of the <see
-        /// cref="CMqEnqueueMessageToQueueReply"/> class. Use this class to represent the reply or response after a
+        /// cref="CMqEnqueueMessageToQueueWithConfirmationReply"/> class. Use this class to represent the reply or response after a
         /// message is enqueued to a queue.</remarks>
-        public CMqEnqueueMessageToQueueReply()
+        public CMqEnqueueMessageToQueueWithConfirmationReply()
         {
         }
 

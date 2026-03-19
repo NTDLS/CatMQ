@@ -78,17 +78,22 @@ namespace NTDLS.CatMQ.Server.Server.QueryHandlers
             }
         }
 
-        public CMqEnqueueMessageToQueueReply EnqueueMessageToQueue(RmContext context, CMqEnqueueMessageToQueue param)
+        public CMqEnqueueMessageToQueueWithConfirmationReply EnqueueMessageToQueueWithConfirmation(RmContext context, CMqEnqueueMessageToQueueWithConfirmation param)
         {
             try
             {
                 _mqServer.Enqueue(param.QueueName, param.DeferDeliveryDuration, param.ObjectType, param.MessageJson);
-                return new CMqEnqueueMessageToQueueReply(true);
+                return new CMqEnqueueMessageToQueueWithConfirmationReply(true);
             }
             catch (Exception ex)
             {
-                return new CMqEnqueueMessageToQueueReply(ex.GetBaseException());
+                return new CMqEnqueueMessageToQueueWithConfirmationReply(ex.GetBaseException());
             }
+        }
+
+        public void EnqueueMessageToQueueExpedient(RmContext context, CMqEnqueueMessageToQueueExpedient param)
+        {
+            _mqServer.Enqueue(param.QueueName, param.DeferDeliveryDuration, param.ObjectType, param.MessageJson);
         }
     }
 }

@@ -20,6 +20,7 @@ namespace CatMQ.Service
                 MaxReceiveBufferSize = serviceConfiguration.MaxReceiveBufferSize,
                 AcknowledgmentTimeoutSeconds = serviceConfiguration.AcknowledgmentTimeoutSeconds,
                 ReceiveBufferGrowthRate = serviceConfiguration.ReceiveBufferGrowthRate,
+                EnableInstrumentation = serviceConfiguration.EnableInstrumentation
             });
             _mqServer.OnLog += MqServer_OnLog;
 
@@ -61,7 +62,6 @@ namespace CatMQ.Service
                 }
 
                 builder.WebHost.UseUrls(serviceConfiguration.WebListenURL);
-
 
                 var app = builder.Build();
 

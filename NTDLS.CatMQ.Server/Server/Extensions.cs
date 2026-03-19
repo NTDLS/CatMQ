@@ -1,4 +1,5 @@
-﻿using RocksDbSharp;
+﻿using NTDLS.CatMQ.Shared;
+using RocksDbSharp;
 using System.Text;
 using System.Text.Json;
 
@@ -53,11 +54,17 @@ namespace NTDLS.CatMQ.Server.Server
         /// <summary>
         /// Removes an item from a database and the message buffer.
         /// </summary>
-        public static void RemoveFromBufferAndDatabase(this EnqueuedMessageContainer container, EnqueuedMessage message)
+        public static void RemoveFromBufferAndDatabase(this EnqueuedMessageContainer container, CMqServer queueServer, EnqueuedMessage message)
         {
             var keyBytes = message.SerialNumber.ToKey();
+
+            var ticketPersistenceRemove = queueServer.Instrumentation?.CreateTicket(CMqInstrumentationEventType.PersistenceRemove);
             container.Database?.Remove(keyBytes, keyBytes.Length);
+            ticketPersistenceRemove?.Accumulate();
+
+            var ticketBufferRemove = queueServer.Instrumentation?.CreateTicket(CMqInstrumentationEventType.BufferRemove);
             container.MessageBuffer.Remove(message);
+            ticketBufferRemove?.Accumulate();
         }
 
         /// <summary>

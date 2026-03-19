@@ -8,6 +8,10 @@ namespace NTDLS.CatMQ.Server
     public class CMqServerConfiguration
     {
         /// <summary>
+        /// Gets or sets a value indicating whether instrumentation is enabled.
+        /// </summary>
+        public bool EnableInstrumentation { get; set; } = false;
+        /// <summary>
         /// The default amount of time to wait for a query to reply before throwing a timeout exception.
         /// </summary>
         public int AcknowledgmentTimeoutSeconds { get; set; } = CMqDefaults.DEFAULT_ACK_TIMEOUT_SECONDS;
