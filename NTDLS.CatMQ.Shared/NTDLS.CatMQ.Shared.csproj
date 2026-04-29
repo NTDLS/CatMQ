@@ -47,7 +47,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="NTDLS.ReliableMessaging" Version="3.3.1" />
+		<PackageReference Include="NTDLS.ReliableMessaging" Version="3.4.2" />
 	</ItemGroup>
 
 </Project>

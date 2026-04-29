@@ -22,7 +22,7 @@ namespace CatMQ.Tests
             Console.WriteLine("Client disconnected.");
         }
 
-        private static void Client_OnConnected(CMqClient client)
+        private static void Client_OnConnected(CMqClient client, bool isReconnect)
         {
             Console.WriteLine("Client connected.");
         }

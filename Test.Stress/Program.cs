@@ -31,7 +31,7 @@ namespace Test.Stress
             {
                 AutoReconnect = true
             });
-            client.ConnectBackground("127.0.0.1", 45784);
+            client.Connect("127.0.0.1", 45784);
 
             Console.WriteLine("Waiting for connection...");
             while (client.IsConnected == false)

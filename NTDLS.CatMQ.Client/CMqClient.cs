@@ -15,7 +15,6 @@ namespace NTDLS.CatMQ.Client
         : IDisposable
     {
         private readonly RmClient _rmClient;
-        private bool _explicitDisconnect = false;
         private readonly CMqClientConfiguration _configuration;
 
         /// <summary>
@@ -30,19 +29,23 @@ namespace NTDLS.CatMQ.Client
         /// </summary>
         public ICMqSerializationProvider? SerializationProvider { get; private set; }
 
-        private string? _lastReconnectHost;
-        private int _lastReconnectPort;
-        private IPAddress? _lastReconnectIpAddress;
-
         /// <summary>
         /// Returns true if the client is connected.
         /// </summary>
         public bool IsConnected => _rmClient.IsConnected;
 
         /// <summary>
-        /// Event used for server-to-client delivery notifications containing raw JSON.
+        /// Delegate used for client connectivity notifications.
         /// </summary>
-        public delegate void OnConnectedEvent(CMqClient client);
+        /// <param name="client">The client instance.</param>
+        /// <param name="isReconnect">True when the connection was an auto-reconnect, otherwise false.</param>
+        public delegate void OnConnectedEvent(CMqClient client, bool isReconnect);
+
+        /// <summary>
+        /// Delegate used for client (dis)connectivity notifications.
+        /// </summary>
+        /// <param name="client">The client instance.</param>
+        public delegate void OnDisconnectedEvent(CMqClient client);
 
         /// <summary>
         /// Event used client connectivity notifications.
@@ -52,7 +55,7 @@ namespace NTDLS.CatMQ.Client
         /// <summary>
         /// Event used client connectivity notifications.
         /// </summary>
-        public event OnConnectedEvent? OnDisconnected;
+        public event OnDisconnectedEvent? OnDisconnected;
 
         /// <summary>
         /// Delegate used to notify of queue client exceptions.
@@ -77,7 +80,8 @@ namespace NTDLS.CatMQ.Client
                 MaxReceiveBufferSize = _configuration.MaxReceiveBufferSize,
                 QueryTimeout = _configuration.QueryTimeout,
                 ReceiveBufferGrowthRate = _configuration.ReceiveBufferGrowthRate,
-                CompressionProvider = new RmDeflateCompressionProvider()
+                CompressionProvider = new RmDeflateCompressionProvider(),
+                AutoReconnect = _configuration.AutoReconnect,
             };
 
             _rmClient = new RmClient(rmConfiguration);
@@ -97,7 +101,8 @@ namespace NTDLS.CatMQ.Client
                 MaxReceiveBufferSize = _configuration.MaxReceiveBufferSize,
                 QueryTimeout = _configuration.QueryTimeout,
                 ReceiveBufferGrowthRate = _configuration.ReceiveBufferGrowthRate,
-                CompressionProvider = new RmDeflateCompressionProvider()
+                CompressionProvider = new RmDeflateCompressionProvider(),
+                AutoReconnect = _configuration.AutoReconnect,
             };
 
             _rmClient = new RmClient(rmConfiguration);
@@ -123,54 +128,11 @@ namespace NTDLS.CatMQ.Client
             SerializationProvider = null;
         }
 
-        private void RmClient_OnConnected(RmContext context)
-        {
-            _explicitDisconnect = false;
-            OnConnected?.Invoke(this);
-        }
+        private void RmClient_OnConnected(RmContext context, bool isReconnect)
+            => OnConnected?.Invoke(this, isReconnect);
 
         private void RmClient_OnDisconnected(RmContext context)
-        {
-            try
-            {
-                OnDisconnected?.Invoke(this);
-
-                if (!_explicitDisconnect && _configuration.AutoReconnect)
-                {
-                    _ = Task.Run(() =>
-                    {
-                        while (!_explicitDisconnect && !_rmClient.IsConnected)
-                        {
-                            try
-                            {
-                                if (_lastReconnectHost != null)
-                                {
-                                    Connect(_lastReconnectHost, _lastReconnectPort);
-                                }
-                                else if (_lastReconnectIpAddress != null)
-                                {
-                                    Connect(_lastReconnectIpAddress, _lastReconnectPort);
-                                }
-                                else
-                                {
-                                    throw new Exception("Cannot reconnect because no previous connection information is available.");
-                                }
-                            }
-                            catch (Exception ex)
-                            {
-                                OnException?.Invoke(this, null, ex.GetBaseException());
-                            }
-
-                            Thread.Sleep(1000);
-                        }
-                    });
-                }
-            }
-            catch (Exception ex)
-            {
-                OnException?.Invoke(this, null, ex.GetBaseException());
-            }
-        }
+            => OnDisconnected?.Invoke(this);
 
         internal CMqConsumeResult InvokeOnReceived(CMqClient client, CMqReceivedMessage message)
         {
@@ -222,12 +184,6 @@ namespace NTDLS.CatMQ.Client
         {
             ResetBufferedMessagesAndSubscriptions();
 
-            _lastReconnectHost = hostName;
-            _lastReconnectIpAddress = null;
-            _lastReconnectPort = port;
-
-            _explicitDisconnect = false;
-
             _rmClient.Connect(hostName, port);
         }
 
@@ -237,66 +193,7 @@ namespace NTDLS.CatMQ.Client
         public void Connect(IPAddress ipAddress, int port)
         {
             ResetBufferedMessagesAndSubscriptions();
-
-            _lastReconnectHost = null;
-            _lastReconnectIpAddress = ipAddress;
-            _lastReconnectPort = port;
-
-            _explicitDisconnect = false;
-
             _rmClient.Connect(ipAddress, port);
-        }
-
-        /// <summary>
-        /// Connects the client to a queue server in a background thread.
-        /// </summary>
-        public void ConnectBackground(string hostName, int port)
-        {
-            _ = Task.Run(() =>
-            {
-                while (!_explicitDisconnect)
-                {
-                    try
-                    {
-                        Connect(hostName, port);
-                        return;
-                    }
-                    catch
-                    {
-                        if (_configuration.AutoReconnect == false)
-                        {
-                            return;
-                        }
-                    }
-                    Thread.Sleep(500);
-                }
-            });
-        }
-
-        /// <summary>
-        /// Connects the client to a queue server in a background thread.
-        /// </summary>
-        public void ConnectBackground(IPAddress ipAddress, int port)
-        {
-            _ = Task.Run(() =>
-            {
-                while (!_explicitDisconnect)
-                {
-                    try
-                    {
-                        Connect(ipAddress, port);
-                        return;
-                    }
-                    catch
-                    {
-                        if (_configuration.AutoReconnect == false)
-                        {
-                            return;
-                        }
-                    }
-                    Thread.Sleep(500);
-                }
-            });
         }
 
         /// <summary>
@@ -304,7 +201,6 @@ namespace NTDLS.CatMQ.Client
         /// </summary>
         public void Disconnect(bool wait = false)
         {
-            _explicitDisconnect = true;
             _rmClient.Disconnect(wait);
             _bufferedDeliveryTask?.Wait();
         }
@@ -491,7 +387,7 @@ namespace NTDLS.CatMQ.Client
         {
             try
             {
-                while (!_explicitDisconnect)
+                while (!_rmClient.ExplicitlyDisconnected)
                 {
                     FlushBufferedMessages(false);
                     Thread.Sleep(1);

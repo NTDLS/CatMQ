@@ -23,7 +23,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="RocksDB" Version="10.4.2.64152" />
+		<PackageReference Include="RocksDB" Version="10.10.1.649" />
 		<PackageReference Include="Serilog.Settings.Configuration" Version="10.0.0" />
 		<PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
 		<PackageReference Include="Topshelf" Version="4.3.0" />
