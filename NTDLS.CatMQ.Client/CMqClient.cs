@@ -85,6 +85,8 @@ namespace NTDLS.CatMQ.Client
             };
 
             _rmClient = new RmClient(rmConfiguration);
+            _rmClient.OnConnected += RmClient_OnConnected;
+            _rmClient.OnDisconnected += RmClient_OnDisconnected;
             _rmClient.AddHandler(new InternalClientQueryHandlers(this));
         }
 

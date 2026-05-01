@@ -92,3 +92,7 @@ CatMQ.Tests/obj/
 Test.SkunkWorx/bin/
 
 Test.SkunkWorx/obj/
+
+Test.QueueClientAutoReconnect/obj/
+
+Test.QueueClientAutoReconnect/bin/
