@@ -14,6 +14,11 @@
         public const int QUEUE_THREAD_DELIVERY_BURNDOWN = 100;
 
         /// <summary>
+        /// Amount of time in milliseconds to wait when attmeptig to acquire a lock before timing out and throwing an exception.
+        /// </summary>
+        public const int DEFAULT_LOCK_TIMEOUT_MS = 10 * 1000;
+
+        /// <summary>
         /// The number of messages to load from a persistence database when hydrating the message buffer.
         /// </summary>
         public const int DEFAULT_PERSISTENT_MESSAGES_BUFFER_SIZE = 5000;

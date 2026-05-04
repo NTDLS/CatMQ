@@ -8,24 +8,6 @@ namespace NTDLS.CatMQ.Server.Server
     internal static class Extensions
     {
         /// <summary>
-        /// Removes an item from a database.
-        /// </summary>
-        public static void RemoveFromDatabase(this RocksDb? db, ulong serialNumber)
-        {
-            var keyBytes = serialNumber.ToKey();
-            db?.Remove(keyBytes, keyBytes.Length);
-        }
-
-        /// <summary>
-        /// Removes an item from a database.
-        /// </summary>
-        public static void Remove(this RocksDb? db, EnqueuedMessage message)
-        {
-            var keyBytes = message.SerialNumber.ToKey();
-            db?.Remove(keyBytes, keyBytes.Length);
-        }
-
-        /// <summary>
         /// Removes all items from a database.
         /// </summary>
         public static void Purge(this RocksDb? db)
@@ -56,11 +38,13 @@ namespace NTDLS.CatMQ.Server.Server
         /// </summary>
         public static void RemoveFromBufferAndDatabase(this EnqueuedMessageContainer container, CMqServer queueServer, EnqueuedMessage message)
         {
-            var keyBytes = message.SerialNumber.ToKey();
-
-            var ticketPersistenceRemove = queueServer.Instrumentation?.CreateTicket(CMqInstrumentationEventType.PersistenceRemove);
-            container.Database?.Remove(keyBytes, keyBytes.Length);
-            ticketPersistenceRemove?.Accumulate();
+            if (container.Database != null)
+            {
+                var keyBytes = message.SerialNumber.ToKey();
+                var ticketPersistenceRemove = queueServer.Instrumentation?.CreateTicket(CMqInstrumentationEventType.PersistenceRemove);
+                container.Database.Remove(keyBytes, keyBytes.Length);
+                ticketPersistenceRemove?.Accumulate();
+            }
 
             var ticketBufferRemove = queueServer.Instrumentation?.CreateTicket(CMqInstrumentationEventType.BufferRemove);
             container.MessageBuffer.Remove(message);

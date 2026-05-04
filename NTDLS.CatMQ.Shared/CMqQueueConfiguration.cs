@@ -15,14 +15,32 @@ namespace NTDLS.CatMQ.Shared
         public string QueueName
         {
             get => _queueName.EnsureNotNull();
-            set => _queueName = value;
+            set
+            {
+                if (!CMqQueueConfiguration.IsValidQueueName(value))
+                    throw new ArgumentException($"QueueName contains invalid characters: {value}", nameof(value));
+
+                _queueName = value;
+            }
+        }
+
+        /// <summary>
+        /// Determines whether the specified queue name is valid according to the naming rules.
+        /// </summary>
+        /// <param name="name">The queue name to validate. Cannot be null, empty, or contain invalid characters.</param>
+        /// <returns>true if the specified name is a valid queue name; otherwise, false.</returns>
+        public static bool IsValidQueueName(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return false;
+            if (CMqCompiledRegEx.InvalidQueueNameChars().IsMatch(name)) return false;
+            return true;
         }
 
         /// <summary>
         /// Whether messages are delivered to subscribers asynchronously.
         /// Messages are still delivered in order per subscriber, but multiple messages can be in-flight to different subscribers at the same time.
         /// </summary>
-        public bool AsycnronousDelivery { get; set; } = true;
+        public bool AsynchronousDelivery { get; set; } = true;
 
         /// <summary>
         /// The maximum number of simultaneously outstanding asynchronous deliveries.
@@ -85,6 +103,9 @@ namespace NTDLS.CatMQ.Shared
         public CMqQueueConfiguration(string queueName)
         {
             QueueName = queueName;
+
+            if (!CMqQueueConfiguration.IsValidQueueName(queueName))
+                throw new ArgumentException($"QueueName contains invalid characters: {queueName}", nameof(queueName));
         }
     }
 }

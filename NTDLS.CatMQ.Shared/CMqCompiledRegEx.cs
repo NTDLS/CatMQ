@@ -9,5 +9,8 @@ namespace NTDLS.CatMQ.Shared
 
         [GeneratedRegex(@"\s*,\s*")]
         internal static partial Regex TypeCleanupRegex();
+
+        [GeneratedRegex(@"[<>:""/\\|?*\x00-\x1F]")]
+        internal static partial Regex InvalidQueueNameChars();
     }
 }

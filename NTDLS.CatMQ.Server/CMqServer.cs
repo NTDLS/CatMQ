@@ -18,7 +18,7 @@ namespace NTDLS.CatMQ.Server
     public class CMqServer
         : IDisposable
     {
-        internal CancellationTokenSource CancelContext { get; set; }
+        internal volatile bool _isRunning = false;
 
         private readonly CMqServerConfiguration _configuration;
         private readonly JsonSerializerOptions _indentedJsonOptions = new() { WriteIndented = true };
@@ -52,9 +52,6 @@ namespace NTDLS.CatMQ.Server
         {
             //ThreadLockOwnershipTracking.Enable();
 
-            CancelContext = new CancellationTokenSource();
-            CancelContext.Cancel();
-
             _configuration = configuration;
 
             if (_configuration.EnableInstrumentation)
@@ -82,9 +79,6 @@ namespace NTDLS.CatMQ.Server
         /// </summary>
         public CMqServer()
         {
-            CancelContext = new CancellationTokenSource();
-            CancelContext.Cancel();
-
             _configuration = new CMqServerConfiguration();
 
             if (_configuration.EnableInstrumentation)
@@ -134,8 +128,15 @@ namespace NTDLS.CatMQ.Server
 
         private void RmServer_OnDisconnected(RmContext context)
         {
-            while (!CancelContext.IsCancellationRequested)
+            var deadline = Environment.TickCount64 + CMqDefaults.DEFAULT_LOCK_TIMEOUT_MS;
+
+            while (_isRunning)
             {
+                if (Environment.TickCount64 >= deadline)
+                {
+                    throw new TimeoutException($"Operation timed out after {CMqDefaults.DEFAULT_LOCK_TIMEOUT_MS}ms.");
+                }
+
                 bool success = true;
 
                 //When a client disconnects, remove their subscriptions.
@@ -205,7 +206,13 @@ namespace NTDLS.CatMQ.Server
                 }
 
                 var persistedQueuesJson = JsonSerializer.Serialize(queueMetas, _indentedJsonOptions);
-                File.WriteAllText(Path.Join(_configuration.PersistencePath, "queues.json"), persistedQueuesJson);
+
+                // Write to a temporary file first, then move it to the target location.
+                // This approach minimizes the risk of data corruption if the application crashes during the write operation.
+                var fileName = Path.Join(_configuration.PersistencePath, "queues.json");
+                var tempfileName = fileName + ".tmp";
+                File.WriteAllText(tempfileName, persistedQueuesJson);
+                File.Move(tempfileName, fileName, overwrite: true);
             }
         }
 
@@ -235,10 +242,18 @@ namespace NTDLS.CatMQ.Server
         /// <summary>
         /// Returns a read-only copy of the queues.
         /// </summary>
-        public ReadOnlyCollection<CMqQueueDescriptor>? GetQueues()
+        public ReadOnlyCollection<CMqQueueDescriptor>? GetQueues(TimeSpan? timeout = null)
         {
-            while (!CancelContext.IsCancellationRequested)
+            var timeoutMs = (timeout?.TotalMilliseconds ?? CMqDefaults.DEFAULT_LOCK_TIMEOUT_MS);
+            var deadline = Environment.TickCount64 + timeoutMs;
+
+            while (_isRunning)
             {
+                if (Environment.TickCount64 >= deadline)
+                {
+                    throw new TimeoutException($"Operation timed out after {timeoutMs}ms.");
+                }
+
                 bool success = true;
                 List<CMqQueueDescriptor>? result = new();
 
@@ -302,10 +317,18 @@ namespace NTDLS.CatMQ.Server
         /// <summary>
         /// Returns a single queue with the given name.
         /// </summary>
-        public CMqQueueDescriptor? GetQueue(string queueName)
+        public CMqQueueDescriptor? GetQueue(string queueName, TimeSpan? timeout = null)
         {
-            while (!CancelContext.IsCancellationRequested)
+            var timeoutMs = (timeout?.TotalMilliseconds ?? CMqDefaults.DEFAULT_LOCK_TIMEOUT_MS);
+            var deadline = Environment.TickCount64 + timeoutMs;
+
+            while (_isRunning)
             {
+                if (Environment.TickCount64 >= deadline)
+                {
+                    throw new TimeoutException($"Operation timed out after {timeoutMs}ms.");
+                }
+
                 bool success = true;
                 CMqQueueDescriptor? result = new();
 
@@ -373,10 +396,18 @@ namespace NTDLS.CatMQ.Server
         /// <summary>
         /// Returns a read-only copy of the queue subscribers.
         /// </summary>
-        public ReadOnlyCollection<CMqSubscriberDescriptor>? GetSubscribers(string queueName)
+        public ReadOnlyCollection<CMqSubscriberDescriptor>? GetSubscribers(string queueName, TimeSpan? timeout = null)
         {
-            while (!CancelContext.IsCancellationRequested)
+            var timeoutMs = (timeout?.TotalMilliseconds ?? CMqDefaults.DEFAULT_LOCK_TIMEOUT_MS);
+            var deadline = Environment.TickCount64 + timeoutMs;
+
+            while (_isRunning)
             {
+                if (Environment.TickCount64 >= deadline)
+                {
+                    throw new TimeoutException($"Operation timed out after {timeoutMs}ms.");
+                }
+
                 bool success = true;
                 var result = new List<CMqSubscriberDescriptor>();
 
@@ -457,10 +488,18 @@ namespace NTDLS.CatMQ.Server
         /// <summary>
         /// Returns a read-only copy messages in the queue.
         /// </summary>
-        public CMqEnqueuedMessageDescriptorCollection? GetQueueMessages(string queueName, int offset, int take)
+        public CMqEnqueuedMessageDescriptorCollection? GetQueueMessages(string queueName, int offset, int take, TimeSpan? timeout = null)
         {
-            while (!CancelContext.IsCancellationRequested)
+            var timeoutMs = (timeout?.TotalMilliseconds ?? CMqDefaults.DEFAULT_LOCK_TIMEOUT_MS);
+            var deadline = Environment.TickCount64 + timeoutMs;
+
+            while (_isRunning)
             {
+                if (Environment.TickCount64 >= deadline)
+                {
+                    throw new TimeoutException($"Operation timed out after {timeoutMs}ms.");
+                }
+
                 bool success = true;
                 List<CMqEnqueuedMessageDescriptor>? result = new();
 
@@ -563,10 +602,18 @@ namespace NTDLS.CatMQ.Server
         /// <summary>
         /// Returns a read-only copy of a message in the queue.
         /// </summary>
-        public CMqEnqueuedMessageDescriptor? GetQueueMessage(string queueName, ulong serialNumber, int? truncateToBytes = null)
+        public CMqEnqueuedMessageDescriptor? GetQueueMessage(string queueName, ulong serialNumber, int? truncateToBytes = null, TimeSpan? timeout = null)
         {
-            while (!CancelContext.IsCancellationRequested)
+            var timeoutMs = (timeout?.TotalMilliseconds ?? CMqDefaults.DEFAULT_LOCK_TIMEOUT_MS);
+            var deadline = Environment.TickCount64 + timeoutMs;
+
+            while (_isRunning)
             {
+                if (Environment.TickCount64 >= deadline)
+                {
+                    throw new TimeoutException($"Operation timed out after {timeoutMs}ms.");
+                }
+
                 bool success = true;
                 CMqEnqueuedMessageDescriptor? result = null;
 
@@ -651,15 +698,12 @@ namespace NTDLS.CatMQ.Server
         public void Start(int listenPort)
         {
             // Already running?
-            if (!CancelContext.IsCancellationRequested)
+            if (_isRunning)
             {
                 return;
             }
 
-            CancelContext?.Dispose(); // If we had an old CancellationTokenSource, clean it up.
-
-            CancelContext = new CancellationTokenSource();
-            var token = CancelContext.Token;
+            _isRunning = true;
 
             var messageQueuesToLoad = new List<SingleMessageQueueServer>();
             var deadLetterQueuesToLoad = new List<SingleMessageQueueServer>();
@@ -738,17 +782,17 @@ namespace NTDLS.CatMQ.Server
 
             _rmServer.Start(listenPort);
 
-            Task.Run(async () => await HeartbeatThread(CancelContext.Token), CancelContext.Token);
+            Task.Run(async () => await HeartbeatThread());
         }
 
-        private async Task HeartbeatThread(CancellationToken token)
+        private async Task HeartbeatThread()
         {
             try
             {
                 var lastCheckpoint = DateTime.UtcNow;
                 var lastHistoricalStatisticsTouch = DateTime.UtcNow;
 
-                while (!token.IsCancellationRequested)
+                while (_isRunning)
                 {
                     if (_configuration.EnableHistoricalStatistics)
                     {
@@ -786,7 +830,7 @@ namespace NTDLS.CatMQ.Server
                         OnLog?.Invoke(this, CMqErrorLevel.Error, "An error occurred in CheckpointPersistentMessageQueues", ex);
                     }
 
-                    await Task.Delay(1000, token);
+                    await Task.Delay(1000);
                 }
             }
             catch (OperationCanceledException)
@@ -802,7 +846,7 @@ namespace NTDLS.CatMQ.Server
         {
             OnLog?.Invoke(this, CMqErrorLevel.Information, "Stopping service.");
 
-            CancelContext.Cancel();
+            _isRunning = false;
             OnLog?.Invoke(this, CMqErrorLevel.Information, "Stopping reliable messaging.");
             _rmServer.Stop();
 
@@ -834,15 +878,23 @@ namespace NTDLS.CatMQ.Server
 
         #region Message queue interactions.
 
-        internal void MoveMessageToDeadLetter(string sourceQueueName, EnqueuedMessage givenMessage)
+        internal void MoveMessageToDeadLetter(string sourceQueueName, EnqueuedMessage givenMessage, TimeSpan? timeout = null)
         {
             OnLog?.Invoke(this, CMqErrorLevel.Verbose, $"Dead-lettering message for [{sourceQueueName}].");
 
             var dlqName = $"{sourceQueueName}.dlq";
             var dlqKey = dlqName.ToLowerInvariant();
 
-            while (!CancelContext.IsCancellationRequested)
+            var timeoutMs = (timeout?.TotalMilliseconds ?? CMqDefaults.DEFAULT_LOCK_TIMEOUT_MS);
+            var deadline = Environment.TickCount64 + timeoutMs;
+
+            while (_isRunning)
             {
+                if (Environment.TickCount64 >= deadline)
+                {
+                    throw new TimeoutException($"Operation timed out after {timeoutMs}ms.");
+                }
+
                 bool success = true;
 
                 _messageQueues.Read(mqd =>
@@ -947,6 +999,9 @@ namespace NTDLS.CatMQ.Server
                 throw new Exception("Queue names cannot end with '.dlq'.");
             }
 
+            if (!CMqQueueConfiguration.IsValidQueueName(queueConfiguration.QueueName))
+                throw new ArgumentException($"QueueName contains invalid characters: {queueConfiguration.QueueName}", nameof(queueConfiguration.QueueName));
+
             CreateQueueInternal(queueConfiguration);
         }
 
@@ -997,14 +1052,22 @@ namespace NTDLS.CatMQ.Server
         /// <summary>
         /// Deletes an existing queue.
         /// </summary>
-        public void DeleteQueue(string queueName)
+        public void DeleteQueue(string queueName, TimeSpan? timeout = null)
         {
             OnLog?.Invoke(this, CMqErrorLevel.Verbose, $"Deleting queue: [{queueName}].");
 
             string queueKey = queueName.ToLowerInvariant();
 
-            while (!CancelContext.IsCancellationRequested)
+            var timeoutMs = (timeout?.TotalMilliseconds ?? CMqDefaults.DEFAULT_LOCK_TIMEOUT_MS);
+            var deadline = Environment.TickCount64 + timeoutMs;
+
+            while (_isRunning)
             {
+                if (Environment.TickCount64 >= deadline)
+                {
+                    throw new TimeoutException($"Operation timed out after {timeoutMs}ms.");
+                }
+
                 bool success = true;
 
                 SingleMessageQueueServer? waitOnStopMessageQueue = null;
@@ -1062,14 +1125,22 @@ namespace NTDLS.CatMQ.Server
         /// <summary>
         /// Creates a subscription to a queue for a given connection id.
         /// </summary>
-        internal void Subscribe(Guid subscriberId, IPEndPoint? localEndpoint, IPEndPoint? remoteEndpoint, string queueName)
+        internal void Subscribe(Guid subscriberId, IPEndPoint? localEndpoint, IPEndPoint? remoteEndpoint, string queueName, TimeSpan? timeout = null)
         {
             OnLog?.Invoke(this, CMqErrorLevel.Verbose, $"Subscribing connection [{subscriberId}] to queue: [{queueName}].");
 
             string queueKey = queueName.ToLowerInvariant();
 
-            while (!CancelContext.IsCancellationRequested)
+            var timeoutMs = (timeout?.TotalMilliseconds ?? CMqDefaults.DEFAULT_LOCK_TIMEOUT_MS);
+            var deadline = Environment.TickCount64 + timeoutMs;
+
+            while (_isRunning)
             {
+                if (Environment.TickCount64 >= deadline)
+                {
+                    throw new TimeoutException($"Operation timed out after {timeoutMs}ms.");
+                }
+
                 bool success = true;
 
                 _messageQueues.Read(mqd =>
@@ -1109,14 +1180,22 @@ namespace NTDLS.CatMQ.Server
         /// <summary>
         /// Removes a subscription from a queue for a given connection id.
         /// </summary>
-        public void Unsubscribe(Guid subscriberId, string queueName)
+        public void Unsubscribe(Guid subscriberId, string queueName, TimeSpan? timeout = null)
         {
             OnLog?.Invoke(this, CMqErrorLevel.Verbose, $"Unsubscribing connection [{subscriberId}] from queue: [{queueName}].");
 
             string queueKey = queueName.ToLowerInvariant();
 
-            while (!CancelContext.IsCancellationRequested)
+            var timeoutMs = (timeout?.TotalMilliseconds ?? CMqDefaults.DEFAULT_LOCK_TIMEOUT_MS);
+            var deadline = Environment.TickCount64 + timeoutMs;
+
+            while (_isRunning)
             {
+                if (Environment.TickCount64 >= deadline)
+                {
+                    throw new TimeoutException($"Operation timed out after {timeoutMs}ms.");
+                }
+
                 bool success = true;
 
                 _messageQueues.Read(mqd =>
@@ -1143,7 +1222,7 @@ namespace NTDLS.CatMQ.Server
         /// <summary>
         /// Removes a subscription from a queue for a given connection id.
         /// </summary>
-        public void Enqueue(string queueName, TimeSpan? deferDeliveryDuration, string assemblyQualifiedTypeName, string messageJson)
+        public void Enqueue(string queueName, TimeSpan? deferDeliveryDuration, string assemblyQualifiedTypeName, string messageJson, TimeSpan? timeout = null)
         {
             OnLog?.Invoke(this, CMqErrorLevel.Verbose, $"Enqueuing message to queue: [{queueName}].");
 
@@ -1151,8 +1230,16 @@ namespace NTDLS.CatMQ.Server
 
             var ticketEnqueueMessage = Instrumentation?.CreateTicket(CMqInstrumentationEventType.EnqueueMessage);
 
-            while (!CancelContext.IsCancellationRequested)
+            var timeoutMs = (timeout?.TotalMilliseconds ?? CMqDefaults.DEFAULT_LOCK_TIMEOUT_MS);
+            var deadline = Environment.TickCount64 + timeoutMs;
+
+            while (_isRunning)
             {
+                if (Environment.TickCount64 >= deadline)
+                {
+                    throw new TimeoutException($"Operation timed out after {timeoutMs}ms.");
+                }
+
                 bool success = true;
 
                 var ticketEnqueueMessageReadLock = Instrumentation?.CreateTicket(CMqInstrumentationEventType.EnqueueMessageReadLock);
@@ -1248,12 +1335,20 @@ namespace NTDLS.CatMQ.Server
         /// <summary>
         /// Removes all messages from the given queue.
         /// </summary>
-        public void PurgeQueue(string queueName)
+        public void PurgeQueue(string queueName, TimeSpan? timeout = null)
         {
             OnLog?.Invoke(this, CMqErrorLevel.Verbose, $"Purging queue: [{queueName}].");
 
-            while (!CancelContext.IsCancellationRequested)
+            var timeoutMs = (timeout?.TotalMilliseconds ?? CMqDefaults.DEFAULT_LOCK_TIMEOUT_MS);
+            var deadline = Environment.TickCount64 + timeoutMs;
+
+            while (_isRunning)
             {
+                if (Environment.TickCount64 >= deadline)
+                {
+                    throw new TimeoutException($"Operation timed out after {timeoutMs}ms.");
+                }
+
                 bool success = true;
 
                 _messageQueues.Read(mqd =>

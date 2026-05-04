@@ -13,7 +13,7 @@ namespace CatMQ.Service.ApiDto.Extensions
 
             var config = new CMqQueueConfiguration(dto.QueueName)
             {
-                AsycnronousDelivery = dto.AsynchronousDelivery ?? defaults.AsycnronousDelivery,
+                AsynchronousDelivery = dto.AsynchronousDelivery ?? defaults.AsynchronousDelivery,
                 MaxOutstandingDeliveries = dto.MaxOutstandingDeliveries ?? defaults.MaxOutstandingDeliveries,
 
                 DeliveryThrottle = dto.DeliveryThrottleMilliseconds.HasValue

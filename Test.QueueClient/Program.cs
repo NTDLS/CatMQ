@@ -48,7 +48,7 @@ namespace Test.QueueClient
             {
                 PersistenceScheme = CMqPersistenceScheme.Persistent,
                 ConsumptionScheme = CMqConsumptionScheme.FirstConsumedSubscriber,
-                AsycnronousDelivery = true,
+                AsynchronousDelivery = true,
                 MaxOutstandingDeliveries = 5,
                 DeadLetterConfiguration = new CMqDeadLetterQueueConfiguration()
                 {

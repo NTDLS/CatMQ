@@ -32,7 +32,7 @@ namespace Test.QueueClientAutoReconnect
                     {
                         PersistenceScheme = CMqPersistenceScheme.Ephemeral,
                         ConsumptionScheme = CMqConsumptionScheme.FirstConsumedSubscriber,
-                        AsycnronousDelivery = true,
+                        AsynchronousDelivery = true,
                         MaxOutstandingDeliveries = 5,
                         DeadLetterConfiguration = new CMqDeadLetterQueueConfiguration()
                         {
@@ -64,7 +64,7 @@ namespace Test.QueueClientAutoReconnect
                                 await client.EnqueueAsync("MyFirstQueue", new MyMessage($"Test message {i:n0}"));
                                 i++;
                             }
-                            catch(Exception ex)
+                            catch (Exception ex)
                             {
                                 Console.WriteLine($"Failed to enqueue message {i:n0}: {ex.Message}");
                             }
@@ -75,7 +75,7 @@ namespace Test.QueueClientAutoReconnect
                             Thread.Sleep(1000);
                         }
                     }
-                    
+
                 }).Start();
             }
 

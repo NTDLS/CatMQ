@@ -63,6 +63,8 @@ namespace NTDLS.CatMQ.Server.Server
 
             int threadYieldBurndown = CMqDefaults.QUEUE_THREAD_DELIVERY_BURNDOWN; //Just used to omit waiting. We want to spin fast when we are delivering messages.
 
+            int consecutiveExceptions = 0;
+
             IsStarted = true;
 
             while (_KeepRunning)
@@ -189,7 +191,7 @@ namespace NTDLS.CatMQ.Server.Server
                         Statistics.IncrementOutstandingDeliveries();
                         topMessage.State = CMqMessageState.OutForDelivery;
 
-                        if (Configuration.AsycnronousDelivery)
+                        if (Configuration.AsynchronousDelivery)
                         {
                             _ = DistributeToSubscribersAsync(topMessage);
                         }
@@ -259,10 +261,19 @@ namespace NTDLS.CatMQ.Server.Server
                     }
 
                     #endregion
+                    consecutiveExceptions = 0;
                 }
                 catch (Exception ex)
                 {
+                    consecutiveExceptions++;
                     _queueServer.InvokeOnLog(ex.GetBaseException());
+                    Thread.Sleep(100);
+
+                    if (consecutiveExceptions > 1000)
+                    {
+                        _queueServer.InvokeOnLog(CMqErrorLevel.Fatal, $"Delivery thread for [{Configuration.QueueName}] has encountered [{consecutiveExceptions}] consecutive exceptions. Signaling shutdown.");
+                        _KeepRunning = false;
+                    }
                 }
 
                 if (threadYieldBurndown >= CMqDefaults.QUEUE_THREAD_DELIVERY_BURNDOWN && _KeepRunning)

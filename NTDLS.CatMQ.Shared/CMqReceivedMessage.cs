@@ -48,17 +48,17 @@
         /// <summary>
         /// The number of subscribers that this message has been successfully delivered to.
         /// </summary>
-        public int SubscriberDeliveryCount { get; set; } = new();
+        public int SubscriberDeliveryCount { get; set; }
 
         /// <summary>
         /// The number of subscribers that have responded to the delivery of this message.
         /// </summary>
-        public int SatisfiedSubscriberCount { get; set; } = new();
+        public int SatisfiedSubscriberCount { get; set; }
 
         /// <summary>
         /// The number of subscribers deliveries that have failed.
         /// </summary>
-        public int FailedSubscriberCount { get; set; } = new();
+        public int FailedSubscriberCount { get; set; }
 
         /// <summary>
         /// Deserializes the received message to its original type.

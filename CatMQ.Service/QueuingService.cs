@@ -145,7 +145,7 @@ namespace CatMQ.Service
                     if (ex != null)
                         Log.Fatal(ex, message);
                     else
-                        Log.Error(message);
+                        Log.Fatal(message);
                     break;
             }
         }

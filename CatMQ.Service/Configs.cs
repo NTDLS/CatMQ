@@ -104,7 +104,12 @@ namespace CatMQ.Service
                 Directory.CreateDirectory(directoryName);
             }
 
-            File.WriteAllText(GetFileName(fileType), json);
+            // Write to a temporary file first, then move it to the target location.
+            // This approach minimizes the risk of data corruption if the application crashes during the write operation.
+            var fileName = GetFileName(fileType);
+            var tempfileName = fileName + ".tmp";
+            File.WriteAllText(tempfileName, json);
+            File.Move(tempfileName, fileName, overwrite: true);
         }
     }
 }

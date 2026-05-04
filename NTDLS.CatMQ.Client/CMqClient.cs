@@ -22,7 +22,7 @@ namespace NTDLS.CatMQ.Client
         /// </summary>
         private readonly OptimisticCriticalResource<QueueSubscriptionDictionary> _subscriptions = new();
         private readonly OptimisticCriticalResource<MessageBufferDictionary> _messageBuffer = new();
-        private Task? _bufferedDeliveryTask;
+        private volatile Task? _bufferedDeliveryTask;
 
         /// <summary>
         /// Provides access to the custom serialization provider, if configured.

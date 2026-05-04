@@ -15,7 +15,7 @@ namespace CatMQ.Service.ApiDto
         // These all map to CMqQueueConfiguration, but are optional so
         // server defaults apply when omitted.
 
-        public bool? AsynchronousDelivery { get; set; }          // CMqQueueConfiguration.AsycnronousDelivery
+        public bool? AsynchronousDelivery { get; set; }          // CMqQueueConfiguration.AsynchronousDelivery
         public int? MaxOutstandingDeliveries { get; set; }       // CMqQueueConfiguration.MaxOutstandingDeliveries
         public int? DeliveryThrottleMilliseconds { get; set; }   // CMqQueueConfiguration.DeliveryThrottle
         public bool? IsDeadLetter { get; set; }                  // CMqQueueConfiguration.IsDeadLetter
