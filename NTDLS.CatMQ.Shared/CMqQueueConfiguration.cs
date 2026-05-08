@@ -21,7 +21,7 @@ namespace NTDLS.CatMQ.Shared
                     throw new ArgumentException($"QueueName contains invalid characters: {value}", nameof(value));
 
                 _queueName = value;
-                PathPart = CMqCompiledRegEx.InvalidQueueNameChars().Replace(QueueName, "_");
+                PathPart = CMqCompiledRegEx.InvalidQueueNameChars().Replace(_queueName, "_");
 
             }
         }

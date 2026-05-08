@@ -19,7 +19,7 @@ namespace NTDLS.CatMQ.Server
         : IDisposable
     {
         internal volatile bool _isRunning = false;
-        private CancellationTokenSource? _heartbeatCts;
+        private CancellationTokenSource? _cts;
 
         private readonly CMqServerConfiguration _configuration;
         private readonly JsonSerializerOptions _indentedJsonOptions = new() { WriteIndented = true };
@@ -783,8 +783,8 @@ namespace NTDLS.CatMQ.Server
 
             _rmServer.Start(listenPort);
 
-            _heartbeatCts = new CancellationTokenSource();
-            Task.Run(async () => await HeartbeatThread(_heartbeatCts.Token));
+            _cts = new CancellationTokenSource();
+            Task.Run(async () => await HeartbeatThread(_cts.Token));
         }
 
         private async Task HeartbeatThread(CancellationToken token)
@@ -849,7 +849,7 @@ namespace NTDLS.CatMQ.Server
             OnLog?.Invoke(this, CMqErrorLevel.Information, "Stopping service.");
 
             _isRunning = false;
-            _heartbeatCts?.Cancel();
+            _cts?.Cancel();
             OnLog?.Invoke(this, CMqErrorLevel.Information, "Stopping reliable messaging.");
             _rmServer.Stop();
 
@@ -875,6 +875,8 @@ namespace NTDLS.CatMQ.Server
             {
                 messageQueue.WaitForShutdown(); //We cant wait on the stop from within a lock above. That'll deadlock.
             }
+
+            _cts?.Dispose();
         }
 
         #endregion

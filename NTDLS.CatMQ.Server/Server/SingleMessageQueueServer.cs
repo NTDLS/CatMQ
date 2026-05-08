@@ -637,6 +637,8 @@ namespace NTDLS.CatMQ.Server.Server
                     m.Database = null;
                 }
             });
+
+            _cts.Dispose();
         }
     }
 }
