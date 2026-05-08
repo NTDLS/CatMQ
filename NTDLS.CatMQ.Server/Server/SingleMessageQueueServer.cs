@@ -14,10 +14,11 @@ namespace NTDLS.CatMQ.Server.Server
     {
         private readonly CMqServer _queueServer;
         private Task? _deliveryTask;
-        private bool _KeepRunning;
+        private volatile bool _isRunning;
+        private readonly CancellationTokenSource _cts = new();
 
         public bool IsInitialized { get; private set; }
-        public bool IsStarted { get; private set; }
+        public bool IsStarted => _isRunning;
 
         /// <summary>
         /// This property is set when there is an error that prevents the queue from functioning properly, such as a failure to initialize the persistent database.
@@ -65,9 +66,7 @@ namespace NTDLS.CatMQ.Server.Server
 
             int consecutiveExceptions = 0;
 
-            IsStarted = true;
-
-            while (_KeepRunning)
+            while (_isRunning)
             {
                 var now = DateTime.UtcNow;
 
@@ -245,19 +244,7 @@ namespace NTDLS.CatMQ.Server.Server
 
                     if (Configuration.DeliveryThrottle > TimeSpan.Zero)
                     {
-                        if (Configuration.DeliveryThrottle.TotalSeconds >= 1)
-                        {
-                            int sleeps = (int)(Configuration.DeliveryThrottle.TotalMilliseconds / 100);
-
-                            for (int sleep = 0; sleep < sleeps && _KeepRunning; sleep++)
-                            {
-                                await Task.Delay(100);
-                            }
-                        }
-                        else
-                        {
-                            await Task.Delay((int)Configuration.DeliveryThrottle.TotalMilliseconds);
-                        }
+                        await Task.Delay((int)Configuration.DeliveryThrottle.TotalMilliseconds, _cts.Token);
                     }
 
                     #endregion
@@ -267,16 +254,17 @@ namespace NTDLS.CatMQ.Server.Server
                 {
                     consecutiveExceptions++;
                     _queueServer.InvokeOnLog(ex.GetBaseException());
-                    Thread.Sleep(100);
+                    await Task.Delay(100, _cts.Token);
 
                     if (consecutiveExceptions > 1000)
                     {
                         _queueServer.InvokeOnLog(CMqErrorLevel.Fatal, $"Delivery thread for [{Configuration.QueueName}] has encountered [{consecutiveExceptions}] consecutive exceptions. Signaling shutdown.");
-                        _KeepRunning = false;
+                        _isRunning = false;
+                        _cts.Cancel();
                     }
                 }
 
-                if (threadYieldBurndown >= CMqDefaults.QUEUE_THREAD_DELIVERY_BURNDOWN && _KeepRunning)
+                if (threadYieldBurndown >= CMqDefaults.QUEUE_THREAD_DELIVERY_BURNDOWN && _isRunning)
                 {
                     threadYieldBurndown = CMqDefaults.QUEUE_THREAD_DELIVERY_BURNDOWN;
 
@@ -329,7 +317,7 @@ namespace NTDLS.CatMQ.Server.Server
 
             foreach (var subscriber in subscriberDispositions.Remaining)
             {
-                if (_KeepRunning == false)
+                if (_isRunning == false)
                 {
                     return CMqMessageState.Shutdown;
                 }
@@ -452,7 +440,7 @@ namespace NTDLS.CatMQ.Server.Server
                 }
             }
 
-            if (_KeepRunning == false)
+            if (_isRunning == false)
             {
                 return CMqMessageState.Shutdown;
             }
@@ -613,7 +601,7 @@ namespace NTDLS.CatMQ.Server.Server
         public void Start()
         {
             _queueServer.InvokeOnLog(CMqErrorLevel.Information, $"Starting delivery thread for [{Configuration.QueueName}].");
-            _KeepRunning = true;
+            _isRunning = true;
             _deliveryTask = Task.Run(async () =>
             {
                 try
@@ -631,7 +619,8 @@ namespace NTDLS.CatMQ.Server.Server
         public void SignalShutdown()
         {
             _queueServer.InvokeOnLog(CMqErrorLevel.Information, $"Signaling shutdown for [{Configuration.QueueName}].");
-            _KeepRunning = false;
+            _isRunning = false;
+            _cts.Cancel();
         }
 
         public void WaitForShutdown()
