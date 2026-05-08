@@ -562,7 +562,7 @@ namespace NTDLS.CatMQ.Server.Server
 
                 _queueServer.InvokeOnLog(CMqErrorLevel.Information, $"Creating persistent path for [{Configuration.QueueName}].");
 
-                var databasePath = Path.Join(_queueServer.Configuration.PersistencePath, "messages", Configuration.QueueName);
+                var databasePath = Path.Join(_queueServer.Configuration.PersistencePath, "messages", Configuration.PathPart);
                 Directory.CreateDirectory(databasePath);
 
                 _queueServer.InvokeOnLog(CMqErrorLevel.Information, $"Instantiating persistent database for [{Configuration.QueueName}].");

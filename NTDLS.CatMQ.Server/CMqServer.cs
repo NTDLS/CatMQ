@@ -19,6 +19,7 @@ namespace NTDLS.CatMQ.Server
         : IDisposable
     {
         internal volatile bool _isRunning = false;
+        private CancellationTokenSource? _heartbeatCts;
 
         private readonly CMqServerConfiguration _configuration;
         private readonly JsonSerializerOptions _indentedJsonOptions = new() { WriteIndented = true };
@@ -782,10 +783,11 @@ namespace NTDLS.CatMQ.Server
 
             _rmServer.Start(listenPort);
 
-            Task.Run(async () => await HeartbeatThread());
+            _heartbeatCts = new CancellationTokenSource();
+            Task.Run(async () => await HeartbeatThread(_heartbeatCts.Token));
         }
 
-        private async Task HeartbeatThread()
+        private async Task HeartbeatThread(CancellationToken token)
         {
             try
             {
@@ -830,7 +832,7 @@ namespace NTDLS.CatMQ.Server
                         OnLog?.Invoke(this, CMqErrorLevel.Error, "An error occurred in CheckpointPersistentMessageQueues", ex);
                     }
 
-                    await Task.Delay(1000);
+                    await Task.Delay(1000, token);
                 }
             }
             catch (OperationCanceledException)
@@ -847,6 +849,7 @@ namespace NTDLS.CatMQ.Server
             OnLog?.Invoke(this, CMqErrorLevel.Information, "Stopping service.");
 
             _isRunning = false;
+            _heartbeatCts?.Cancel();
             OnLog?.Invoke(this, CMqErrorLevel.Information, "Stopping reliable messaging.");
             _rmServer.Stop();
 
@@ -999,9 +1002,6 @@ namespace NTDLS.CatMQ.Server
                 throw new Exception("Queue names cannot end with '.dlq'.");
             }
 
-            if (!CMqQueueConfiguration.IsValidQueueName(queueConfiguration.QueueName))
-                throw new ArgumentException($"QueueName contains invalid characters: {queueConfiguration.QueueName}", nameof(queueConfiguration.QueueName));
-
             CreateQueueInternal(queueConfiguration);
         }
 
@@ -1101,7 +1101,7 @@ namespace NTDLS.CatMQ.Server
 
                         if (string.IsNullOrEmpty(_configuration.PersistencePath) == false)
                         {
-                            var databasePath = Path.Join(Configuration.PersistencePath, "messages", waitOnStopMessageQueue.Configuration.QueueName);
+                            var databasePath = Path.Join(Configuration.PersistencePath, "messages", waitOnStopMessageQueue.Configuration.PathPart);
 
                             try
                             {

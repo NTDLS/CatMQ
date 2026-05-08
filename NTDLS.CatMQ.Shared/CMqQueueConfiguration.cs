@@ -17,12 +17,19 @@ namespace NTDLS.CatMQ.Shared
             get => _queueName.EnsureNotNull();
             set
             {
-                if (!CMqQueueConfiguration.IsValidQueueName(value))
+                if (!IsValidQueueName(value))
                     throw new ArgumentException($"QueueName contains invalid characters: {value}", nameof(value));
 
                 _queueName = value;
+                PathPart = CMqCompiledRegEx.InvalidQueueNameChars().Replace(QueueName, "_");
+
             }
         }
+
+        /// <summary>
+        /// The file name friendly version of the queue name, used for persistence.
+        /// </summary>
+        public string? PathPart { get; private set; }
 
         /// <summary>
         /// Determines whether the specified queue name is valid according to the naming rules.
@@ -33,6 +40,7 @@ namespace NTDLS.CatMQ.Shared
         {
             if (string.IsNullOrWhiteSpace(name)) return false;
             if (CMqCompiledRegEx.InvalidQueueNameChars().IsMatch(name)) return false;
+            if (name.Split('.').All(segment => segment.Length == 0)) return false;
             return true;
         }
 
@@ -103,9 +111,6 @@ namespace NTDLS.CatMQ.Shared
         public CMqQueueConfiguration(string queueName)
         {
             QueueName = queueName;
-
-            if (!CMqQueueConfiguration.IsValidQueueName(queueName))
-                throw new ArgumentException($"QueueName contains invalid characters: {queueName}", nameof(queueName));
         }
     }
 }
