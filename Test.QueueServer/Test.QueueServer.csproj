@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="RocksDB" Version="10.10.1.649" />
+    <PackageReference Include="RocksDB" Version="11.8.1.4423" />
   </ItemGroup>
 
   <ItemGroup>
