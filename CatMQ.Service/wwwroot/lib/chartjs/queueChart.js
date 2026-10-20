@@ -19,6 +19,13 @@ async function loadChartData() {
     return await response.json();
 }
 
+// Chart.js draws on a canvas, so it does not pick up the page's CSS: hand it the theme's colors.
+function applyChartTheme() {
+    const styles = getComputedStyle(document.documentElement);
+    Chart.defaults.color = styles.getPropertyValue("--bs-secondary-color").trim() || "#666";
+    Chart.defaults.borderColor = styles.getPropertyValue("--bs-border-color").trim() || "rgba(0, 0, 0, 0.1)";
+}
+
 function buildDataset(s, i) {
     const color = chartColors[i % chartColors.length];
     return {
@@ -61,6 +68,7 @@ async function buildOrUpdateChart() {
                 queueChart = null;
             }
 
+            applyChartTheme();
             queueChart = new Chart(canvas.getContext("2d"), {
                 type: "line",
                 data: {
@@ -129,6 +137,15 @@ async function buildOrUpdateChart() {
 document.addEventListener("DOMContentLoaded", async function () {
     await buildOrUpdateChart();
     setInterval(buildOrUpdateChart, 5000);
+
+    // Rebuild the chart with the new colors when the theme changes.
+    document.addEventListener("themechange", function () {
+        if (queueChart) {
+            queueChart.destroy();
+            queueChart = null;
+        }
+        buildOrUpdateChart();
+    });
 
     // Catch up right away when the tab becomes visible again.
     document.addEventListener("visibilitychange", function () {

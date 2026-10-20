@@ -25,10 +25,10 @@
 </head>
 <body>
     <header>
-        <nav class="navbar navbar-expand-sm fixed-top navbar-light bg-white border-bottom box-shadow mb-3">
+        <nav class="navbar navbar-expand-sm fixed-top bg-body border-bottom box-shadow mb-3">
             <div class="container-fluid">
                 <a class="navbar-brand" asp-area="" asp-page="/Index">
-                    <span class="text-dark"><img src="/images/32.png" /> CatMQ</span>
+                    <span class="text-body"><img src="/images/32.png" /> CatMQ</span>
                 </a>
 
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="@Localize("Toggle navigation")">
@@ -40,7 +40,7 @@
                         @if (User.Identity != null && User.Identity.IsAuthenticated)
                         {
                             <li class="nav-item dropdown">
-                                <a class="nav-link dropdown-toggle text-dark" href="#" id="navbarDropdownMenuLink" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">@Localize("Administration")</a>
+                                <a class="nav-link dropdown-toggle text-body" href="#" id="navbarDropdownMenuLink" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">@Localize("Administration")</a>
                                 <div class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdownMenuLink">
                                     <a class="nav-link" asp-page="/Accounts">@Localize("Accounts")</a>
                                     <a class="nav-link" asp-page="/Configuration">@Localize("Configuration")</a>
@@ -50,7 +50,7 @@
                                 </div>
                             </li>
                             <li class="nav-item dropdown">
-                                <a class="nav-link dropdown-toggle text-dark" href="#" id="navbarDropdownMenuLink2" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">@Localize("My")</a>
+                                <a class="nav-link dropdown-toggle text-body" href="#" id="navbarDropdownMenuLink2" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">@Localize("My")</a>
                                 <div class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdownMenuLink2">
                                     <a class="nav-link" href="/Account/@_accountId">@Localize("Account")</a>
                                     <div class="dropdown-divider"></div>
@@ -64,8 +64,18 @@
                                 <a class="nav-link" asp-page="/Login">@Localize("Login")</a>
                             </li>
                         }
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle text-body" href="#" id="themeToggle" data-bs-toggle="dropdown" aria-expanded="false" title="@Localize("Theme")">
+                                <i id="themeToggleIcon" class="bi bi-circle-half"></i>
+                            </a>
+                            <div class="dropdown-menu dropdown-menu-end" aria-labelledby="themeToggle">
+                                <button type="button" class="dropdown-item" data-theme-choice="auto" onclick="setThemePreference('auto')"><i class="bi bi-circle-half me-2"></i>@Localize("Auto")</button>
+                                <button type="button" class="dropdown-item" data-theme-choice="light" onclick="setThemePreference('light')"><i class="bi bi-sun-fill me-2"></i>@Localize("Light")</button>
+                                <button type="button" class="dropdown-item" data-theme-choice="dark" onclick="setThemePreference('dark')"><i class="bi bi-moon-stars-fill me-2"></i>@Localize("Dark")</button>
+                            </div>
+                        </li>
                         <li class="nav-item">
-                            <a class="nav-link text-dark" href="/Language" title="@Localize("Language")">
+                            <a class="nav-link text-body" href="/Language" title="@Localize("Language")">
                                 @System.Globalization.CultureInfo.CurrentUICulture.Name.ToUpperInvariant()
                             </a>
                         </li>
