@@ -21,7 +21,7 @@ namespace NTDLS.CatMQ.Client.Client.QueryHandlers
                     DeferDuration = param.DeferDuration,
                     SubscriberDeliveryCount = param.SubscriberDeliveryCount,
                     SatisfiedSubscriberCount = param.SatisfiedSubscriberCount,
-                    FailedSubscriberCount = param.SatisfiedSubscriberCount
+                    FailedSubscriberCount = param.FailedSubscriberCount
                 };
                 var messageDisposition = mqClient.InvokeOnReceived(mqClient, message);
                 return new CMqMessageDeliveryQueryReply(messageDisposition);
