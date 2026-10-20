@@ -58,11 +58,14 @@ namespace CatMQ.Service.Pages
 
         #region Queue Data.
 
-        public JsonResult OnGetQueueData()
+        public IActionResult OnGetQueueData()
         {
-            var queue = mqServer.GetQueues()?
-                .Where(o => o.QueueName.Equals(QueueName, StringComparison.OrdinalIgnoreCase))
-                .FirstOrDefault() ?? new();
+            //A missing queue (deleted, or a bad link) must not look like a queue whose counters are all zero.
+            var queue = mqServer.GetQueue(QueueName);
+            if (queue == null)
+            {
+                return NotFound();
+            }
 
             var record = new
             {

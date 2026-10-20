@@ -65,7 +65,7 @@
             if (!Array.isArray(subscribers) || subscribers.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="8" class="text-center text-muted">
+                        <td colspan="9" class="text-center text-muted">
                             @Localize("No queues.")
                         </td>
                     </tr>`;
@@ -136,7 +136,7 @@
                     <tbody>
                         <tr>
                             <td class="text-end" id="q-currentSubscriberCount">...</td>
-                            <td class="text-end" id="q-queueDepth">...</></td>
+                            <td class="text-end" id="q-queueDepth">...</td>
                             <td class="text-end" id="q-currentOutstandingDeliveries">...</td>
                             <td class="text-end" id="q-receivedMessageCount">...</td>
                             <td class="text-end" id="q-deliveredMessageCount">...</td>

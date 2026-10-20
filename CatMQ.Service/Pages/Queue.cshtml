@@ -32,7 +32,13 @@
         }
 
         async function refreshQueueData() {
-            const data = await loadQueueData();
+            let data = null;
+            try {
+                data = await loadQueueData();
+            } catch (err) {
+                console.error('Error loading queue data:', err);
+            }
+            if (!data) return;
 
             //Configuration table.
             document.getElementById('q-persistenceScheme').textContent = data.persistenceScheme;

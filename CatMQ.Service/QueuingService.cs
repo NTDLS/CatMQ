@@ -72,6 +72,12 @@ namespace CatMQ.Service
                     ];
                 });
 
+                //The web UI returns the same enums as JSON (such as instrumentation event names), with or without the web API.
+                builder.Services.Configure<Microsoft.AspNetCore.Mvc.JsonOptions>(options =>
+                {
+                    options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+                });
+
                 if (serviceConfiguration.EnableWebUI)
                 {
                     builder.Services.AddRazorPages();
