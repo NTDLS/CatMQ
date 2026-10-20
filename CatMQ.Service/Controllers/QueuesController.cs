@@ -31,15 +31,15 @@ namespace CatMQ.Service.Controllers
         {
             if (string.IsNullOrWhiteSpace(type))
             {
-                return BadRequest("Query parameter 'type' (assembly-qualified type name) is required.");
+                return BadRequest(Localize("Query parameter 'type' (assembly-qualified type name) is required."));
             }
             if (deferSeconds < 0)
             {
-                return BadRequest("Query parameter 'deferSeconds' cannot be negative.");
+                return BadRequest(Localize("Query parameter 'deferSeconds' cannot be negative."));
             }
             if (_mqServer.GetQueue(queueName) == null)
             {
-                return NotFound($"Queue not found: [{queueName}].");
+                return NotFound(Localize("Queue not found: [{0}].", queueName));
             }
 
             TimeSpan? deferDuration = deferSeconds > 0 ? TimeSpan.FromSeconds(deferSeconds.Value) : null;
@@ -47,7 +47,7 @@ namespace CatMQ.Service.Controllers
             _mqServer.Enqueue(queueName, deferDuration, type, messageJson.GetRawText());
 
             // The message is accepted for delivery, but delivery to subscribers happens asynchronously.
-            return Accepted(new { Message = "Enqueued.", queueName, type });
+            return Accepted(new { Message = Localize("Enqueued."), queueName, type });
         }
 
         /// <summary>
@@ -59,12 +59,12 @@ namespace CatMQ.Service.Controllers
         {
             if (config == null || string.IsNullOrEmpty(config.QueueName))
             {
-                return BadRequest("QueueName is required.");
+                return BadRequest(Localize("QueueName is required."));
             }
 
             if (_mqServer.GetQueue(config.QueueName) != null)
             {
-                return Conflict($"Queue already exists: [{config.QueueName}].");
+                return Conflict(Localize("Queue already exists: [{0}].", config.QueueName));
             }
 
             try
@@ -77,7 +77,7 @@ namespace CatMQ.Service.Controllers
             }
 
             return CreatedAtAction(nameof(GetQueue), new { queueName = config.QueueName },
-                new { Message = "Queue created successfully.", config.QueueName });
+                new { Message = Localize("Queue created successfully."), config.QueueName });
         }
 
         /// <summary>
@@ -127,7 +127,7 @@ namespace CatMQ.Service.Controllers
         {
             if (_mqServer.GetQueue(queueName) == null)
             {
-                return NotFound($"Queue not found: [{queueName}].");
+                return NotFound(Localize("Queue not found: [{0}].", queueName));
             }
 
             _mqServer.PurgeQueue(queueName);

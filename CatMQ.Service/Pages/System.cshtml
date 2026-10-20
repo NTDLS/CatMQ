@@ -2,7 +2,7 @@
 @using NTDLS.Helpers
 @model SystemModel
 @{
-    ViewData["Title"] = "System";
+    ViewData["Title"] = Localize("System");
     var p = Model.ProcessInfo;
 }
 
@@ -18,7 +18,7 @@
     <script>
         async function onCompact() {
             const url = `/ui/LohCollect`;
-            const message = `Forcing an aggressive collection will release unused memory but can cause temporary performance issues. Continue?`;
+            const message = @Json.Serialize(Localize("Forcing an aggressive collection will release unused memory but can cause temporary performance issues. Continue?"));
 
             const ok = await showConfirmModal(message);
             if (!ok) return;
@@ -33,14 +33,14 @@
                 });
 
                 if (!response.ok) {
-                    alert("Operation failed.");
+                    alert(@Json.Serialize(Localize("Operation failed.")));
                     return;
                 }
 
                 window.location.href = "/System";
             }
             catch (error) {
-                alert(`Operation failed: ${error}`);
+                alert(fmt(@Json.Serialize(Localize("Operation failed: {0}")), error));
             }
         }
     </script>
@@ -51,7 +51,7 @@
         <div>
             @* Left-aligned "toolbar" controls *@
             <h5 class="display-6">
-                System
+                @Localize("System")
             </h5>
         </div>
 
@@ -64,19 +64,19 @@
     {
         <div class="alert alert-danger alert-dismissible fade show" role="alert">
             <p class="fw-bold">@Html.Raw(Model.ErrorMessage)</p>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@Localize("Close")"></button>
         </div>
     }
 
     <div class="card shadow-lg mt-2">
         <div class="card-header">
-            <h5>Application</h5>
+            <h5>@Localize("Application")</h5>
         </div>
         <div class="card-body">
             <table class="table table-sm table-striped table-fit">
                 <tbody>
-                    <tr><th>Vendor</th><td><a href="http://NetworkDLS.com/">NetworkDLS</a></td></tr>
-                    <tr><th>Product</th><td><a href="https://github.com/NTDLS/CatMQ">CatMQ</a> v@(Model.ApplicationVersion)</td></tr>
+                    <tr><th>@Localize("Vendor")</th><td><a href="http://NetworkDLS.com/">NetworkDLS</a></td></tr>
+                    <tr><th>@Localize("Product")</th><td><a href="https://github.com/NTDLS/CatMQ">CatMQ</a> v@(Model.ApplicationVersion)</td></tr>
                 </tbody>
             </table>
         </div>
@@ -84,15 +84,15 @@
 
     <div class="card shadow-lg mt-2">
         <div class="card-header">
-            <h5>Machine</h5>
+            <h5>@Localize("Machine")</h5>
         </div>
         <div class="card-body">
             <table class="table table-sm table-striped table-fit">
                 <tbody>
-                    <tr><th>Name</th><td>@p.MachineName</td></tr>
-                    <tr><th>OS</th><td>@p.OSDescription</td></tr>
+                    <tr><th>@Localize("Name")</th><td>@p.MachineName</td></tr>
+                    <tr><th>@Localize("OS")</th><td>@p.OSDescription</td></tr>
                     <tr><th>.NET</th><td>@p.FrameworkDescription</td></tr>
-                    <tr><th>Uptime</th><td>@p.Uptime</td></tr>
+                    <tr><th>@Localize("Uptime")</th><td>@p.Uptime</td></tr>
                 </tbody>
             </table>
         </div>
@@ -100,16 +100,16 @@
 
     <div class="card shadow-lg mt-2">
         <div class="card-header">
-            <h5>Process</h5>
+            <h5>@Localize("Process")</h5>
         </div>
         <div class="card-body">
             <table class="table table-sm table-striped table-fit">
                 <tbody>
-                    <tr><th>Process</th><td>@p.ProcessName (@p.ProcessId)</td></tr>
-                    <tr><th>Start (UTC)</th><td>@p.StartTimeUtc.ToString("u")</td></tr>
-                    <tr><th>Uptime</th><td>@p.Uptime.ToString(@"hh\:mm\:ss")</td></tr>
-                    <tr><th>Threads</th><td>@p.ThreadCount.ToString("N0")</td></tr>
-                    <tr><th>Handles</th><td>@p.HandleCount.ToString("N0")</td></tr>
+                    <tr><th>@Localize("Process")</th><td>@p.ProcessName (@p.ProcessId)</td></tr>
+                    <tr><th>@Localize("Start (UTC)")</th><td>@p.StartTimeUtc.ToString("u")</td></tr>
+                    <tr><th>@Localize("Uptime")</th><td>@p.Uptime.ToString(@"hh\:mm\:ss")</td></tr>
+                    <tr><th>@Localize("Threads")</th><td>@p.ThreadCount.ToString("N0")</td></tr>
+                    <tr><th>@Localize("Handles")</th><td>@p.HandleCount.ToString("N0")</td></tr>
                 </tbody>
             </table>
         </div>
@@ -117,14 +117,14 @@
 
     <div class="card shadow-lg mt-2">
         <div class="card-header">
-            <h5>CPU</h5>
+            <h5>@Localize("CPU")</h5>
         </div>
         <div class="card-body">
             <table class="table table-sm table-striped table-fit">
                 <tbody>
-                    <tr><th>CPU Cores</th><td>@p.ProcessorCount</td></tr>
-                    <tr><th>CPU Time</th><td>@p.TotalProcessorTime.ToString(@"hh\:mm\:ss")</td></tr>
-                    <tr><th>Avg. Utilization</th><td>@p.CpuUsagePercentAvg.ToString("N1")%</td></tr>
+                    <tr><th>@Localize("CPU Cores")</th><td>@p.ProcessorCount</td></tr>
+                    <tr><th>@Localize("CPU Time")</th><td>@p.TotalProcessorTime.ToString(@"hh\:mm\:ss")</td></tr>
+                    <tr><th>@Localize("Avg. Utilization")</th><td>@p.CpuUsagePercentAvg.ToString("N1")%</td></tr>
                 </tbody>
             </table>
         </div>
@@ -132,24 +132,24 @@
 
     <div class="card shadow-lg mt-2">
         <div class="card-header">
-            <h5>Memory</h5>
+            <h5>@Localize("Memory")</h5>
         </div>
         <div class="card-body">
             <table class="table table-sm table-striped table-fit">
                 <tbody>
 
-                    <tr><th>Working Set</th><td>@p.WorkingSetMb.ToString("N1") MB</td></tr>
-                    <tr><th>Private Memory</th><td>@p.PrivateMemoryMb.ToString("N1") MB</td></tr>
+                    <tr><th>@Localize("Working Set")</th><td>@p.WorkingSetMb.ToString("N1") MB</td></tr>
+                    <tr><th>@Localize("Private Memory")</th><td>@p.PrivateMemoryMb.ToString("N1") MB</td></tr>
                     <tr>
-                        <th>GC Heap</th>
+                        <th>@Localize("GC Heap")</th>
                         <td>
                             @p.GcHeapSizeMb.ToString("N1") MB of @p.GcAvailableMemMb.ToString("N1") MB
-                            <a class="btn btn-danger btn-thin" href="javascript:void(0)" onclick="onCompact()">Compact</a>
+                            <a class="btn btn-danger btn-thin" href="javascript:void(0)" onclick="onCompact()">@Localize("Compact")</a>
                         </td>
                     </tr>
 
                     <tr>
-                        <th>GC Collections</th>
+                        <th>@Localize("GC Collections")</th>
                         <td>
                             Gen0: @p.GcCollectionGen0,
                             Gen1: @p.GcCollectionGen1,
@@ -163,14 +163,14 @@
 
     <div class="card shadow-lg mt-2">
         <div class="card-header">
-            <h5>Modules</h5>
+            <h5>@Localize("Modules")</h5>
         </div>
         <div class="card-body">
             <table class="table table-sm table-striped table-fit">
                 <thead>
                     <tr>
-                        <th>Name</th>
-                        <th>Version</th>
+                        <th>@Localize("Name")</th>
+                        <th>@Localize("Version")</th>
                     </tr>
                 </thead>
                 <tbody>

@@ -35,7 +35,7 @@ namespace CatMQ.Service
             if (!context.Request.Headers.TryGetValue(ApiKeyHeaderName, out var extractedApiKey))
             {
                 context.Response.StatusCode = 401;
-                await context.Response.WriteAsync("API Key was not provided.");
+                await context.Response.WriteAsync(Localize("API Key was not provided."));
                 return;
             }
 
@@ -47,7 +47,7 @@ namespace CatMQ.Service
             if (!authorized)
             {
                 context.Response.StatusCode = 401;
-                await context.Response.WriteAsync("Unauthorized client.");
+                await context.Response.WriteAsync(Localize("Unauthorized client."));
                 return;
             }
 

@@ -67,7 +67,7 @@ namespace CatMQ.Service.Pages
 
                     Configs.PutAccounts(accounts);
 
-                    SuccessMessage = "Saved!";
+                    SuccessMessage = Localize("Saved!");
                 }
             }
             catch (Exception ex)
@@ -100,7 +100,7 @@ namespace CatMQ.Service.Pages
 
                     Configs.PutAccounts(accounts);
 
-                    SuccessMessage = "API Key Created!";
+                    SuccessMessage = Localize("API Key Created!");
                 }
 
                 TimeZones = TimeZoneItem.GetAll();

@@ -2,7 +2,7 @@
 @using NTDLS.Helpers
 @model InstrumentationModel
 @{
-    ViewData["Title"] = "Instrumentation";
+    ViewData["Title"] = Localize("Instrumentation");
 }
 
 @section Scripts {
@@ -62,7 +62,7 @@
                 tbody.innerHTML = `
                     <tr>
                         <td colspan="3" class="text-center text-muted">
-                            No instrumentation data.
+                            @Localize("No instrumentation data.")
                         </td>
                     </tr>`;
                 return;
@@ -80,7 +80,7 @@
         <div>
             @* Left-aligned "toolbar" controls *@
             <h5 class="display-6">
-                Instrumentation
+                @Localize("Instrumentation")
             </h5>
         </div>
 
@@ -93,7 +93,7 @@
     {
         <div class="alert alert-danger alert-dismissible fade show" role="alert">
             <p class="fw-bold">@Html.Raw(Model.ErrorMessage)</p>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@Localize("Close")"></button>
         </div>
     }
 
@@ -101,9 +101,9 @@
         <table class="table table-striped table-bordered mx-0 my-0">
             <thead>
                 <tr>
-                    <th class="text-start">Metric</th>
-                    <th class="text-end">Event Count</th>
-                    <th class="text-end">Event Time (ms)</th>
+                    <th class="text-start">@Localize("Metric")</th>
+                    <th class="text-end">@Localize("Event Count")</th>
+                    <th class="text-end">@Localize("Event Time (ms)")</th>
                 </tr>
             </thead>
 
