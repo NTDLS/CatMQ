@@ -331,7 +331,7 @@ namespace NTDLS.CatMQ.Server
                 }
 
                 bool success = true;
-                CMqQueueDescriptor? result = new();
+                CMqQueueDescriptor? result = null;
 
                 _messageQueues.Read(mqd =>
                 {

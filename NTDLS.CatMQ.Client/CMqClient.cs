@@ -528,13 +528,16 @@ namespace NTDLS.CatMQ.Client
                                     continue;
                                 }
 
-                                if (force
-                                    || buffered.Count >= subscription.BatchSize
-                                    || (subscription.AutoFlushInterval != TimeSpan.Zero
-                                        && (now - subscription.LastBufferFlushed) >= subscription.AutoFlushInterval))
+                                var batchSize = Math.Max(1, subscription.BatchSize ?? 1);
+                                var intervalElapsed = subscription.AutoFlushInterval != TimeSpan.Zero
+                                    && (now - subscription.LastBufferFlushed) >= subscription.AutoFlushInterval;
+
+                                //Full batches are always delivered. A partial batch is only delivered when
+                                //  the flush interval has elapsed or when we are flushing everything.
+                                while (buffered.Count >= batchSize || (buffered.Count > 0 && (force || intervalElapsed)))
                                 {
-                                    var batch = buffered.ToList();
-                                    buffered.Clear();
+                                    var batch = buffered.Take(batchSize).ToList();
+                                    buffered.RemoveRange(0, batch.Count);
                                     subscription.LastBufferFlushed = now;
 
                                     void DeliverBatch()
