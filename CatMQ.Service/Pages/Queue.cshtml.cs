@@ -58,11 +58,14 @@ namespace CatMQ.Service.Pages
 
         #region Queue Data.
 
-        public JsonResult OnGetQueueData()
+        public IActionResult OnGetQueueData()
         {
-            var queue = mqServer.GetQueues()?
-                .Where(o => o.QueueName.Equals(QueueName, StringComparison.OrdinalIgnoreCase))
-                .FirstOrDefault() ?? new();
+            //A missing queue (deleted, or a bad link) must not look like a queue whose counters are all zero.
+            var queue = mqServer.GetQueue(QueueName);
+            if (queue == null)
+            {
+                return NotFound();
+            }
 
             var record = new
             {
@@ -139,31 +142,31 @@ namespace CatMQ.Service.Pages
             {
                 new ChartSeriesDto
                 {
-                    Label = "Receive/s",
+                    Label = Localize("Receive/s"),
                     Values = receiveRates,
                     YAxisId = "y"
                 },
                 new ChartSeriesDto
                 {
-                    Label = "Delivered/s",
+                    Label = Localize("Delivered/s"),
                     Values = deliveryRates,
                     YAxisId = "y"
                 },
                 new ChartSeriesDto
                 {
-                    Label = "Deferred/s",
+                    Label = Localize("Deferred/s"),
                     Values = deferredDeliveryRates,
                     YAxisId = "y"
                 },
                 new ChartSeriesDto
                 {
-                    Label = "Depth",
+                    Label = Localize("Depth"),
                     Values = queueDepths,
                     YAxisId = "y1"
                 },
                 new ChartSeriesDto
                 {
-                    Label = "Outstanding",
+                    Label = Localize("Outstanding"),
                     Values = OutstandingDeliveries,
                     YAxisId = "y"
                 }

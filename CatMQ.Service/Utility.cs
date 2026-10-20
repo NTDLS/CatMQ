@@ -31,37 +31,37 @@ namespace CatMQ.Service
 
             if (string.IsNullOrEmpty(password))
             {
-                errorMessage = "Password cannot be empty.";
+                errorMessage = Localize("Password cannot be empty.");
                 return false;
             }
 
             if (password.Length < 8)
             {
-                errorMessage = "Password must be at least 8 characters long.";
+                errorMessage = Localize("Password must be at least 8 characters long.");
                 return false;
             }
 
             if (!password.Any(char.IsUpper))
             {
-                errorMessage = "Password must contain at least one uppercase letter.";
+                errorMessage = Localize("Password must contain at least one uppercase letter.");
                 return false;
             }
 
             if (!password.Any(char.IsLower))
             {
-                errorMessage = "Password must contain at least one lowercase letter.";
+                errorMessage = Localize("Password must contain at least one lowercase letter.");
                 return false;
             }
 
             if (!password.Any(char.IsDigit))
             {
-                errorMessage = "Password must contain at least one digit.";
+                errorMessage = Localize("Password must contain at least one digit.");
                 return false;
             }
 
             if (password.Any(char.IsWhiteSpace))
             {
-                errorMessage = "Password cannot contain spaces.";
+                errorMessage = Localize("Password cannot contain spaces.");
                 return false;
             }
 

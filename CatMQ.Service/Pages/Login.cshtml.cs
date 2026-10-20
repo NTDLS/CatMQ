@@ -80,7 +80,7 @@ namespace CatMQ.Service.Pages
                     return RedirectToPage("/Index");
                 }
 
-                ErrorMessage = "Invalid username or password";
+                ErrorMessage = Localize("Invalid username or password");
             }
             catch (Exception ex)
             {

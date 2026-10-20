@@ -1,7 +1,7 @@
 ﻿@page "/messages/{QueueName}/{PageNumber:int=0}"
 @model MessagesModel
 @{
-    ViewData["Title"] = $"{@Model.QueueName} Queue";
+    ViewData["Title"] = Localize("{0} Queue", Model.QueueName);
 }
 
 <div>
@@ -15,7 +15,7 @@
 
         <div>
             @* Right-aligned "toolbar" controls  *@
-            <a href="/queue/@Model.QueueName" class="btn btn-outline-secondary" title="Back to queue">
+            <a href="/queue/@Model.QueueName" class="btn btn-outline-secondary" title="@Localize("Back to queue")">
                 <i class="bi bi-arrow-up"></i>
             </a>
         </div>
@@ -25,7 +25,7 @@
     {
         <div class="alert alert-danger alert-dismissible fade show" role="alert">
             <p class="fw-bold">@Html.Raw(Model.ErrorMessage)</p>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@Localize("Close")"></button>
         </div>
     }
 
@@ -51,37 +51,37 @@
         <table class="table table-striped table-bordered mx-0 my-0">
             <thead>
                 <tr>
-                    <th>Serial
+                    <th>@Localize("Serial")
                         <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
-                           title="The queue-scoped unique identifier for this message. Note that if the message is moved from one queue to another, such as in dead-lettering, that the message will receive a new id."></i>
+                           title="@Localize("The queue-scoped unique identifier for this message. Note that if the message is moved from one queue to another, such as in dead-lettering, that the message will receive a new id.")"></i>
                     </th>
-                    <th>Timestamp
+                    <th>@Localize("Timestamp")
                         <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
-                           title="UTC date and time when the message was enqueued."></i>
+                           title="@Localize("UTC date and time when the message was enqueued.")"></i>
                     </th>
-                    <th>Due
+                    <th>@Localize("Due")
                         <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
-                           title="For deferred messages, the due time defines when the message is next scheduled for delivery."></i>
+                           title="@Localize("For deferred messages, the due time defines when the message is next scheduled for delivery.")"></i>
                     </th>
-                    <th class="text-end">Deferred
+                    <th class="text-end">@Localize("Deferred")
                         <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
-                           title="The cumulative number of times that this message has been delivered to a subscriber where that subscriber requested that the message be redelivered at a later time."></i>
+                           title="@Localize("The cumulative number of times that this message has been delivered to a subscriber where that subscriber requested that the message be redelivered at a later time.")"></i>
                     </th>
-                    <th class="text-end">Subscribers
+                    <th class="text-end">@Localize("Subscribers")
                         <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
-                           title="Current number of subscribers that are subscribed to this message."></i>
+                           title="@Localize("Current number of subscribers that are subscribed to this message.")"></i>
                     </th>
-                    <th class="text-end">Delivered
+                    <th class="text-end">@Localize("Delivered")
                         <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
-                           title="The cumulative number of times that this message has been delivered to a subscriber."></i>
+                           title="@Localize("The cumulative number of times that this message has been delivered to a subscriber.")"></i>
                     </th>
-                    <th class="text-end">Consumed
+                    <th class="text-end">@Localize("Consumed")
                         <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
-                           title="The cumulative number of times that this message has been delivered to a subscriber where the subscriber responded with a consumption disposition."></i>
+                           title="@Localize("The cumulative number of times that this message has been delivered to a subscriber where the subscriber responded with a consumption disposition.")"></i>
                     </th>
-                    <th>Type
+                    <th>@Localize("Type")
                         <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
-                           title="Native type of the serialized object in the queue."></i>
+                           title="@Localize("Native type of the serialized object in the queue.")"></i>
                     </th>
                 </tr>
             </thead>
@@ -91,7 +91,7 @@
                     <tr>
                         <td><a href="/message/@Model.QueueName/@message.SerialNumber">@message.SerialNumber</a></td>
                         <td>@message.Timestamp</td>
-                        <td>@(message.DeferredUntil?.ToString() ?? "asap")</td>
+                        <td>@(message.DeferredUntil?.ToString() ?? Localize("asap"))</td>
                         <td class="text-end">@message.DeferredDeliveryCount.ToString("n0")</td>
                         <td class="text-end">@message.SubscriberCount.ToString("n0")</td>
                         <td class="text-end">@message.SubscriberMessageDeliveries.Count.ToString("n0")</td>

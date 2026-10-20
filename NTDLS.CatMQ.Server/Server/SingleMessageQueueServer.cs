@@ -215,6 +215,12 @@ namespace NTDLS.CatMQ.Server.Server
                         {
                             foreach (var message in messagesWithDispositions)
                             {
+                                //The message may have been purged while it was out for delivery. If so, there is nothing left to dispose of.
+                                if (m.MessageBuffer.Contains(message) == false)
+                                {
+                                    continue;
+                                }
+
                                 switch (message.State)
                                 {
                                     case CMqMessageState.DeadLetter:
@@ -250,11 +256,24 @@ namespace NTDLS.CatMQ.Server.Server
                     #endregion
                     consecutiveExceptions = 0;
                 }
+                catch (OperationCanceledException) when (!_isRunning)
+                {
+                    //Normal during shutdown or queue deletion.
+                    break;
+                }
                 catch (Exception ex)
                 {
                     consecutiveExceptions++;
                     _queueServer.InvokeOnLog(ex.GetBaseException());
-                    await Task.Delay(100, _cts.Token);
+
+                    try
+                    {
+                        await Task.Delay(100, _cts.Token);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        //Shutdown was signaled while backing off.
+                    }
 
                     if (consecutiveExceptions > 1000)
                     {
@@ -281,10 +300,11 @@ namespace NTDLS.CatMQ.Server.Server
             {
                 message.State = await DistributeToSubscribersWithDisposition(message);
             }
-            catch
+            catch (Exception ex)
             {
                 message.State = CMqMessageState.Ready;
                 _queueServer.InvokeOnLog(CMqErrorLevel.Fatal, $"Failure of DistributeToSubscribersWithResolution [{Configuration.QueueName}].");
+                _queueServer.InvokeOnLog(ex.GetBaseException());
             }
             finally
             {
@@ -393,9 +413,13 @@ namespace NTDLS.CatMQ.Server.Server
                         {
                             ticketDeferReadLock?.Accumulate();
 
-                            var ticketDeferStore = _queueServer.Instrumentation?.CreateTicket(CMqInstrumentationEventType.DeferStore);
-                            messages.Database.Store(message);
-                            ticketDeferStore?.Accumulate();
+                            //If the queue was purged while the message was out for delivery, do not write it back to the database.
+                            if (messages.MessageBuffer.Contains(message))
+                            {
+                                var ticketDeferStore = _queueServer.Instrumentation?.CreateTicket(CMqInstrumentationEventType.DeferStore);
+                                messages.Database.Store(message);
+                                ticketDeferStore?.Accumulate();
+                            }
                         });
 
                         //We return "Ready" so that the message can be re-delivered later and we do not deliver it to any other subscribers.
@@ -505,7 +529,16 @@ namespace NTDLS.CatMQ.Server.Server
                 int messagesLoaded = 0;
 
                 using var iterator = m.Database.NewIterator();
-                for (iterator.SeekToFirst(); iterator.Valid() && messagesLoaded < countToGet; iterator.Next())
+                if (maxBufferedSerialNumber != null)
+                {
+                    iterator.Seek((maxBufferedSerialNumber.Value + 1).ToKey());
+                }
+                else
+                {
+                    iterator.SeekToFirst();
+                }
+
+                for (; iterator.Valid() && messagesLoaded < countToGet; iterator.Next())
                 {
                     var persistedSerialNumberBytes = iterator.Key();
                     if (BitConverter.IsLittleEndian)
@@ -520,6 +553,14 @@ namespace NTDLS.CatMQ.Server.Server
                         var persistedMessage = JsonSerializer.Deserialize<EnqueuedMessage>(json);
                         if (persistedMessage != null)
                         {
+                            if (persistedMessage.MessageId == Guid.Empty)
+                            {
+                                //Persisted by a version that did not assign message IDs. Give it one and write it
+                                //  back so that it keeps the same ID if it is redelivered after another restart.
+                                persistedMessage.MessageId = Guid.NewGuid();
+                                m.Database.Store(persistedMessage);
+                            }
+
                             m.MessageBuffer.Add(persistedMessage);
                             messagesLoaded++;
                         }
@@ -627,6 +668,14 @@ namespace NTDLS.CatMQ.Server.Server
         {
             _queueServer.InvokeOnLog(CMqErrorLevel.Information, $"Waiting on delivery thread to quit for [{Configuration.QueueName}].");
             _deliveryTask?.Wait();
+
+            //Asynchronous deliveries are not tracked by the delivery task. Wait for them to finish so that they
+            //  do not touch the database after it has been disposed.
+            var deadline = Environment.TickCount64 + CMqDefaults.DEFAULT_LOCK_TIMEOUT_MS * 3;
+            while (Statistics.OutstandingDeliveries > 0 && Environment.TickCount64 < deadline)
+            {
+                Thread.Sleep(10);
+            }
 
             _queueServer.InvokeOnLog(CMqErrorLevel.Information, $"Shutting down database connection for [{Configuration.QueueName}].");
             EnqueuedMessages.Write(m =>

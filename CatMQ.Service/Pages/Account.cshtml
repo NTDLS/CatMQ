@@ -2,13 +2,13 @@
 @using NTDLS.Helpers
 @model AccountModel
 @{
-    ViewData["Title"] = "Account";
+    ViewData["Title"] = Localize("Account");
 }
 @section Scripts {
     <script>
         async function onDeleteAccount(accountId, username) {
             const url = `/ui/DeleteAccount/${accountId}`;
-            const message = `Deleting account ${username}' will also remove any associated API keys. Continue?`;
+            const message = fmt(@Json.Serialize(Localize("Deleting account '{0}' will also remove any associated API keys. Continue?")), username);
 
             const ok = await showConfirmModal(message);
             if (!ok) return;
@@ -23,20 +23,20 @@
                 });
 
                 if (!response.ok) {
-                    alert("Operation failed.");
+                    alert(@Json.Serialize(Localize("Operation failed.")));
                     return;
                 }
 
                 window.location.href = "/Accounts";
             }
             catch (error) {
-                alert(`Operation failed: ${error}`);
+                alert(fmt(@Json.Serialize(Localize("Operation failed: {0}")), error));
             }
         }
 
         async function onDeleteAPIKey(accountId, apiKeyId) {
             const url = `/ui/DeleteAPIKey/${accountId}/${apiKeyId}`;
-            const message = `Deleting API key '${apiKeyId}' is not reversable. Continue?`;
+            const message = fmt(@Json.Serialize(Localize("Deleting API key '{0}' is not reversible. Continue?")), apiKeyId);
 
             const ok = await showConfirmModal(message);
             if (!ok) return;
@@ -51,14 +51,14 @@
                 });
 
                 if (!response.ok) {
-                    alert("Operation failed.");
+                    alert(@Json.Serialize(Localize("Operation failed.")));
                     return;
                 }
 
                 window.location.href = "/Account/@Model.AccountId";
             }
             catch (error) {
-                alert(`Operation failed: ${error}`);
+                alert(fmt(@Json.Serialize(Localize("Operation failed: {0}")), error));
             }
         }
     </script>
@@ -69,13 +69,13 @@
         <div>
             @* Left-aligned "toolbar" controls *@
             <h5 class="display-6">
-                Account
+                @Localize("Account")
             </h5>
         </div>
 
         <div>
             @* Right-aligned "toolbar" controls  *@
-            <a class="btn btn-danger" href="javascript:void(0)" onclick="onDeleteAccount('@Model.AccountId', '@Model.Account.Username')">Delete</a>
+            <a class="btn btn-danger" href="javascript:void(0)" onclick="onDeleteAccount('@Model.AccountId', '@Model.Account.Username')">@Localize("Delete")</a>
         </div>
     </div>
 
@@ -83,7 +83,7 @@
     {
         <div class="alert alert-danger alert-dismissible fade show" role="alert">
             <p class="fw-bold">@Html.Raw(Model.ErrorMessage)</p>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@Localize("Close")"></button>
         </div>
     }
 
@@ -91,7 +91,7 @@
     {
         <div id="success-alert" class="alert alert-success alert-dismissible fade show" role="alert">
             <p class="fw-bold">@Html.Raw(Model.SuccessMessage)</p>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@Localize("Close")"></button>
         </div>
 
         <script>
@@ -114,37 +114,37 @@
     <form method="post" asp-page-handler="SaveAccount">
         <div class="card shadow-lg">
             <div class="card-header">
-                <h5>Account</h5>
+                <h5>@Localize("Account")</h5>
             </div>
             <div class="card-body">
 
                 <div class="mb-3">
-                    <label for="username" class="form-label fw-bold">Username</label>
+                    <label for="username" class="form-label fw-bold">@Localize("Username")</label>
                     <span asp-validation-for="Account.Username" class="text-danger"></span>
                     <input type="text" id="username" class="form-control" asp-for="Account.Username">
                 </div>
 
                 <div class="mb-3">
-                    <label for="description" class="form-label fw-bold">Description</label>
+                    <label for="description" class="form-label fw-bold">@Localize("Description")</label>
                     <span asp-validation-for="Account.Description" class="text-danger"></span>
                     <input type="text" id="description" class="form-control" asp-for="Account.Description">
                 </div>
 
                 <div class="mb-3">
-                    <label for="timeZone" class="form-label fw-bold">Time Zone</label>
+                    <label for="timeZone" class="form-label fw-bold">@Localize("Time Zone")</label>
                     <span asp-validation-for="Account.TimeZone" class="text-danger"></span>
                     <select id="timeZone" class="form-select" asp-for="Account.TimeZone" asp-items="@(new SelectList(Model.TimeZones, "Value", "Text"))">
-                        <option value="">Select a time zone</option>
+                        <option value="">@Localize("Select a time zone")</option>
                     </select>
                 </div>
 
                 <div class="mb-3">
-                    <label for="password" class="form-label fw-bold">Change Password</label>
+                    <label for="password" class="form-label fw-bold">@Localize("Change Password")</label>
                     <span asp-validation-for="Password" class="text-danger"></span>
                     <input type="text" id="password" class="form-control" asp-for="Password" autocomplete="new-password-no-auto-fill">
                 </div>
 
-                <button type="submit" class="btn btn-primary">Save</button>
+                <button type="submit" class="btn btn-primary">@Localize("Save")</button>
             </div>
         </div>
         <br />
@@ -153,7 +153,7 @@
     <form method="post" asp-page-handler="CreateAPIKey">
         <div class="card shadow-lg">
             <div class="card-header">
-                <h5>API Keys</h5>
+                <h5>@Localize("API Keys")</h5>
             </div>
             <div class="card-body">
                 @if (Model.Account.ApiKeys.Count > 0)
@@ -161,9 +161,9 @@
                     <table class="table table-striped table-bordered">
                         <thead>
                             <tr>
-                                <th>Key</th>
-                                <th>Description</th>
-                                <th>Action</th>
+                                <th>@Localize("Key")</th>
+                                <th>@Localize("Description")</th>
+                                <th>@Localize("Action")</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -177,14 +177,14 @@
                                         @apiKey.Description
                                     </td>
                                     <td>
-                                        <a class="btn btn-danger btn-thin" href="javascript:void(0)" onclick="onDeleteAPIKey('@Model.AccountId', '@apiKey.Id')">Delete</a>
+                                        <a class="btn btn-danger btn-thin" href="javascript:void(0)" onclick="onDeleteAPIKey('@Model.AccountId', '@apiKey.Id')">@Localize("Delete")</a>
                                     </td>
                                 </tr>
                             }
                         </tbody>
                     </table>
                 }
-                <button type="submit" class="btn btn-primary">Create API Key</button>
+                <button type="submit" class="btn btn-primary">@Localize("Create API Key")</button>
             </div>
         </div>
     </form>

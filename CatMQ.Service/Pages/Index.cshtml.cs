@@ -135,31 +135,31 @@ namespace CatMQ.Service.Pages
             {
                 new ChartSeriesDto
                 {
-                    Label = "Receive/s",
+                    Label = Localize("Receive/s"),
                     Values = receiveRates,
                     YAxisId = "y"
                 },
                 new ChartSeriesDto
                 {
-                    Label = "Delivered/s",
+                    Label = Localize("Delivered/s"),
                     Values = deliveryRates,
                     YAxisId = "y"
                 },
                 new ChartSeriesDto
                 {
-                    Label = "Deferred/s",
+                    Label = Localize("Deferred/s"),
                     Values = deferredDeliveryRates,
                     YAxisId = "y"
                 },
                 new ChartSeriesDto
                 {
-                    Label = "Depth",
+                    Label = Localize("Depth"),
                     Values = queueDepths,
                     YAxisId = "y1"
                 },
                 new ChartSeriesDto
                 {
-                    Label = "Outstanding",
+                    Label = Localize("Outstanding"),
                     Values = OutstandingDeliveries,
                     YAxisId = "y"
                 }

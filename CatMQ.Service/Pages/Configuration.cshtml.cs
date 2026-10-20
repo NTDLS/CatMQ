@@ -20,7 +20,7 @@ namespace CatMQ.Service.Pages
                 if (ModelState.IsValid)
                 {
                     Configs.PutServiceConfig(ServerConfig);
-                    SuccessMessage = "Configuration has been saved.<br />You will need to restart the service for these changes to take affect.";
+                    SuccessMessage = Localize("Configuration has been saved.") + "<br />" + Localize("You will need to restart the service for these changes to take effect.");
                 }
             }
             catch (Exception ex)

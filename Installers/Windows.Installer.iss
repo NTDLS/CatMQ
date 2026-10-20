@@ -1,4 +1,4 @@
-#define AppVersion "2.7.6"
+#define AppVersion "2.8.0"
 
 [Setup]
 ;-- Main Setup Information
@@ -23,6 +23,7 @@
 
 [Files]
  Source: "publish\win-x64\wwwroot\*.*"; DestDir: "{app}\wwwroot"; Flags: IgnoreVersion recursesubdirs;
+ Source: "publish\win-x64\Translations\*.*"; DestDir: "{app}\Translations"; Flags: IgnoreVersion recursesubdirs;
  Source: "publish\win-x64\*.exe"; DestDir: "{app}"; Flags: IgnoreVersion;
  Source: "publish\win-x64\*.dll"; DestDir: "{app}"; Flags: IgnoreVersion;
  Source: "publish\win-x64\*.json"; DestDir: "{app}"; Flags: IgnoreVersion;

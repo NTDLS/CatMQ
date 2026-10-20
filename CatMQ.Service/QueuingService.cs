@@ -1,5 +1,8 @@
-﻿using NTDLS.CatMQ.Server;
+﻿using Microsoft.AspNetCore.Localization;
+using Microsoft.Extensions.Options;
+using NTDLS.CatMQ.Server;
 using NTDLS.CatMQ.Shared;
+using NTDLS.Localization;
 using Serilog;
 using System.Text.Json.Serialization;
 
@@ -47,6 +50,34 @@ namespace CatMQ.Service
                 builder.Services.AddSingleton(_mqServer);
                 builder.Services.AddSingleton(serviceConfiguration);
 
+                //All of the UI text comes from Translations.db via NTDLS.Localization.
+                LocalizationDiagnostics.OnWarning = (message, exception) => Log.Warning(exception, "{Message}", message);
+                LocalizationDiagnostics.OnError = (message, exception) => Log.Error(exception, "{Message}", message);
+
+                var supportedCultures = new SupportedCultures();
+                builder.Services.AddSingleton(supportedCultures);
+
+                builder.Services.Configure<RequestLocalizationOptions>(opts =>
+                {
+                    var cultures = supportedCultures.Collection.Select(o => o.Culture).ToList();
+
+                    opts.DefaultRequestCulture = new RequestCulture("en");
+                    opts.SupportedCultures = cultures; //Formatting of numbers, dates, etc.
+                    opts.SupportedUICultures = cultures; //UI strings that we have localized.
+                    opts.RequestCultureProviders =
+                    [
+                        new QueryStringRequestCultureProvider(),
+                        new CookieRequestCultureProvider(),
+                        new AcceptLanguageHeaderRequestCultureProvider(),
+                    ];
+                });
+
+                //The web UI returns the same enums as JSON (such as instrumentation event names), with or without the web API.
+                builder.Services.Configure<Microsoft.AspNetCore.Mvc.JsonOptions>(options =>
+                {
+                    options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+                });
+
                 if (serviceConfiguration.EnableWebUI)
                 {
                     builder.Services.AddRazorPages();
@@ -64,6 +95,8 @@ namespace CatMQ.Service
                 builder.WebHost.UseUrls(serviceConfiguration.WebListenURL);
 
                 var app = builder.Build();
+
+                app.UseRequestLocalization(app.Services.GetRequiredService<IOptions<RequestLocalizationOptions>>().Value);
 
                 app.UseRouting();
 

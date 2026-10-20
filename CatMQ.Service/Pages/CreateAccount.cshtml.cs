@@ -33,7 +33,7 @@ namespace CatMQ.Service.Pages
             {
                 if (string.IsNullOrEmpty(Password))
                 {
-                    ModelState.AddModelError(nameof(Password), "Password cannot be empty.");
+                    ModelState.AddModelError(nameof(Password), Localize("Password cannot be empty."));
                 }
                 else
                 {

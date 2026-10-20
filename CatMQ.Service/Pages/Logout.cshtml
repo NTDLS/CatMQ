@@ -1,7 +1,7 @@
 ﻿@page
 @model LogoutModel
 @{
-    ViewData["Title"] = "Logout";
+    ViewData["Title"] = Localize("Logout");
 }
 
 <div>
@@ -9,13 +9,13 @@
     {
         <div class="alert alert-danger alert-dismissible fade show" role="alert">
             <p class="fw-bold">@Html.Raw(Model.ErrorMessage)</p>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@Localize("Close")"></button>
         </div>
     }
 
     <div class="card shadow-lg" style="width: 400px;">
         <div class="card-body">
-            <h2 class="card-title text-center">Login</h2>
+            <h2 class="card-title text-center">@Localize("Login")</h2>
             @if (Model.ErrorMessage != null)
             {
                 <div class="alert alert-danger" role="alert">
@@ -24,14 +24,14 @@
             }
             <form method="post">
                 <div class="mb-3">
-                    <label for="username" class="form-label">Username</label>
-                    <input type="text" id="username" name="Username" class="form-control" placeholder="Enter username" required />
+                    <label for="username" class="form-label">@Localize("Username")</label>
+                    <input type="text" id="username" name="Username" class="form-control" placeholder="@Localize("Enter username")" required />
                 </div>
                 <div class="mb-3">
-                    <label for="password" class="form-label">Password</label>
-                    <input type="password" id="password" name="Password" class="form-control" placeholder="Enter password" required />
+                    <label for="password" class="form-label">@Localize("Password")</label>
+                    <input type="password" id="password" name="Password" class="form-control" placeholder="@Localize("Enter password")" required />
                 </div>
-                <button type="submit" class="btn btn-primary w-100">Login</button>
+                <button type="submit" class="btn btn-primary w-100">@Localize("Login")</button>
             </form>
         </div>
     </div>

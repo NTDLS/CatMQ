@@ -36,7 +36,7 @@ namespace CatMQ.Service.Pages
 
                     Configs.PutAccounts(accounts);
 
-                    SuccessMessage = "Saved!";
+                    SuccessMessage = Localize("Saved!");
                 }
 
                 AccountApiKey = account.ApiKeys.Single(o => o.Id == ApiKeyId);

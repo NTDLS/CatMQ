@@ -2,7 +2,7 @@
 @using NTDLS.Helpers
 @model QueuesModel
 @{
-    ViewData["Title"] = "Queues";
+    ViewData["Title"] = Localize("Queues");
 }
 
 @section Scripts {
@@ -53,8 +53,8 @@
             if (!Array.isArray(queues) || queues.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="8" class="text-center text-muted">
-                            No queues.
+                        <td colspan="9" class="text-center text-muted">
+                            @Localize("No queues.")
                         </td>
                     </tr>`;
                 return;
@@ -72,13 +72,13 @@
         <div>
             @* Left-aligned "toolbar" controls *@
             <h5 class="display-6">
-                Queues
+                @Localize("Queues")
             </h5>
         </div>
 
         <div>
             @* Right-aligned "toolbar" controls  *@
-            <a href="/" class="btn btn-outline-secondary" title="Back to home">
+            <a href="/" class="btn btn-outline-secondary" title="@Localize("Back to home")">
                 <i class="bi bi-arrow-up"></i>
             </a>
         </div>
@@ -88,7 +88,7 @@
     {
         <div class="alert alert-danger alert-dismissible fade show" role="alert">
             <p class="fw-bold">@Html.Raw(Model.ErrorMessage)</p>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@Localize("Close")"></button>
         </div>
     }
 
@@ -97,49 +97,49 @@
             <thead>
                 <tr>
                     <th class="text-start">
-                        Name
+                        @Localize("Name")
                         <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
-                           title="Name of the queue."></i>
+                           title="@Localize("Name of the queue.")"></i>
                     </th>
                     <th class="text-end">
-                        Subscribers
+                        @Localize("Subscribers")
                         <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
-                           title="Current number of subscribers to the queue."></i>
+                           title="@Localize("Current number of subscribers to the queue.")"></i>
                     </th>
                     <th class="text-end">
-                        Depth
+                        @Localize("Depth")
                         <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
-                           title="Current number of messages in the queue."></i>
+                           title="@Localize("Current number of messages in the queue.")"></i>
                     </th>
                     <th class="text-end">
-                        Outstanding
+                        @Localize("Outstanding")
                         <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
-                           title="Current number of messages that are out-for-delivery. These messages have been dispatched and are awaiting a disposition from a subscriber."></i>
+                           title="@Localize("Current number of messages that are out-for-delivery. These messages have been dispatched and are awaiting a disposition from a subscriber.")"></i>
                     </th>
                     <th class="text-end">
-                        Received
+                        @Localize("Received")
                         <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
-                           title="Cumulative number of messages that have been received into the queue."></i>
+                           title="@Localize("Cumulative number of messages that have been received into the queue.")"></i>
                     </th>
                     <th class="text-end">
-                        Delivered
+                        @Localize("Delivered")
                         <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
-                           title="Cumulative number of messages that have been delivered to subscribers from the queue."></i>
+                           title="@Localize("Cumulative number of messages that have been delivered to subscribers from the queue.")"></i>
                     </th>
                     <th class="text-end">
-                        Deferred
+                        @Localize("Deferred")
                         <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
-                           title="Cumulative number of messages that have been delivered to subscribers where the subscriber requested that the message be redelivered at a later time."></i>
+                           title="@Localize("Cumulative number of messages that have been delivered to subscribers where the subscriber requested that the message be redelivered at a later time.")"></i>
                     </th>
                     <th class="text-end">
-                        Expired
+                        @Localize("Expired")
                         <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
-                           title="Cumulative number of messages that have expired while waiting to be delivered. Depending on the configuration, these messages are either discarded or moved to the dead-letter-queue."></i>
+                           title="@Localize("Cumulative number of messages that have expired while waiting to be delivered. Depending on the configuration, these messages are either discarded or moved to the dead-letter-queue.")"></i>
                     </th>
                     <th class="text-end">
-                        Delivery Failures
+                        @Localize("Delivery Failures")
                         <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
-                           title="Cumulative number of messages where delivery attempts resulted in an exception."></i>
+                           title="@Localize("Cumulative number of messages where delivery attempts resulted in an exception.")"></i>
                     </th>
                 </tr>
             </thead>

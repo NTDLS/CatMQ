@@ -2,7 +2,7 @@
 @using NTDLS.Helpers
 @model ApiKeyModel
 @{
-    ViewData["Title"] = "API Key";
+    ViewData["Title"] = Localize("API Key");
 }
 
 <div>
@@ -10,7 +10,7 @@
         <div>
             @* Left-aligned "toolbar" controls *@
             <h5 class="display-6">
-                API Key
+                @Localize("API Key")
             </h5>
         </div>
 
@@ -23,7 +23,7 @@
     {
         <div class="alert alert-danger alert-dismissible fade show" role="alert">
             <p class="fw-bold">@Html.Raw(Model.ErrorMessage)</p>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@Localize("Close")"></button>
         </div>
     }
 
@@ -31,7 +31,7 @@
     {
         <div id="success-alert" class="alert alert-success alert-dismissible fade show" role="alert">
             <p class="fw-bold">@Html.Raw(Model.SuccessMessage)</p>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@Localize("Close")"></button>
         </div>
 
         <script>
@@ -56,18 +56,18 @@
             <div class="card shadow-lg">
                 <div class="card-body">
                     <div class="mb-3">
-                        <label for="key" class="form-label fw-bold">Key</label>
+                        <label for="key" class="form-label fw-bold">@Localize("Key")</label>
                         <span asp-validation-for="AccountApiKey.Key" class="text-danger"></span>
                         <input type="text" id="key" class="form-control" asp-for="AccountApiKey.Key" readonly>
                     </div>
 
                     <div class="mb-3">
-                        <label for="description" class="form-label fw-bold">Description</label>
+                        <label for="description" class="form-label fw-bold">@Localize("Description")</label>
                         <span asp-validation-for="AccountApiKey.Description" class="text-danger"></span>
                         <input type="text" id="description" class="form-control" asp-for="AccountApiKey.Description">
                     </div>
 
-                    <button type="submit" class="btn btn-primary">Save</button>
+                    <button type="submit" class="btn btn-primary">@Localize("Save")</button>
                 </div>
             </div>
         </form>

@@ -1,7 +1,7 @@
 ﻿@page "/queue/{QueueName}"
 @model QueueModel
 @{
-    ViewData["Title"] = $"{@Model.QueueName} Queue";
+    ViewData["Title"] = Localize("{0} Queue", Model.QueueName);
 }
 
 @section Scripts {
@@ -32,7 +32,13 @@
         }
 
         async function refreshQueueData() {
-            const data = await loadQueueData();
+            let data = null;
+            try {
+                data = await loadQueueData();
+            } catch (err) {
+                console.error('Error loading queue data:', err);
+            }
+            if (!data) return;
 
             //Configuration table.
             document.getElementById('q-persistenceScheme').textContent = data.persistenceScheme;
@@ -75,7 +81,7 @@
 
         async function onRemoveSubscription(subscriberId) {
             const url = `/ui/Unsubscribe/${queueName}/${subscriberId}`;
-            const message = `Removing the subscription for '${subscriberId}' from '${queueName}' will cause the subscriber to fail. Continue?`;
+            const message = fmt(@Json.Serialize(Localize("Removing the subscription for '{0}' from '{1}' will cause the subscriber to fail. Continue?")), subscriberId, queueName);
 
             const ok = await showConfirmModal(message);
             if (!ok) return;
@@ -90,20 +96,20 @@
                 });
 
                 if (!response.ok) {
-                    alert("Operation failed.");
+                    alert(@Json.Serialize(Localize("Operation failed.")));
                     return;
                 }
 
                 refreshSubscribers();
             }
             catch (error) {
-                alert(`Operation failed: ${error}`);
+                alert(fmt(@Json.Serialize(Localize("Operation failed: {0}")), error));
             }
         }
 
         async function onPurgeQueue() {
             const url = `/ui/PurgeQueue/${queueName}`;
-            const message = `Purging the queue '${queueName}' will result in permanent message loss. Continue?`;
+            const message = fmt(@Json.Serialize(Localize("Purging the queue '{0}' will result in permanent message loss. Continue?")), queueName);
 
             const ok = await showConfirmModal(message);
             if (!ok) return;
@@ -118,20 +124,20 @@
                 });
 
                 if (!response.ok) {
-                    alert("Operation failed.");
+                    alert(@Json.Serialize(Localize("Operation failed.")));
                     return;
                 }
 
                 refreshQueueData();
             }
             catch (error) {
-                alert(`Operation failed: ${error}`);
+                alert(fmt(@Json.Serialize(Localize("Operation failed: {0}")), error));
             }
         }
 
         async function onDeleteQueue() {
             const url = `/ui/DeleteQueue/${queueName}`;
-            const message = `Deleting the queue '${queueName}' will result in permanent message loss and any subscribers will fail. Continue?`;
+            const message = fmt(@Json.Serialize(Localize("Deleting the queue '{0}' will result in permanent message loss and any subscribers will fail. Continue?")), queueName);
 
             const ok = await showConfirmModal(message);
             if (!ok) return;
@@ -146,14 +152,14 @@
                 });
 
                 if (!response.ok) {
-                    alert("Operation failed.");
+                    alert(@Json.Serialize(Localize("Operation failed.")));
                     return;
                 }
 
                 window.location.href = "/Queues";
             }
             catch (error) {
-                alert(`Operation failed: ${error}`);
+                alert(fmt(@Json.Serialize(Localize("Operation failed: {0}")), error));
             }
         }
 
@@ -169,7 +175,7 @@
                     <td class="text-end">${sub.consumedDeliveryCount}</td>
                     <td class="text-end">${sub.failedDeliveryCount}</td>
                     <td>
-                        <a class="btn btn-danger btn-thin" href="javascript:void(0)" onclick="onRemoveSubscription('${sub.subscriberId}')">Remove</a>
+                        <a class="btn btn-danger btn-thin" href="javascript:void(0)" onclick="onRemoveSubscription('${sub.subscriberId}')">@Localize("Remove")</a>
                     </td>
                 </tr>`;
         }
@@ -183,7 +189,7 @@
                 tbody.innerHTML = `
                     <tr>
                         <td colspan="8" class="text-center text-muted">
-                            No subscribers.
+                            @Localize("No subscribers.")
                         </td>
                     </tr>`;
                 return;
@@ -208,7 +214,7 @@
 
         <div>
             @* Right-aligned "toolbar" controls  *@
-            <a href="/Queues" class="btn btn-outline-secondary" title="Back to queues">
+            <a href="/Queues" class="btn btn-outline-secondary" title="@Localize("Back to queues")">
                 <i class="bi bi-arrow-up"></i>
             </a>
         </div>
@@ -218,50 +224,50 @@
     {
         <div class="alert alert-danger alert-dismissible fade show" role="alert">
             <p class="fw-bold">@Html.Raw(Model.ErrorMessage)</p>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@Localize("Close")"></button>
         </div>
     }
 
     <div class="card shadow-lg">
         <div class="card-header">
-            <h5>Configuration</h5>
+            <h5>@Localize("Configuration")</h5>
         </div>
         <div class="card-body">
             <div class="table-responsive shadow-lg">
                 <table class="table table-striped table-bordered my-0 mx-0">
                     <thead>
                         <tr>
-                            <th>Persistence
+                            <th>@Localize("Persistence")
                                 <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
-                                   title="Persistence Scheme defines whether the messages are persisted or ephemeral, where persisted messages survive service restarts and ephemeral queues lose all messages when the service is restarted."></i>
+                                   title="@Localize("Persistence Scheme defines whether the messages are persisted or ephemeral, where persisted messages survive service restarts and ephemeral queues lose all messages when the service is restarted.")"></i>
                             </th>
-                            <th>Consumption
+                            <th>@Localize("Consumption")
                                 <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
-                                   title="Consumption Scheme defines how the queue will considered a message delivered. Such as 'First Consumed Subscriber' where the message is removed once any subscriber consumes the message where 'All Subscribers Satisfied' would require that all subscribers either consume the message or indicate that they are not interested in the message."></i>
+                                   title="@Localize("Consumption Scheme defines how the queue will considered a message delivered. Such as 'First Consumed Subscriber' where the message is removed once any subscriber consumes the message where 'All Subscribers Satisfied' would require that all subscribers either consume the message or indicate that they are not interested in the message.")"></i>
                             </th>
-                            <th>Delivery
+                            <th>@Localize("Delivery")
                                 <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
-                                   title="Delivery Scheme defines the manner in which messages are distributed to subscribers where 'Balanced' attempts to balance the number of deliveries between subscribers and 'Random' delivers to the subscribers in a random order."></i>
+                                   title="@Localize("Delivery Scheme defines the manner in which messages are distributed to subscribers where 'Balanced' attempts to balance the number of deliveries between subscribers and 'Random' delivers to the subscribers in a random order.")"></i>
                             </th>
-                            <th class="text-end">Max. Outstanding
+                            <th class="text-end">@Localize("Max. Outstanding")
                                 <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
-                                   title="Maximum Outstanding Deliveries defines the maximum number of concurrent parallel deliveries that will be allowed. When the number of messages that are out-for-delivery reaches the limit, no further deliveries will be attempted until dispositions are returned by the subscriber or a failure occurs."></i>
+                                   title="@Localize("Maximum Outstanding Deliveries defines the maximum number of concurrent parallel deliveries that will be allowed. When the number of messages that are out-for-delivery reaches the limit, no further deliveries will be attempted until dispositions are returned by the subscriber or a failure occurs.")"></i>
                             </th>
-                            <th class="text-end">Throttle
+                            <th class="text-end">@Localize("Throttle")
                                 <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
-                                   title="Delivery Throttle defines the amount of time to delay between delivering messages from the queue. This applies to all subscribers of the queue."></i>
+                                   title="@Localize("Delivery Throttle defines the amount of time to delay between delivering messages from the queue. This applies to all subscribers of the queue.")"></i>
                             </th>
-                            <th class="text-end">Retries
+                            <th class="text-end">@Localize("Retries")
                                 <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
-                                   title="Retries or Maximum Delivery Attempts defines the number of attempts that will be made to subscribers where the result is not consumption disposition, before the message is considered for purging or dead-lettering (depending on configuration)."></i>
+                                   title="@Localize("Retries or Maximum Delivery Attempts defines the number of attempts that will be made to subscribers where the result is not consumption disposition, before the message is considered for purging or dead-lettering (depending on configuration).")"></i>
                             </th>
-                            <th class="text-end">Expiration
+                            <th class="text-end">@Localize("Expiration")
                                 <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
-                                   title="Expiration defines the amount of time that any message can remain in the queue before the message is considered expired and wither purged or moved to the dead-letter-queue (depending on configuration)"></i>
+                                   title="@Localize("Expiration defines the amount of time that any message can remain in the queue before the message is considered expired and wither purged or moved to the dead-letter-queue (depending on configuration)")"></i>
                             </th>
-                            <th class="text-end">Action
+                            <th class="text-end">@Localize("Action")
                                 <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
-                                   title="Actions that can be performed on the queue."></i>
+                                   title="@Localize("Actions that can be performed on the queue.")"></i>
                             </th>
                         </tr>
                     </thead>
@@ -275,7 +281,7 @@
                             <td class="text-end" id="q-maxDeliveryAttempts">...</td>
                             <td class="text-end" id="q-maxMessageAge">...</td>
                             <td class="text-end">
-                                <a class="btn btn-danger btn-thin" href="javascript:void(0)" onclick="onDeleteQueue()">Delete</a>
+                                <a class="btn btn-danger btn-thin" href="javascript:void(0)" onclick="onDeleteQueue()">@Localize("Delete")</a>
                             </td>
                         </tr>
                     </tbody>
@@ -286,7 +292,7 @@
 
     <div class="card shadow-lg mt-2">
         <div class="card-header">
-            <h5>Queue Statistics</h5>
+            <h5>@Localize("Queue Statistics")</h5>
         </div>
         <div class="card-body">
             <canvas id="queueChart" height="50"></canvas>
@@ -295,49 +301,49 @@
                     <thead>
                         <tr>
                             <th class="text-end">
-                                Subscribers
+                                @Localize("Subscribers")
                                 <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
-                                   title="Current number of subscribers to the queue."></i>
+                                   title="@Localize("Current number of subscribers to the queue.")"></i>
                             </th>
                             <th class="text-end">
-                                Depth
+                                @Localize("Depth")
                                 <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
-                                   title="Current number of messages in the queue."></i>
+                                   title="@Localize("Current number of messages in the queue.")"></i>
                             </th>
                             <th class="text-end">
-                                Outstanding
+                                @Localize("Outstanding")
                                 <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
-                                   title="Current number of messages that are out-for-delivery. These messages have been dispatched and are awaiting a disposition from a subscriber."></i>
+                                   title="@Localize("Current number of messages that are out-for-delivery. These messages have been dispatched and are awaiting a disposition from a subscriber.")"></i>
                             </th>
                             <th class="text-end">
-                                Received
+                                @Localize("Received")
                                 <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
-                                   title="Cumulative number of messages that have been received into the queue."></i>
+                                   title="@Localize("Cumulative number of messages that have been received into the queue.")"></i>
                             </th>
                             <th class="text-end">
-                                Delivered
+                                @Localize("Delivered")
                                 <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
-                                   title="Cumulative number of messages that have been delivered to subscribers from the queue."></i>
+                                   title="@Localize("Cumulative number of messages that have been delivered to subscribers from the queue.")"></i>
                             </th>
                             <th class="text-end">
-                                Deferred
+                                @Localize("Deferred")
                                 <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
-                                   title="Cumulative number of messages that have been delivered to subscribers where the subscriber requested that the message be redelivered at a later time."></i>
+                                   title="@Localize("Cumulative number of messages that have been delivered to subscribers where the subscriber requested that the message be redelivered at a later time.")"></i>
                             </th>
                             <th class="text-end">
-                                Expired
+                                @Localize("Expired")
                                 <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
-                                   title="Cumulative number of messages that have expired while waiting to be delivered. Depending on the configuration, these messages are either discarded or moved to the dead-letter-queue."></i>
+                                   title="@Localize("Cumulative number of messages that have expired while waiting to be delivered. Depending on the configuration, these messages are either discarded or moved to the dead-letter-queue.")"></i>
                             </th>
                             <th class="text-end">
-                                Delivery Failures
+                                @Localize("Delivery Failures")
                                 <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
-                                   title="Cumulative number of messages where delivery attempts resulted in an exception."></i>
+                                   title="@Localize("Cumulative number of messages where delivery attempts resulted in an exception.")"></i>
                             </th>
 
-                            <th class="text-end">Action
+                            <th class="text-end">@Localize("Action")
                                 <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
-                                   title="Actions that can be performed on the queue messages."></i>
+                                   title="@Localize("Actions that can be performed on the queue messages.")"></i>
                             </th>
                         </tr>
                     </thead>
@@ -352,7 +358,7 @@
                             <td class="text-end" id="q-expiredMessageCount">...</td>
                             <td class="text-end" id="q-failedDeliveryCount">...</td>
                             <td class="text-end">
-                                <a class="btn btn-danger btn-thin" href="javascript:void(0)" onclick="onPurgeQueue()">Purge</a>
+                                <a class="btn btn-danger btn-thin" href="javascript:void(0)" onclick="onPurgeQueue()">@Localize("Purge")</a>
                             </td>
                         </tr>
                     </tbody>
@@ -363,41 +369,41 @@
 
     <div class="card shadow-lg mt-2">
         <div class="card-header">
-            <h5>Subscribers</h5>
+            <h5>@Localize("Subscribers")</h5>
         </div>
         <div class="card-body">
             <div class="table-responsive shadow-lg">
                 <table class="table table-striped table-bordered my-0 mx-0">
                     <thead>
                         <tr>
-                            <th>SubscriberId
+                            <th>@Localize("SubscriberId")
                                 <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
-                                   title="Unique identifier associated with the subscriber. This id changes each time the subscriber resubscribes to the queue."></i>
+                                   title="@Localize("Unique identifier associated with the subscriber. This id changes each time the subscriber resubscribes to the queue.")"></i>
                             </th>
-                            <th>Address</th>
-                            <th class="text-end">Attempts
+                            <th>@Localize("Address")</th>
+                            <th class="text-end">@Localize("Attempts")
                                 <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
-                                   title="Cumulative number of attempts that have been made to deliver messages to this subscriber."></i>
+                                   title="@Localize("Cumulative number of attempts that have been made to deliver messages to this subscriber.")"></i>
                             </th>
-                            <th class="text-end">Successful
+                            <th class="text-end">@Localize("Successful")
                                 <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
-                                   title="Cumulative number of successful delivery attempts that have been made to this subscriber."></i>
+                                   title="@Localize("Cumulative number of successful delivery attempts that have been made to this subscriber.")"></i>
                             </th>
-                            <th class="text-end">Deferred
+                            <th class="text-end">@Localize("Deferred")
                                 <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
-                                   title="Cumulative number of deliveries that have been made to this subscriber where the subscriber requested that the message be redelivered at a later time."></i>
+                                   title="@Localize("Cumulative number of deliveries that have been made to this subscriber where the subscriber requested that the message be redelivered at a later time.")"></i>
                             </th>
-                            <th class="text-end">Consumed
+                            <th class="text-end">@Localize("Consumed")
                                 <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
-                                   title="Cumulative number of deliveries that have been made to this subscriber that resulted in a consumption of the message."></i>
+                                   title="@Localize("Cumulative number of deliveries that have been made to this subscriber that resulted in a consumption of the message.")"></i>
                             </th>
-                            <th class="text-end">Delivery Failures
+                            <th class="text-end">@Localize("Delivery Failures")
                                 <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
-                                   title="Cumulative number of delivery attempts that have been made to this subscriber that resulted in an exception."></i>
+                                   title="@Localize("Cumulative number of delivery attempts that have been made to this subscriber that resulted in an exception.")"></i>
                             </th>
-                            <th class="text-end">Action
+                            <th class="text-end">@Localize("Action")
                                 <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
-                                   title="Actions that can be performed on the subscriber."></i>
+                                   title="@Localize("Actions that can be performed on the subscriber.")"></i>
                             </th>
                         </tr>
                     </thead>

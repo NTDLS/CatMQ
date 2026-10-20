@@ -130,8 +130,68 @@ namespace NTDLS.CatMQ.Client
             SerializationProvider = null;
         }
 
+        private void RegisterSubscription(CMqSubscription subscription)
+        {
+            _subscriptions.Write(s =>
+            {
+                if (s.ContainsKey(subscription.QueueName))
+                {
+                    throw new Exception($"Client is already subscribed to queue [{subscription.QueueName}].");
+                }
+
+                s[subscription.QueueName] = subscription;
+            });
+        }
+
+        /// <summary>
+        /// Removes a subscription that the server did not accept, so the caller can retry.
+        /// </summary>
+        private void DiscardSubscription(CMqSubscription subscription)
+        {
+            _subscriptions.Write(s =>
+            {
+                if (s.TryGetValue(subscription.QueueName, out var existing) && existing.Id == subscription.Id)
+                {
+                    s.Remove(subscription.QueueName);
+                }
+            });
+        }
+
         private void RmClient_OnConnected(RmContext context, bool isReconnect)
-            => OnConnected?.Invoke(this, isReconnect);
+        {
+            if (isReconnect)
+            {
+                //Subscriptions are tied to the server-side connection, so they are lost when the connection drops.
+                //Run on another thread so we do not issue queries from inside the connection callback.
+                Task.Run(RestoreSubscriptions);
+            }
+
+            OnConnected?.Invoke(this, isReconnect);
+        }
+
+        private void RestoreSubscriptions()
+        {
+            try
+            {
+                var queueNames = _subscriptions.Read(s => s.Values.Select(o => o.QueueName).ToList());
+
+                foreach (var queueName in queueNames)
+                {
+                    try
+                    {
+                        _rmClient.Query(new CMqSubscribeToQueueQuery(queueName)).ThrowIfFailed();
+                    }
+                    catch (Exception ex)
+                    {
+                        OnException?.Invoke(this, queueName, ex.GetBaseException());
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                OnException?.Invoke(this, null, ex.GetBaseException());
+            }
+        }
 
         private void RmClient_OnDisconnected(RmContext context)
             => OnDisconnected?.Invoke(this);
@@ -263,19 +323,17 @@ namespace NTDLS.CatMQ.Client
         public async Task<CMqSubscription> SubscribeAsync(string queueName, OnMessageReceived deliveryEvent)
         {
             var subscription = new CMqSubscription(queueName, deliveryEvent);
+            RegisterSubscription(subscription);
 
-            _subscriptions.Write(s =>
+            try
             {
-                if (s.ContainsKey(queueName))
-                {
-                    throw new Exception($"Client is already subscribed to queue [{queueName}].");
-                }
-
-                s[queueName] = subscription;
-            });
-
-            var result = await _rmClient.QueryAsync(new CMqSubscribeToQueueQuery(queueName));
-            result.ThrowIfFailed();
+                (await _rmClient.QueryAsync(new CMqSubscribeToQueueQuery(queueName))).ThrowIfFailed();
+            }
+            catch
+            {
+                DiscardSubscription(subscription);
+                throw;
+            }
 
             return subscription;
         }
@@ -288,18 +346,17 @@ namespace NTDLS.CatMQ.Client
         public CMqSubscription Subscribe(string queueName, OnMessageReceived deliveryEvent)
         {
             var subscription = new CMqSubscription(queueName, deliveryEvent);
+            RegisterSubscription(subscription);
 
-            _subscriptions.Write(s =>
+            try
             {
-                if (s.ContainsKey(queueName))
-                {
-                    throw new Exception($"Client is already subscribed to queue [{queueName}].");
-                }
-
-                s[queueName] = subscription;
-            });
-
-            _rmClient.Query(new CMqSubscribeToQueueQuery(queueName)).ThrowIfFailed();
+                _rmClient.Query(new CMqSubscribeToQueueQuery(queueName)).ThrowIfFailed();
+            }
+            catch
+            {
+                DiscardSubscription(subscription);
+                throw;
+            }
 
             return subscription;
         }
@@ -318,19 +375,17 @@ namespace NTDLS.CatMQ.Client
         public async Task<CMqSubscription> SubscribeBufferedAsync(string queueName, int batchSize, TimeSpan autoFlushInterval, OnBatchReceived batchDeliveryEvent)
         {
             var subscription = new CMqSubscription(queueName, batchSize, autoFlushInterval, batchDeliveryEvent);
+            RegisterSubscription(subscription);
 
-            _subscriptions.Write(s =>
+            try
             {
-                if (s.ContainsKey(queueName))
-                {
-                    throw new Exception($"Client is already subscribed to queue [{queueName}].");
-                }
-
-                s[queueName] = subscription;
-            });
-
-            var result = await _rmClient.QueryAsync(new CMqSubscribeToQueueQuery(queueName));
-            result.ThrowIfFailed();
+                (await _rmClient.QueryAsync(new CMqSubscribeToQueueQuery(queueName))).ThrowIfFailed();
+            }
+            catch
+            {
+                DiscardSubscription(subscription);
+                throw;
+            }
 
             StartBufferedDeliveryTask();
 
@@ -349,18 +404,17 @@ namespace NTDLS.CatMQ.Client
         public CMqSubscription SubscribeBuffered(string queueName, int batchSize, TimeSpan autoFlushInterval, OnBatchReceived batchDeliveryEvent)
         {
             var subscription = new CMqSubscription(queueName, batchSize, autoFlushInterval, batchDeliveryEvent);
+            RegisterSubscription(subscription);
 
-            _subscriptions.Write(s =>
+            try
             {
-                if (s.ContainsKey(queueName))
-                {
-                    throw new Exception($"Client is already subscribed to queue [{queueName}].");
-                }
-
-                s[queueName] = subscription;
-            });
-
-            _rmClient.Query(new CMqSubscribeToQueueQuery(queueName)).ThrowIfFailed();
+                _rmClient.Query(new CMqSubscribeToQueueQuery(queueName)).ThrowIfFailed();
+            }
+            catch
+            {
+                DiscardSubscription(subscription);
+                throw;
+            }
 
             StartBufferedDeliveryTask();
 
@@ -371,11 +425,15 @@ namespace NTDLS.CatMQ.Client
         {
             try
             {
-                if (_bufferedDeliveryTask == null)
+                //The task exits when the client is explicitly disconnected, so restart it if the client has since been reconnected.
+                if (_bufferedDeliveryTask == null || _bufferedDeliveryTask.IsCompleted)
                 {
                     lock (this)
                     {
-                        _bufferedDeliveryTask ??= Task.Run(BufferedDeliveryTaskProc);
+                        if (_bufferedDeliveryTask == null || _bufferedDeliveryTask.IsCompleted)
+                        {
+                            _bufferedDeliveryTask = Task.Run(BufferedDeliveryTaskProc);
+                        }
                     }
                 }
             }
@@ -430,11 +488,12 @@ namespace NTDLS.CatMQ.Client
         }
 
         /// <summary>
-        /// Flush the entire message buffer to the subscribed event.
+        /// Flushes the message buffers to the subscribed batch events.
         /// </summary>
-        /// <param name="ensureEmpty">Whether or not to continue until the message buffer is empty.
-        /// We do this because we *typically* allow failure-to-lock to defer the event.</param>
-        private void FlushBufferedMessages(bool ensureEmpty)
+        /// <param name="force">When true, every buffered message is delivered regardless of batch size or flush interval,
+        /// and the call does not return until the buffers have been flushed. We do this because we *typically*
+        /// allow failure-to-lock to defer the event.</param>
+        private void FlushBufferedMessages(bool force)
         {
             try
             {
@@ -455,30 +514,62 @@ namespace NTDLS.CatMQ.Client
                         {
                             foreach (var subscription in s.Values)
                             {
-                                foreach (var messageBuffer in mb)
+                                //Each subscription only ever flushes its own buffer.
+                                if (subscription.BatchSize == null || !mb.TryGetValue(subscription.Id, out var buffered))
                                 {
-                                    if (messageBuffer.Value.Count == 0)
-                                    {
-                                        subscription.LastBufferFlushed = DateTime.UtcNow;
-                                    }
-                                    else if (messageBuffer.Value.Count >= subscription.BatchSize
-                                        || (subscription.AutoFlushInterval != TimeSpan.Zero
-                                        && (DateTime.UtcNow - subscription.LastBufferFlushed) >= subscription.AutoFlushInterval))
-                                    {
-                                        if (messageBuffer.Key == subscription.Id)
-                                        {
-                                            var bufferedValueClone = messageBuffer.Value.ToList();
-                                            Task.Run(() => subscription.BatchDeliveryEvent?.Invoke(this, bufferedValueClone));
-                                            messageBuffer.Value.Clear();
-                                        }
+                                    continue;
+                                }
 
-                                        subscription.LastBufferFlushed = DateTime.UtcNow;
+                                var now = DateTime.UtcNow;
+
+                                if (buffered.Count == 0)
+                                {
+                                    subscription.LastBufferFlushed = now;
+                                    continue;
+                                }
+
+                                var batchSize = Math.Max(1, subscription.BatchSize ?? 1);
+                                var intervalElapsed = subscription.AutoFlushInterval != TimeSpan.Zero
+                                    && (now - subscription.LastBufferFlushed) >= subscription.AutoFlushInterval;
+
+                                //Full batches are always delivered. A partial batch is only delivered when
+                                //  the flush interval has elapsed or when we are flushing everything.
+                                while (buffered.Count >= batchSize || (buffered.Count > 0 && (force || intervalElapsed)))
+                                {
+                                    var batch = buffered.Take(batchSize).ToList();
+                                    buffered.RemoveRange(0, batch.Count);
+                                    subscription.LastBufferFlushed = now;
+
+                                    void DeliverBatch()
+                                    {
+                                        try
+                                        {
+                                            subscription.BatchDeliveryEvent?.Invoke(this, batch);
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            OnException?.Invoke(this, subscription.QueueName, ex.GetBaseException());
+                                        }
+                                    }
+
+                                    if (force)
+                                    {
+                                        DeliverBatch(); //We are shutting down, so deliver before returning.
+                                    }
+                                    else
+                                    {
+                                        Task.Run(DeliverBatch);
                                     }
                                 }
                             }
                         }) && success;
                     }) && success;
-                } while (!success && ensureEmpty);
+
+                    if (!success && force)
+                    {
+                        Thread.Sleep(1);
+                    }
+                } while (!success && force);
             }
             catch (Exception ex)
             {

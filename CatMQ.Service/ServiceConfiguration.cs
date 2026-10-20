@@ -24,7 +24,7 @@ namespace CatMQ.Service
         /// </summary>
         public bool EnableWebUI { get; set; } = true;
 
-        [Required(ErrorMessage = "Data Path is required.")]
+        [LocalizedRequired("Data Path")]
         public string DataPath
         {
             get
@@ -53,41 +53,41 @@ namespace CatMQ.Service
         /// <summary>
         /// The port which the queue service will listen on.
         /// </summary>
-        [Required(ErrorMessage = "Queue Port is required.")]
-        [Range(1, 65535, ErrorMessage = "Queue Port must be between 1 and 65,535.")]
+        [LocalizedRequired("Queue Port")]
+        [LocalizedRange("Queue Port", 1, 65535)]
         public int QueuePort { get; set; } = CMqDefaults.DEFAULT_LISTEN_PORT;
 
-        [Required(ErrorMessage = "Web UI URL is required.")]
+        [LocalizedRequired("Web UI Binding")]
         public string? WebListenURL { get; set; } = "http://*:45783";
 
         /// <summary>
         /// The default amount of time to wait for a query to reply before throwing a timeout exception.
         /// </summary>
-        [Required(ErrorMessage = "Query Timeout Seconds is required.")]
-        [Range(1, 3600, ErrorMessage = "Query Timeout Seconds must be between 1 and 3,600.")]
+        [LocalizedRequired("Query Timeout (s)")]
+        [LocalizedRange("Query Timeout (s)", 1, 3600)]
         public int AcknowledgmentTimeoutSeconds { get; set; } = CMqDefaults.DEFAULT_ACK_TIMEOUT_SECONDS;
 
         /// <summary>
         /// The initial size in bytes of the receive buffer.
         /// If the buffer ever gets full while receiving data it will be automatically resized up to MaxReceiveBufferSize.
         /// </summary>
-        [Required(ErrorMessage = "Initial Receive Buffer Size is required.")]
-        [Range(1024, 1048576, ErrorMessage = "Initial Receive Buffer Size must be between 1 and 1,048,576.")]
+        [LocalizedRequired("Initial Receive Buffer Size (bytes)")]
+        [LocalizedRange("Initial Receive Buffer Size (bytes)", 1024, 1048576)]
         public int InitialReceiveBufferSize { get; set; } = CMqDefaults.DEFAULT_INITIAL_BUFFER_SIZE;
 
         /// <summary>
         ///The maximum size in bytes of the receive buffer.
         ///If the buffer ever gets full while receiving data it will be automatically resized up to MaxReceiveBufferSize.
         /// </summary>
-        [Required(ErrorMessage = "Max Receive Buffer Size is required.")]
-        [Range(1, 16777216, ErrorMessage = "Max Receive Buffer Size must be between 1 and 16,777,216.")]
+        [LocalizedRequired("Max Receive Buffer Size (bytes)")]
+        [LocalizedRange("Max Receive Buffer Size (bytes)", 1, 16777216)]
         public int MaxReceiveBufferSize { get; set; } = CMqDefaults.DEFAULT_MAX_BUFFER_SIZE;
 
         /// <summary>
         ///The growth rate of the auto-resizing for the receive buffer.
         /// </summary>
-        [Required(ErrorMessage = "Receive Buffer Growth Rate is required.")]
-        [Range(0.1, 2, ErrorMessage = "Receive Buffer Growth Rate must be between 0.1 and 2.0.")]
+        [LocalizedRequired("Receive Buffer Growth Rate (decimal %)")]
+        [LocalizedRange("Receive Buffer Growth Rate (decimal %)", 0.1, 2)]
         public double ReceiveBufferGrowthRate { get; set; } = CMqDefaults.DEFAULT_BUFFER_GROWTH_RATE;
     }
 }
