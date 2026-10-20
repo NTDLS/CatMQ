@@ -19,6 +19,6 @@ namespace CatMQ.Service
         : RangeAttribute(minimum, maximum)
     {
         public override string FormatErrorMessage(string name)
-            => Localize("{0} must be between {1:#,0.###} and {2:#,0.###}.", Localize(displayName), minimum, maximum);
+            => Localize("{0} must be between {1:#,0.###} and {2:#,0.###}.", Localize(displayName), Minimum, Maximum);
     }
 }
