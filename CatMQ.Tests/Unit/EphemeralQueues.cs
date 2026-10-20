@@ -1,4 +1,4 @@
-using CatMQ.Tests.Messages;
+﻿using CatMQ.Tests.Messages;
 using NTDLS.CatMQ.Client;
 using NTDLS.CatMQ.Shared;
 using System.Collections.Concurrent;
@@ -223,6 +223,10 @@ namespace CatMQ.Tests.Unit
 
             Assert.Empty(messages);
 
+            //The subscriber has replied "dead-letter" for every message, but the server moves them to the dead-letter queue
+            //  afterwards, so wait for that to finish instead of counting the instant the last reply arrives.
+            Assert.True(Wait.Until(() => fixture.Server.GetQueueMessages($"{queueName}.dlq", 0, int.MaxValue)?.Count == enqueuedCount, 30));
+
             //Make sure the dead-letter queue has the same number of messages as the original queue.
             var deadLetterMessages = fixture.Server.GetQueueMessages($"{queueName}.dlq", 0, int.MaxValue);
             Assert.NotNull(deadLetterMessages);
@@ -320,8 +324,9 @@ namespace CatMQ.Tests.Unit
                 enqueuedCount++;
             }
 
-            //Give the messages time to expire.
-            Thread.Sleep((int)(maxMessageAge + TimeSpan.FromSeconds(1)).TotalMilliseconds);
+            //Give the messages time to expire. Expiration is checked by the delivery thread, so wait for it rather than guessing how long it takes.
+            //The expired count goes up when a message is flagged, and the message is removed just after, so wait for both.
+            Assert.True(Wait.Until(() => fixture.Server.GetQueue(queueName) is { QueueDepth: 0 } queued && queued.ExpiredMessageCount == (ulong)enqueuedCount, 30));
 
             //Make sure the queue is empty.
             var messages = fixture.Server.GetQueueMessages(queueName, 0, int.MaxValue);
@@ -399,7 +404,9 @@ namespace CatMQ.Tests.Unit
                 publisher.Enqueue(queueName, new KeyValueMessage(i, $"Value:{i}"));
             }
 
-            Thread.Sleep(2000); // Allow time for processing
+            // Allow time for processing.
+            Assert.True(Wait.Until(() => Volatile.Read(ref receivedByClient1) + Volatile.Read(ref receivedByClient2) >= messageCount, 30));
+            Thread.Sleep(200); //Let any stragglers (which would be a failure) show up.
 
             Assert.True(receivedByClient1 > 0);
             Assert.True(receivedByClient2 > 0);
