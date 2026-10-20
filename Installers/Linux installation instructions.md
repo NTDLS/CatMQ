@@ -3,18 +3,16 @@
 - Connect to the Linux server with your favorite SSH client. I'm using Putty.
 - You can get the IP address of the Linux machine via ```ip addr show```
 
-- Install .net
-```
-sudo add-apt-repository ppa:dotnet/backports
-sudo apt update
-sudo apt-get install -y aspnetcore-runtime-9.0
-```
+- The Linux builds are self contained (they carry their own .NET runtime), so .NET does not need to be installed.
+  Use the `x64` or the `arm64` zip to match the machine (`uname -m` says `x86_64` or `aarch64`).
 
 - Install unzip
   > sudo apt install unzip
 
 - Download CatMQ (be sure to change the URL for the version you want to install)
   > wget https://github.com/NTDLS/CatMQ/releases/download/2.3.0/CatMQ.linux.x64.zip
+  >
+  > (or `CatMQ.linux.arm64.zip` for ARM machines such as a Raspberry Pi or Graviton)
 
 - Extract files
   > unzip CatMQ.linux.x64.zip -d CatMQ
@@ -48,11 +46,6 @@ sudo apt-get install -y aspnetcore-runtime-9.0
   - Restart the ssh service.
       > sudo systemctl restart ssh
 
-  - Install .net
-    - >sudo add-apt-repository ppa:dotnet/backports
-    - > sudo apt update
-    - > sudo apt-get install -y aspnetcore-runtime-9.0
-    - > (NOT NEEDED BUR DOCUMENTING HERE) sudo apt-get install -y dotnet-runtime-9.0 (THIS IS NT
 
 - Linux
   - Install unzip
