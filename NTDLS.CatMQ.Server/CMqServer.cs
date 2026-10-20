@@ -523,6 +523,7 @@ namespace NTDLS.CatMQ.Server
                                     {
                                         result.Add(new CMqEnqueuedMessageDescriptor(message.SerialNumber)
                                         {
+                                            MessageId = message.MessageId,
                                             Timestamp = message.Timestamp,
                                             SubscriberCount = sKVP.Count,
                                             DeferredUntil = message.DeferredUntil,
@@ -555,6 +556,7 @@ namespace NTDLS.CatMQ.Server
                                         {
                                             result.Add(new CMqEnqueuedMessageDescriptor(persistedMessage.SerialNumber)
                                             {
+                                                MessageId = persistedMessage.MessageId,
                                                 Timestamp = persistedMessage.Timestamp,
                                                 SubscriberCount = sKVP.Count,
                                                 DeferredUntil = persistedMessage.DeferredUntil,
@@ -631,6 +633,7 @@ namespace NTDLS.CatMQ.Server
 
                                 result = new CMqEnqueuedMessageDescriptor(message.SerialNumber)
                                 {
+                                    MessageId = message.MessageId,
                                     Timestamp = message.Timestamp,
                                     SubscriberMessageDeliveries = message.SubscriberMessageDeliveries.Keys.ToHashSet(),
                                     SatisfiedSubscribersSubscriberIDs = message.SatisfiedDeliverySubscriberIDs,
@@ -652,6 +655,7 @@ namespace NTDLS.CatMQ.Server
 
                                 result = new CMqEnqueuedMessageDescriptor(persistedMessage.SerialNumber)
                                 {
+                                    MessageId = persistedMessage.MessageId,
                                     Timestamp = persistedMessage.Timestamp,
                                     SubscriberMessageDeliveries = persistedMessage.SubscriberMessageDeliveries.Keys.ToHashSet(),
                                     SatisfiedSubscribersSubscriberIDs = persistedMessage.SatisfiedDeliverySubscriberIDs,
@@ -970,6 +974,7 @@ namespace NTDLS.CatMQ.Server
             var message = new CMqMessageDeliveryQuery(queueName, enqueuedMessage.SerialNumber,
                 enqueuedMessage.AssemblyQualifiedTypeName, enqueuedMessage.MessageJson)
             {
+                MessageId = enqueuedMessage.MessageId,
                 Timestamp = enqueuedMessage.Timestamp,
                 DeferDuration = enqueuedMessage.DeferDuration,
                 DeferredCount = enqueuedMessage.DeferredCount,
@@ -1294,6 +1299,7 @@ namespace NTDLS.CatMQ.Server
 
                                 var message = new EnqueuedMessage(messageQueue.Configuration.QueueName, assemblyQualifiedTypeName, messageJson, messageQueue.Statistics.GetNextSerialNumber())
                                 {
+                                    MessageId = Guid.NewGuid(),
                                     DeferDuration = deferDeliveryDuration,
                                     DeferredUntil = deferDeliveryDuration == null ? null : DateTime.UtcNow + deferDeliveryDuration
                                 };
@@ -1326,6 +1332,7 @@ namespace NTDLS.CatMQ.Server
 
                                 var message = new EnqueuedMessage(messageQueue.Configuration.QueueName, assemblyQualifiedTypeName, messageJson, messageQueue.Statistics.GetNextSerialNumber())
                                 {
+                                    MessageId = Guid.NewGuid(),
                                     DeferDuration = deferDeliveryDuration,
                                     DeferredUntil = deferDeliveryDuration == null ? null : DateTime.UtcNow + deferDeliveryDuration
                                 };

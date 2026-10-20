@@ -553,6 +553,14 @@ namespace NTDLS.CatMQ.Server.Server
                         var persistedMessage = JsonSerializer.Deserialize<EnqueuedMessage>(json);
                         if (persistedMessage != null)
                         {
+                            if (persistedMessage.MessageId == Guid.Empty)
+                            {
+                                //Persisted by a version that did not assign message IDs. Give it one and write it
+                                //  back so that it keeps the same ID if it is redelivered after another restart.
+                                persistedMessage.MessageId = Guid.NewGuid();
+                                m.Database.Store(persistedMessage);
+                            }
+
                             m.MessageBuffer.Add(persistedMessage);
                             messagesLoaded++;
                         }

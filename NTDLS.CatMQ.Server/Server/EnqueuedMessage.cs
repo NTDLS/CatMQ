@@ -22,6 +22,13 @@ namespace NTDLS.CatMQ.Server.Server
         public ulong SerialNumber { get; set; } = serialNumber;
 
         /// <summary>
+        /// The globally unique ID of the message. It is assigned when the message is enqueued, survives restarts and is kept when the message is dead-lettered,
+        /// so that subscribers can use it to detect a message that they have already handled. Guid.Empty only for messages persisted by older versions,
+        /// which are given an ID when they are loaded.
+        /// </summary>
+        public Guid MessageId { get; set; } = Guid.Empty;
+
+        /// <summary>
         /// The UTC date and time when the message was enqueued.
         /// </summary>
         public DateTime Timestamp { get; set; } = DateTime.UtcNow;
@@ -79,6 +86,7 @@ namespace NTDLS.CatMQ.Server.Server
         {
             return new EnqueuedMessage(queueName, AssemblyQualifiedTypeName, MessageJson, serialNumber)
             {
+                MessageId = MessageId,
                 Timestamp = Timestamp,
                 DeferredCount = DeferredCount
             };

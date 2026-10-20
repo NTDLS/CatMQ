@@ -11,6 +11,11 @@
         public ulong SerialNumber { get; internal set; } = serialNumber;
 
         /// <summary>
+        /// The globally unique ID of the message.
+        /// </summary>
+        public Guid MessageId { get; internal set; }
+
+        /// <summary>
         /// The UTC date and time when the message was enqueued.
         /// </summary>
         public DateTime Timestamp { get; internal set; } = DateTime.UtcNow;

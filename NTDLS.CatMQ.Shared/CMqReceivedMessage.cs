@@ -31,6 +31,11 @@
         public ulong SerialNumber { get; set; } = serialNumber;
 
         /// <summary>
+        /// The globally unique ID of the message. It does not change when the message is redelivered, so it can be used to detect a message that was already handled.
+        /// </summary>
+        public Guid MessageId { get; set; }
+
+        /// <summary>
         /// The UTC date and time when the message was enqueued.
         /// </summary>
         public DateTime Timestamp { get; set; }
