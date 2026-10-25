@@ -98,3 +98,5 @@ Test.QueueClientAutoReconnect/obj/
 Test.QueueClientAutoReconnect/bin/
 
 Installers/publish/
+
+Installers/packages/

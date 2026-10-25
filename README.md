@@ -106,6 +106,16 @@ private static CMqConsumeResult OnMessageReceived(CMqClient client, CMqReceivedM
 }
 ```
 
+If the handler awaits I/O (database calls, HTTP, etc.), subscribe with an asynchronous handler instead. No thread is held while it is pending,
+so slow handlers cannot starve the thread-pool. Avoid blocking on tasks (.Result, .Wait()) inside a synchronous handler for the same reason.
+```csharp
+client.Subscribe("MyFirstQueue", async (client, rawMessage) =>
+{
+    await SaveToDatabaseAsync(rawMessage.Deserialize());
+    return CMqConsumeResult.Consumed();
+});
+```
+
 
 ## Web API
 When enabled, CatMQ also allows managing queues by the way of Web API, you'll first need to login to the web management UI, create a user and generate a API key. This API key will need to be passed in the "x-catmq-api-Key" header value.

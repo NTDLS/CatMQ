@@ -9,6 +9,13 @@ namespace NTDLS.CatMQ.Client
     public delegate CMqConsumeResult OnMessageReceived(CMqClient client, CMqReceivedMessage rawMessage);
 
     /// <summary>
+    /// Delegate used for asynchronous server-to-client delivery notifications containing raw JSON.
+    /// No thread is held while the returned task is pending, so use this when the handler awaits I/O.
+    /// </summary>
+    /// <returns>The disposition of the message, which is returned to the server once the task completes.</returns>
+    public delegate Task<CMqConsumeResult> OnMessageReceivedAsync(CMqClient client, CMqReceivedMessage rawMessage);
+
+    /// <summary>
     /// Delegate used for server-to-client delivery notifications containing raw JSON.
     /// </summary>
     public delegate void OnBatchReceived(CMqClient client, List<CMqReceivedMessage> rawMessages);

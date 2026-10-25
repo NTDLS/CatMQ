@@ -21,6 +21,11 @@
         public OnMessageReceived? DeliveryEvent { get; internal set; }
 
         /// <summary>
+        /// Asynchronous function that is called when a message is received for this subscription.
+        /// </summary>
+        public OnMessageReceivedAsync? AsyncDeliveryEvent { get; internal set; }
+
+        /// <summary>
         /// For buffered subscriptions, this is the number of messages that the client will attempt to honor.
         /// </summary>
         public int? BatchSize { get; private set; }
@@ -41,6 +46,12 @@
         {
             QueueName = queueName;
             DeliveryEvent = deliveryEvent;
+        }
+
+        internal CMqSubscription(string queueName, OnMessageReceivedAsync asyncDeliveryEvent)
+        {
+            QueueName = queueName;
+            AsyncDeliveryEvent = asyncDeliveryEvent;
         }
 
         internal CMqSubscription(string queueName, int bufferSize, TimeSpan autoFlushInterval, OnBatchReceived batchDeliveryEvent)

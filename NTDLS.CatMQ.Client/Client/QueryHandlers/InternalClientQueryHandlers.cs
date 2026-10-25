@@ -9,8 +9,9 @@ namespace NTDLS.CatMQ.Client.Client.QueryHandlers
     {
         /// <summary>
         /// The client has received a message from the server which needs to be consumed.
+        /// This is asynchronous so that asynchronous subscription handlers do not hold a thread while they are pending.
         /// </summary>
-        public CMqMessageDeliveryQueryReply MessageDeliveryQuery(RmContext context, CMqMessageDeliveryQuery param)
+        public async Task<CMqMessageDeliveryQueryReply> MessageDeliveryQuery(RmContext context, CMqMessageDeliveryQuery param)
         {
             try
             {
@@ -24,7 +25,7 @@ namespace NTDLS.CatMQ.Client.Client.QueryHandlers
                     SatisfiedSubscriberCount = param.SatisfiedSubscriberCount,
                     FailedSubscriberCount = param.FailedSubscriberCount
                 };
-                var messageDisposition = mqClient.InvokeOnReceived(mqClient, message);
+                var messageDisposition = await mqClient.InvokeOnReceivedAsync(mqClient, message);
                 return new CMqMessageDeliveryQueryReply(messageDisposition);
             }
             catch (Exception ex)

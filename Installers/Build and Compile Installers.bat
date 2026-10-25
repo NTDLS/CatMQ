@@ -4,9 +4,15 @@ set path=%path%;C:\Program Files (x86)\Inno Setup 6\;
 
 rd publish /q /s
 rd output /q /s
+rd packages /q /s
 
 md output
 md publish
+md packages
+
+dotnet pack ..\NTDLS.CatMQ.Server -c Release -o ".\packages"
+dotnet pack ..\NTDLS.CatMQ.Shared -c Release -o ".\packages"
+dotnet pack ..\NTDLS.CatMQ.Client -c Release -o ".\packages"
 
 dotnet publish ..\CatMQ.Service -c Release -o publish\win-x64 --runtime win-x64 --self-contained false -f net10.0
 del publish\win-x64\*.pdb /q

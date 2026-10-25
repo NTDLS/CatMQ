@@ -470,7 +470,7 @@ namespace CatMQ.Tests.Unit
             int receivedCount = 0;
 
             var tempClient = ClientFactory.CreateAndConnect();
-            tempClient.Subscribe(queueName, (_, _) =>
+            tempClient.Subscribe(queueName, CMqConsumeResult (_, _) =>
             {
                 Interlocked.Increment(ref receivedCount);
                 throw new Exception("Some error");

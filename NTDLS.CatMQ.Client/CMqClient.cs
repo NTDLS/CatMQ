@@ -196,7 +196,7 @@ namespace NTDLS.CatMQ.Client
         private void RmClient_OnDisconnected(RmContext context)
             => OnDisconnected?.Invoke(this);
 
-        internal CMqConsumeResult InvokeOnReceived(CMqClient client, CMqReceivedMessage message)
+        internal Task<CMqConsumeResult> InvokeOnReceivedAsync(CMqClient client, CMqReceivedMessage message)
         {
             var subscriptionHandler = _subscriptions.Read(s =>
             {
@@ -224,16 +224,20 @@ namespace NTDLS.CatMQ.Client
                         }
                     });
 
-                    return new CMqConsumeResult(CMqConsumptionDisposition.Consumed);
+                    return Task.FromResult(new CMqConsumeResult(CMqConsumptionDisposition.Consumed));
                 }
                 //If the message is not buffered, invoke the delivery event and return the result to the server.
+                else if (subscriptionHandler.AsyncDeliveryEvent != null)
+                {
+                    return subscriptionHandler.AsyncDeliveryEvent.Invoke(client, message);
+                }
                 else if (subscriptionHandler.DeliveryEvent != null)
                 {
-                    return subscriptionHandler.DeliveryEvent.Invoke(client, message);
+                    return Task.FromResult(subscriptionHandler.DeliveryEvent.Invoke(client, message));
                 }
             }
 
-            return new CMqConsumeResult(CMqConsumptionDisposition.NotInterested);
+            return Task.FromResult(new CMqConsumeResult(CMqConsumptionDisposition.NotInterested));
         }
 
         internal void InvokeOnException(CMqClient client, string? queueName, Exception ex)
@@ -320,14 +324,40 @@ namespace NTDLS.CatMQ.Client
         /// </summary>
         /// <param name="queueName">Queue name to subscribe to.</param>
         /// <param name="deliveryEvent">Delegate function to call for each message.</param>
-        public async Task<CMqSubscription> SubscribeAsync(string queueName, OnMessageReceived deliveryEvent)
+        public Task<CMqSubscription> SubscribeAsync(string queueName, OnMessageReceived deliveryEvent)
+            => SubscribeAsync(new CMqSubscription(queueName, deliveryEvent));
+
+        /// <summary>
+        /// Instructs the server to notify the client of messages sent to the given queue.
+        /// </summary>
+        /// <param name="queueName">Queue name to subscribe to.</param>
+        /// <param name="deliveryEvent">Asynchronous delegate function to call for each message. No thread is held while it is pending.</param>
+        public Task<CMqSubscription> SubscribeAsync(string queueName, OnMessageReceivedAsync deliveryEvent)
+            => SubscribeAsync(new CMqSubscription(queueName, deliveryEvent));
+
+        /// <summary>
+        /// Instructs the server to notify the client of messages sent to the given queue.
+        /// </summary>
+        /// <param name="queueName">Queue name to subscribe to.</param>
+        /// <param name="deliveryEvent">Delegate function to call for each message.</param>
+        public CMqSubscription Subscribe(string queueName, OnMessageReceived deliveryEvent)
+            => Subscribe(new CMqSubscription(queueName, deliveryEvent));
+
+        /// <summary>
+        /// Instructs the server to notify the client of messages sent to the given queue.
+        /// </summary>
+        /// <param name="queueName">Queue name to subscribe to.</param>
+        /// <param name="deliveryEvent">Asynchronous delegate function to call for each message. No thread is held while it is pending.</param>
+        public CMqSubscription Subscribe(string queueName, OnMessageReceivedAsync deliveryEvent)
+            => Subscribe(new CMqSubscription(queueName, deliveryEvent));
+
+        private async Task<CMqSubscription> SubscribeAsync(CMqSubscription subscription)
         {
-            var subscription = new CMqSubscription(queueName, deliveryEvent);
             RegisterSubscription(subscription);
 
             try
             {
-                (await _rmClient.QueryAsync(new CMqSubscribeToQueueQuery(queueName))).ThrowIfFailed();
+                (await _rmClient.QueryAsync(new CMqSubscribeToQueueQuery(subscription.QueueName))).ThrowIfFailed();
             }
             catch
             {
@@ -338,19 +368,13 @@ namespace NTDLS.CatMQ.Client
             return subscription;
         }
 
-        /// <summary>
-        /// Instructs the server to notify the client of messages sent to the given queue.
-        /// </summary>
-        /// <param name="queueName">Queue name to subscribe to.</param>
-        /// <param name="deliveryEvent">Delegate function to call for each message.</param>
-        public CMqSubscription Subscribe(string queueName, OnMessageReceived deliveryEvent)
+        private CMqSubscription Subscribe(CMqSubscription subscription)
         {
-            var subscription = new CMqSubscription(queueName, deliveryEvent);
             RegisterSubscription(subscription);
 
             try
             {
-                _rmClient.Query(new CMqSubscribeToQueueQuery(queueName)).ThrowIfFailed();
+                _rmClient.Query(new CMqSubscribeToQueueQuery(subscription.QueueName)).ThrowIfFailed();
             }
             catch
             {
