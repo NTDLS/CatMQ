@@ -979,27 +979,12 @@ namespace NTDLS.CatMQ.Server
         }
 
         /// <summary>
-        /// Deliver a message from a server queue to a subscribed client.
+        /// Sends a message delivery to a client connected with the native TCP protocol and waits for its response.
         /// </summary>
-        internal async Task<CMqConsumeResult> DeliverMessageWithResultAsync(Guid subscriberId, string queueName, EnqueuedMessage enqueuedMessage)
+        internal async Task<CMqConsumeResult> QueryConnectionAsync(Guid connectionId, CMqMessageDeliveryQuery message)
         {
-            var message = new CMqMessageDeliveryQuery(queueName, enqueuedMessage.SerialNumber,
-                enqueuedMessage.MessageType, enqueuedMessage.Body)
-            {
-                MessageId = enqueuedMessage.MessageId,
-                ContentType = enqueuedMessage.ContentType,
-                Headers = enqueuedMessage.Headers,
-                BodyIsBase64 = enqueuedMessage.BodyIsBase64,
-                Timestamp = enqueuedMessage.Timestamp,
-                DeferDuration = enqueuedMessage.DeferDuration,
-                DeferredCount = enqueuedMessage.DeferredCount,
-                SubscriberDeliveryCount = enqueuedMessage.SubscriberMessageDeliveries.Count,
-                SatisfiedSubscriberCount = enqueuedMessage.SatisfiedDeliverySubscriberIDs.Count,
-                FailedSubscriberCount = enqueuedMessage.DeliveryLimitReachedSubscriberIDs.Count
-            };
-
             var ticketDeliverMessageWithResult = Instrumentation?.CreateTicket(CMqInstrumentationEventType.DeliverMessageWithResult);
-            var result = await _rmServer.QueryAsync(subscriberId, message);
+            var result = await _rmServer.QueryAsync(connectionId, message);
             ticketDeliverMessageWithResult?.Accumulate();
 
             result.ThrowIfFailed();
@@ -1237,7 +1222,33 @@ namespace NTDLS.CatMQ.Server
         /// </summary>
         internal void Subscribe(Guid subscriberId, IPEndPoint? localEndpoint, IPEndPoint? remoteEndpoint, string queueName, string? consumerName = null, TimeSpan? timeout = null)
         {
-            OnLog?.Invoke(this, CMqErrorLevel.Verbose, $"Subscribing connection [{subscriberId}] to queue: [{queueName}].");
+            AddSubscriber(queueName, new CMqSubscriberDescriptor(subscriberId, new TcpDeliveryTransport(this, subscriberId), consumerName)
+            {
+                LocalAddress = localEndpoint?.Address?.ToString(),
+                RemoteAddress = remoteEndpoint?.Address?.ToString(),
+                LocalPort = localEndpoint?.Port,
+                RemotePort = remoteEndpoint?.Port
+            }, timeout);
+        }
+
+        /// <summary>
+        /// Adds a consumer that receives messages through the given transport rather than through a TCP connection.
+        /// Consumers that share a name compete for messages, including those connected with the native TCP protocol.
+        /// </summary>
+        /// <returns>The subscriber ID, which removes the consumer when it is passed to Unsubscribe.</returns>
+        public Guid AddConsumer(string queueName, string consumerName, ICMqDeliveryTransport transport, TimeSpan? timeout = null)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(consumerName);
+            ArgumentNullException.ThrowIfNull(transport);
+
+            var subscriberId = Guid.NewGuid();
+            AddSubscriber(queueName, new CMqSubscriberDescriptor(subscriberId, transport, consumerName), timeout);
+            return subscriberId;
+        }
+
+        private void AddSubscriber(string queueName, CMqSubscriberDescriptor subscriber, TimeSpan? timeout)
+        {
+            OnLog?.Invoke(this, CMqErrorLevel.Verbose, $"Subscribing [{subscriber.SubscriberId}] to queue: [{queueName}] using [{subscriber.TransportName}].");
 
             string queueKey = queueName.ToLowerInvariant();
 
@@ -1259,17 +1270,10 @@ namespace NTDLS.CatMQ.Server
                     {
                         success = messageQueue.Subscribers.TryWrite(CMqDefaults.DEFAULT_TRY_WAIT_MS, s =>
                         {
-                            if (s.ContainsKey(subscriberId) == false)
-                            {
-                                s.Add(subscriberId, new CMqSubscriberDescriptor(subscriberId, consumerName)
-                                {
-                                    LocalAddress = localEndpoint?.Address?.ToString(),
-                                    RemoteAddress = remoteEndpoint?.Address?.ToString(),
-                                    LocalPort = localEndpoint?.Port,
-                                    RemotePort = remoteEndpoint?.Port
-                                });
-                            }
+                            s.TryAdd(subscriber.SubscriberId, subscriber);
                         }) && success;
+
+                        messageQueue.DeliveryThreadWaitEvent.Set();
                     }
                     else
                     {

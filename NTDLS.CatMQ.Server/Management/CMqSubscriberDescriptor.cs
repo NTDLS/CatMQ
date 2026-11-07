@@ -8,12 +8,23 @@ namespace NTDLS.CatMQ.Server.Management
     /// </summary>
     public class CMqSubscriberDescriptor
     {
-        internal CMqSubscriberDescriptor(Guid subscriberId, string? consumerName = null)
+        internal CMqSubscriberDescriptor(Guid subscriberId, ICMqDeliveryTransport transport, string? consumerName = null)
         {
             SubscriberId = subscriberId;
+            Transport = transport;
             ConsumerName = consumerName;
             ConsumerId = consumerName == null ? subscriberId : new Guid(MD5.HashData(Encoding.UTF8.GetBytes(consumerName)));
         }
+
+        /// <summary>
+        /// Carries messages to this subscriber.
+        /// </summary>
+        internal ICMqDeliveryTransport Transport { get; }
+
+        /// <summary>
+        /// The name of the transport that carries messages to this subscriber, such as "tcp".
+        /// </summary>
+        public string TransportName => Transport.Name;
 
         /// <summary>
         /// The name that the consumer chose. Null when it is identified only by its connection.
@@ -27,7 +38,7 @@ namespace NTDLS.CatMQ.Server.Management
         public Guid ConsumerId { get; internal set; }
 
         /// <summary>
-        /// The unique id of the subscriber, synonymous with ConnectionId.
+        /// The unique id of the subscriber. For a subscriber connected with the native TCP protocol this is its ConnectionId.
         /// </summary>
         public Guid SubscriberId { get; internal set; }
 

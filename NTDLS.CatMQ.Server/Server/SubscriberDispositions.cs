@@ -12,7 +12,15 @@ namespace NTDLS.CatMQ.Server.Server
 
         public HashSet<Guid> RemainingSubscriberIDs { get; private set; }
 
+        /// <summary>
+        /// One subscriber for each consumer that still has to receive the message.
+        /// </summary>
         public List<CMqSubscriberDescriptor> Remaining { get; private set; }
+
+        /// <summary>
+        /// One subscriber for each remaining consumer that can accept a delivery right now.
+        /// </summary>
+        public List<CMqSubscriberDescriptor> Deliverable { get; private set; }
 
         /// <summary>
         /// The ID of the subscribers that have replied with a "consumed" disposition.
@@ -46,6 +54,7 @@ namespace NTDLS.CatMQ.Server.Server
             }
 
             //Connections that share a consumer name are competing workers, so only one of them receives each message.
+            Deliverable = Remaining.Where(o => o.Transport.IsReady).DistinctBy(o => o.ConsumerId).ToList();
             Remaining = Remaining.DistinctBy(o => o.ConsumerId).ToList();
         }
     }

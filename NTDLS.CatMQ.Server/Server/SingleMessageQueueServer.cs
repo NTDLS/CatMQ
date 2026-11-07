@@ -171,13 +171,23 @@ namespace NTDLS.CatMQ.Server.Server
                             {
                                 ticketDeliverySubscribersLock?.Accumulate();
 
-                                //We only process a queue if it has subscribers so that we do not
-                                //  discard messages as delivered for queues with no subscribers.
-                                if (s.Count > 0)
+                                //We only process a queue if it has subscribers that can accept a delivery, so that
+                                //  we do not discard messages as delivered for queues with no subscribers.
+                                var readyConsumerIDs = s.Values.Where(o => o.Transport.IsReady).Select(o => o.ConsumerId).ToHashSet();
+                                if (readyConsumerIDs.Count > 0)
                                 {
-                                    //Get the first message in the list, if any.
+                                    var consumerIDs = s.Values.Select(o => o.ConsumerId).ToHashSet();
+
+                                    static bool NeedsDelivery(EnqueuedMessage message, HashSet<Guid> ids)
+                                        => ids.Any(id => message.SatisfiedDeliverySubscriberIDs.Contains(id) == false
+                                            && message.DeliveryLimitReachedSubscriberIDs.Contains(id) == false);
+
+                                    //Get the first message that one of the ready consumers still needs. A message that is only
+                                    //  waiting on a consumer that is not ready must not hold up the ones behind it. A message
+                                    //  that no consumer needs is also selected, because delivery is what finishes it off.
                                     topMessage = m.MessageBuffer.FirstOrDefault(o =>
-                                        o.State == CMqMessageState.Ready && (o.DeferredUntil == null || now >= o.DeferredUntil));
+                                        o.State == CMqMessageState.Ready && (o.DeferredUntil == null || now >= o.DeferredUntil)
+                                        && (NeedsDelivery(o, readyConsumerIDs) || NeedsDelivery(o, consumerIDs) == false));
 
                                     if (Configuration.PersistenceScheme == CMqPersistenceScheme.Persistent)
                                     {
@@ -345,6 +355,26 @@ namespace NTDLS.CatMQ.Server.Server
         }
 
         /// <summary>
+        /// Creates the transport-neutral form of a message, as it stands for this delivery attempt.
+        /// </summary>
+        private CMqReceivedMessage CreateDelivery(EnqueuedMessage message)
+        {
+            return new CMqReceivedMessage(Configuration.QueueName, message.SerialNumber, message.MessageType, message.Body)
+            {
+                MessageId = message.MessageId,
+                ContentType = message.ContentType,
+                Headers = message.Headers,
+                BodyIsBase64 = message.BodyIsBase64,
+                Timestamp = message.Timestamp,
+                DeferDuration = message.DeferDuration,
+                DeferredCount = message.DeferredCount,
+                SubscriberDeliveryCount = message.SubscriberMessageDeliveries.Count,
+                SatisfiedSubscriberCount = message.SatisfiedDeliverySubscriberIDs.Count,
+                FailedSubscriberCount = message.DeliveryLimitReachedSubscriberIDs.Count
+            };
+        }
+
+        /// <summary>
         /// Delivers the message to any remaining subscribers and waits for a disposition from the subscriber.
         /// </summary>
         private async Task<CMqMessageState> DistributeToSubscribersWithDisposition(EnqueuedMessage message)
@@ -365,9 +395,15 @@ namespace NTDLS.CatMQ.Server.Server
                 return CMqMessageState.DeadLetter;
             }
 
+            if (subscriberDispositions.Deliverable.Count == 0)
+            {
+                //The consumers that were ready when this message was selected no longer are. Leave it for later.
+                return CMqMessageState.Ready;
+            }
+
             var failureToDeliverSubscriberIDs = new HashSet<Guid>();
 
-            foreach (var subscriber in subscriberDispositions.Remaining)
+            foreach (var subscriber in subscriberDispositions.Deliverable)
             {
                 if (_isRunning == false)
                 {
@@ -389,7 +425,7 @@ namespace NTDLS.CatMQ.Server.Server
                 {
                     subscriber.IncrementAttemptedDeliveryCount();
 
-                    var deliveryResult = await _queueServer.DeliverMessageWithResultAsync(subscriber.SubscriberId, Configuration.QueueName, message);
+                    var deliveryResult = await subscriber.Transport.DeliverAsync(CreateDelivery(message), _cts.Token);
 
                     ResetDeliveryBackoff();
                     Statistics.IncrementDeliveredMessageCount();
@@ -503,7 +539,7 @@ namespace NTDLS.CatMQ.Server.Server
                 return CMqMessageState.Shutdown;
             }
 
-            bool allDeliveriesFailed = !subscriberDispositions.Remaining.Select(o => o.ConsumerId).Except(failureToDeliverSubscriberIDs).Any();
+            bool allDeliveriesFailed = !subscriberDispositions.Deliverable.Select(o => o.ConsumerId).Except(failureToDeliverSubscriberIDs).Any();
 
             //Get fresh subscriber dispositions.
             subscriberDispositions = new SubscriberDispositions(this, message);
