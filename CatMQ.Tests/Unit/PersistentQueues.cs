@@ -90,6 +90,104 @@ namespace CatMQ.Tests.Unit
             Assert.True(Wait.Until(() => fixture.Server.GetQueue(queueName)?.QueueDepth == 0));
         }
 
+        [Fact(DisplayName = "Persistent: messages enqueued after the queue has drained are hydrated and delivered.")]
+        public void TestHydrationAfterDrain()
+        {
+            using var client = ClientFactory.CreateAndConnect();
+            var queueName = NewQueueName();
+            client.CreateQueue(Persistent(queueName));
+
+            var received = new ConcurrentQueue<int>();
+            client.Subscribe(queueName, (_, m) => { received.Enqueue(((KeyValueMessage)m.Deserialize()).Key); return CMqConsumeResult.Consumed(); });
+
+            //Each round empties the message buffer, so the next one has to resume from where hydration left off.
+            for (int round = 0; round < 3; round++)
+            {
+                for (int i = 0; i < 100; i++)
+                {
+                    client.Enqueue(queueName, new KeyValueMessage((round * 100) + i, "x"));
+                }
+
+                int expected = (round + 1) * 100;
+                Assert.True(Wait.Until(() => received.Count == expected, 30), $"Received {received.Count} of {expected}.");
+                Assert.True(Wait.Until(() => fixture.Server.GetQueue(queueName)?.QueueDepth == 0));
+            }
+
+            Assert.Equal(300, received.Distinct().Count());
+        }
+
+        [Fact(DisplayName = "Persistent: a failing subscriber is retried with a backoff and recovers when it stops failing.")]
+        public void TestDeliveryFailureBackoff()
+        {
+            using var client = ClientFactory.CreateAndConnect();
+            var queueName = NewQueueName();
+            client.CreateQueue(new CMqQueueConfiguration(queueName)
+            {
+                PersistenceScheme = CMqPersistenceScheme.Persistent,
+                AsynchronousDelivery = true,
+                MaxOutstandingDeliveries = 5,
+                MaxDeliveryAttempts = 0
+            });
+
+            for (int i = 0; i < 20; i++)
+            {
+                client.Enqueue(queueName, new KeyValueMessage(i, "x"));
+            }
+
+            bool failing = true;
+            var received = new ConcurrentDictionary<int, byte>();
+            client.Subscribe(queueName, (_, m) =>
+            {
+                if (Volatile.Read(ref failing))
+                {
+                    throw new Exception("Subscriber failure.");
+                }
+                received[((KeyValueMessage)m.Deserialize()).Key] = 1;
+                return CMqConsumeResult.Consumed();
+            });
+
+            Thread.Sleep(2000);
+            Volatile.Write(ref failing, false);
+
+            //Without a backoff this is tens of thousands of attempts.
+            Assert.InRange(fixture.Server.GetQueue(queueName)?.FailedDeliveryCount ?? 0, 1UL, 100UL);
+            Assert.True(Wait.Until(() => received.Count == 20, 30), $"Received {received.Count} of 20.");
+        }
+
+        [Fact(DisplayName = "Persistent: a dead-letter max age of zero means infinite, so expired messages are kept and do not expire there.")]
+        public void TestExpiredMessageIsDeadLetteredWhenDeadLetterAgeIsZero()
+        {
+            using var client = ClientFactory.CreateAndConnect();
+            var queueName = NewQueueName();
+            var configuration = Persistent(queueName);
+            configuration.MaxMessageAge = TimeSpan.FromSeconds(1);
+            configuration.DeadLetterConfiguration = new CMqDeadLetterQueueConfiguration
+            {
+                PersistenceScheme = CMqPersistenceScheme.Persistent,
+                MaxMessageAge = TimeSpan.Zero
+            };
+            client.CreateQueue(configuration);
+
+            client.Enqueue(queueName, new KeyValueMessage(1, "x"));
+            Thread.Sleep(1500);
+
+            //Persistent messages are only examined once a subscriber causes them to be buffered.
+            int delivered = 0;
+            client.Subscribe(queueName, (_, _) => { Interlocked.Increment(ref delivered); return CMqConsumeResult.Consumed(); });
+
+            var deadLetterQueueName = $"{queueName}.dlq";
+            Assert.True(Wait.Until(() => fixture.Server.GetQueue(queueName) is { QueueDepth: 0, ExpiredMessageCount: 1 }));
+            Assert.True(Wait.Until(() => fixture.Server.GetQueue(deadLetterQueueName)?.QueueDepth == 1));
+            Assert.Equal(0, Volatile.Read(ref delivered));
+
+            //The dead-letter queue has the same zero age, so its message must be delivered rather than expired.
+            var received = new ConcurrentBag<int>();
+            client.Subscribe(deadLetterQueueName, (_, m) => { received.Add(((KeyValueMessage)m.Deserialize()).Key); return CMqConsumeResult.Consumed(); });
+
+            Assert.True(Wait.Until(() => received.Count == 1));
+            Assert.Equal(0UL, fixture.Server.GetQueue(deadLetterQueueName)?.ExpiredMessageCount);
+        }
+
         [Fact(DisplayName = "Persistent: purge removes messages from the database as well as the buffer.")]
         public void TestPurge()
         {

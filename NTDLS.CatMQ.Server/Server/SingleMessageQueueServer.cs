@@ -13,9 +13,18 @@ namespace NTDLS.CatMQ.Server.Server
     internal class SingleMessageQueueServer
     {
         private readonly CMqServer _queueServer;
-        private Task? _deliveryTask;
+        private Thread? _deliveryThread;
         private volatile bool _isRunning;
         private readonly CancellationTokenSource _cts = new();
+
+        /// <summary>
+        /// The highest serial number that has been loaded from the database into the message buffer.
+        /// Only accessed while holding the write lock on EnqueuedMessages.
+        /// </summary>
+        private ulong? _lastHydratedSerialNumber;
+
+        private int _consecutiveDeliveryFailures;
+        private long _deliveryBackoffUntilTicks;
 
         public bool IsInitialized { get; private set; }
         public bool IsStarted => _isRunning;
@@ -54,11 +63,8 @@ namespace NTDLS.CatMQ.Server.Server
             HistoricalStatistics = new HistoricalStatistics(_queueServer.Configuration);
         }
 
-        private async Task DeliveryThreadProc()
+        private void DeliveryThreadProc()
         {
-#if DEBUG
-            Thread.CurrentThread.Name = $"DeliveryThreadProc_{Environment.CurrentManagedThreadId}";
-#endif
             var lastCheckpoint = DateTime.UtcNow;
             bool attemptBufferRehydration = false;
 
@@ -109,7 +115,7 @@ namespace NTDLS.CatMQ.Server.Server
                     {
                         ticketDeliveryMessageLock?.Accumulate();
 
-                        if (Configuration.MaxMessageAge != null)
+                        if (Configuration.MaxMessageAge > TimeSpan.Zero) //NULL and zero both mean that messages never expire.
                         {
                             var ticketExpirationCheck = _queueServer.Instrumentation?.CreateTicket(CMqInstrumentationEventType.ExpirationCheck);
 
@@ -124,7 +130,8 @@ namespace NTDLS.CatMQ.Server.Server
                                 //If MaxMessageAge is defined, then remove the stale messages.
                                 if (Configuration.DeadLetterConfiguration != null)
                                 {
-                                    if ((now - message.Timestamp) > Configuration.DeadLetterConfiguration.MaxMessageAge)
+                                    if (Configuration.DeadLetterConfiguration.MaxMessageAge > TimeSpan.Zero
+                                        && (now - message.Timestamp) > Configuration.DeadLetterConfiguration.MaxMessageAge)
                                     {
                                         //Even too old for the dead-letter queue, discard expired message.
                                         message.State = CMqMessageState.Drop;
@@ -146,7 +153,8 @@ namespace NTDLS.CatMQ.Server.Server
                             ticketExpirationCheck?.Accumulate();
                         }
 
-                        if (Statistics.OutstandingDeliveries < Configuration.MaxOutstandingDeliveries)
+                        if (Statistics.OutstandingDeliveries < Configuration.MaxOutstandingDeliveries
+                            && Environment.TickCount64 >= Interlocked.Read(ref _deliveryBackoffUntilTicks))
                         {
                             var ticketDeliverySubscribersLock = _queueServer.Instrumentation?.CreateTicket(CMqInstrumentationEventType.DeliverySubscribersLock);
 
@@ -196,7 +204,7 @@ namespace NTDLS.CatMQ.Server.Server
                         }
                         else
                         {
-                            await DistributeToSubscribersAsync(topMessage);
+                            DistributeToSubscribersAsync(topMessage).GetAwaiter().GetResult();
                         }
                     }
                     else if (threadYieldBurndown < CMqDefaults.QUEUE_THREAD_DELIVERY_BURNDOWN)
@@ -211,7 +219,8 @@ namespace NTDLS.CatMQ.Server.Server
 
                     if (messagesWithDispositions?.Count > 0)
                     {
-                        EnqueuedMessages.TryWrite(m =>
+                        //Wait briefly: a single attempt can lose to busy readers forever, leaving finished messages in the buffer.
+                        EnqueuedMessages.TryWrite(CMqDefaults.DEFAULT_TRY_WAIT_MS, m =>
                         {
                             foreach (var message in messagesWithDispositions)
                             {
@@ -250,7 +259,7 @@ namespace NTDLS.CatMQ.Server.Server
 
                     if (Configuration.DeliveryThrottle > TimeSpan.Zero)
                     {
-                        await Task.Delay((int)Configuration.DeliveryThrottle.TotalMilliseconds, _cts.Token);
+                        _cts.Token.WaitHandle.WaitOne((int)Configuration.DeliveryThrottle.TotalMilliseconds);
                     }
 
                     #endregion
@@ -266,14 +275,7 @@ namespace NTDLS.CatMQ.Server.Server
                     consecutiveExceptions++;
                     _queueServer.InvokeOnLog(ex.GetBaseException());
 
-                    try
-                    {
-                        await Task.Delay(100, _cts.Token);
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        //Shutdown was signaled while backing off.
-                    }
+                    _cts.Token.WaitHandle.WaitOne(100);
 
                     if (consecutiveExceptions > 1000)
                     {
@@ -309,7 +311,28 @@ namespace NTDLS.CatMQ.Server.Server
             finally
             {
                 Statistics.DecrementOutstandingDeliveries();
+
+                //A delivery slot just opened up. The delivery thread may be idling because all of the slots
+                //  were taken, so wake it now rather than leaving the subscriber idle until the wait times out.
+                DeliveryThreadWaitEvent.Set();
             }
+        }
+
+        /// <summary>
+        /// Failed messages go straight back to the top of the queue, so without a pause a failing subscriber
+        /// is retried as fast as the server can spin. Each consecutive failure doubles the pause, up to a limit.
+        /// </summary>
+        private void ExtendDeliveryBackoff()
+        {
+            int failures = Interlocked.Increment(ref _consecutiveDeliveryFailures);
+            long backoffMs = Math.Min(1L << Math.Min(failures, 30), CMqDefaults.MAX_DELIVERY_FAILURE_BACKOFF_MS);
+            Interlocked.Exchange(ref _deliveryBackoffUntilTicks, Environment.TickCount64 + backoffMs);
+        }
+
+        private void ResetDeliveryBackoff()
+        {
+            Interlocked.Exchange(ref _consecutiveDeliveryFailures, 0);
+            Interlocked.Exchange(ref _deliveryBackoffUntilTicks, 0);
         }
 
         /// <summary>
@@ -359,6 +382,7 @@ namespace NTDLS.CatMQ.Server.Server
 
                     var deliveryResult = await _queueServer.DeliverMessageWithResultAsync(subscriber.SubscriberId, Configuration.QueueName, message);
 
+                    ResetDeliveryBackoff();
                     Statistics.IncrementDeliveredMessageCount();
                     subscriber.IncrementSuccessfulDeliveryCount();
 
@@ -447,6 +471,7 @@ namespace NTDLS.CatMQ.Server.Server
                 catch (Exception ex) //Delivery failure.
                 {
                     failureToDeliverSubscriberIDs.Add(subscriber.SubscriberId);
+                    ExtendDeliveryBackoff();
                     Statistics.IncrementFailedDeliveryCount();
                     subscriber.IncrementFailedDeliveryCount();
                     _queueServer.InvokeOnLog(ex.GetBaseException());
@@ -516,7 +541,7 @@ namespace NTDLS.CatMQ.Server.Server
             _queueServer.InvokeOnLog(CMqErrorLevel.Verbose, $"Re-hydrating message buffer for [{Configuration.QueueName}].");
 
             var ticketMessageBufferHydrationWriteLock = _queueServer.Instrumentation?.CreateTicket(CMqInstrumentationEventType.MessageBufferHydrationWriteLock);
-            bool result = EnqueuedMessages.TryWrite(m =>
+            bool result = EnqueuedMessages.TryWrite(CMqDefaults.DEFAULT_TRY_WAIT_MS, m =>
             {
                 ticketMessageBufferHydrationWriteLock?.Accumulate();
 
@@ -526,45 +551,23 @@ namespace NTDLS.CatMQ.Server.Server
                 }
 
                 ulong? maxBufferedSerialNumber = m.MessageBuffer.Count > 0 ? m.MessageBuffer.Max(o => o.SerialNumber) : null;
-                int messagesLoaded = 0;
 
-                using var iterator = m.Database.NewIterator();
-                if (maxBufferedSerialNumber != null)
+                //Resume after the newest message we have ever loaded. Seeking from the start of the database means walking
+                //  the tombstone of every message consumed since the last compaction, which takes hundreds of milliseconds
+                //  on a busy queue, all while holding the write lock.
+                ulong? resumeAfterSerialNumber = maxBufferedSerialNumber;
+                if (_lastHydratedSerialNumber != null && (resumeAfterSerialNumber == null || _lastHydratedSerialNumber > resumeAfterSerialNumber))
                 {
-                    iterator.Seek((maxBufferedSerialNumber.Value + 1).ToKey());
-                }
-                else
-                {
-                    iterator.SeekToFirst();
+                    resumeAfterSerialNumber = _lastHydratedSerialNumber;
                 }
 
-                for (; iterator.Valid() && messagesLoaded < countToGet; iterator.Next())
+                int messagesLoaded = LoadMessagesFromDatabase(m, resumeAfterSerialNumber, countToGet);
+
+                if (messagesLoaded == 0 && resumeAfterSerialNumber != null && m.MessageBuffer.Count == 0)
                 {
-                    var persistedSerialNumberBytes = iterator.Key();
-                    if (BitConverter.IsLittleEndian)
-                    {
-                        Array.Reverse(persistedSerialNumberBytes); // Convert key back to little-endian.
-                    }
-                    var persistedSerialNumber = BitConverter.ToUInt64(persistedSerialNumberBytes);
-
-                    if (maxBufferedSerialNumber == null || persistedSerialNumber > maxBufferedSerialNumber)
-                    {
-                        var json = Encoding.UTF8.GetString(iterator.Value());
-                        var persistedMessage = JsonSerializer.Deserialize<EnqueuedMessage>(json);
-                        if (persistedMessage != null)
-                        {
-                            if (persistedMessage.MessageId == Guid.Empty)
-                            {
-                                //Persisted by a version that did not assign message IDs. Give it one and write it
-                                //  back so that it keeps the same ID if it is redelivered after another restart.
-                                persistedMessage.MessageId = Guid.NewGuid();
-                                m.Database.Store(persistedMessage);
-                            }
-
-                            m.MessageBuffer.Add(persistedMessage);
-                            messagesLoaded++;
-                        }
-                    }
+                    //The queue has depth but there is nothing past the resume point. Serial numbers are assigned before messages
+                    //  are stored, so a message can land behind the resume point. Scan from the start so that it is not stranded.
+                    LoadMessagesFromDatabase(m, null, countToGet);
                 }
             });
 
@@ -574,6 +577,61 @@ namespace NTDLS.CatMQ.Server.Server
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// Adds messages from the database to the message buffer, starting after the given serial number (or from the start
+        /// of the database when NULL). The caller must hold the write lock on the container.
+        /// </summary>
+        private int LoadMessagesFromDatabase(EnqueuedMessageContainer m, ulong? afterSerialNumber, int countToGet)
+        {
+            int messagesLoaded = 0;
+
+            using var iterator = m.Database!.NewIterator();
+            if (afterSerialNumber != null)
+            {
+                iterator.Seek((afterSerialNumber.Value + 1).ToKey());
+            }
+            else
+            {
+                iterator.SeekToFirst();
+            }
+
+            for (; iterator.Valid() && messagesLoaded < countToGet; iterator.Next())
+            {
+                var persistedSerialNumberBytes = iterator.Key();
+                if (BitConverter.IsLittleEndian)
+                {
+                    Array.Reverse(persistedSerialNumberBytes); // Convert key back to little-endian.
+                }
+                var persistedSerialNumber = BitConverter.ToUInt64(persistedSerialNumberBytes);
+
+                if (afterSerialNumber == null || persistedSerialNumber > afterSerialNumber)
+                {
+                    var json = Encoding.UTF8.GetString(iterator.Value());
+                    var persistedMessage = JsonSerializer.Deserialize<EnqueuedMessage>(json);
+                    if (persistedMessage != null)
+                    {
+                        if (persistedMessage.MessageId == Guid.Empty)
+                        {
+                            //Persisted by a version that did not assign message IDs. Give it one and write it
+                            //  back so that it keeps the same ID if it is redelivered after another restart.
+                            persistedMessage.MessageId = Guid.NewGuid();
+                            m.Database.Store(persistedMessage);
+                        }
+
+                        m.MessageBuffer.Add(persistedMessage);
+                        messagesLoaded++;
+
+                        if (_lastHydratedSerialNumber == null || persistedSerialNumber > _lastHydratedSerialNumber)
+                        {
+                            _lastHydratedSerialNumber = persistedSerialNumber;
+                        }
+                    }
+                }
+            }
+
+            return messagesLoaded;
         }
 
         public void InitializePersistentDatabase()
@@ -643,18 +701,26 @@ namespace NTDLS.CatMQ.Server.Server
         {
             _queueServer.InvokeOnLog(CMqErrorLevel.Information, $"Starting delivery thread for [{Configuration.QueueName}].");
             _isRunning = true;
-            _deliveryTask = Task.Run(async () =>
+
+            //This is a dedicated thread because it blocks while it idles. On the thread pool, one per queue can occupy every
+            //  minimum thread on a small server, which starves the delivery replies, enqueues and web requests that need the pool.
+            _deliveryThread = new Thread(() =>
             {
                 try
                 {
-                    await DeliveryThreadProc();
+                    DeliveryThreadProc();
                 }
                 catch (Exception ex)
                 {
                     ErrorMessage = $"Critical error occurred in delivery thread [{Configuration.QueueName}]. Exception: {ex.GetBaseException().Message}";
                     _queueServer.InvokeOnLog(CMqErrorLevel.Error, ErrorMessage);
                 }
-            });
+            })
+            {
+                IsBackground = true,
+                Name = $"CatMQ.Delivery.{Configuration.QueueName}"
+            };
+            _deliveryThread.Start();
         }
 
         public void SignalShutdown()
@@ -667,7 +733,7 @@ namespace NTDLS.CatMQ.Server.Server
         public void WaitForShutdown()
         {
             _queueServer.InvokeOnLog(CMqErrorLevel.Information, $"Waiting on delivery thread to quit for [{Configuration.QueueName}].");
-            _deliveryTask?.Wait();
+            _deliveryThread?.Join();
 
             //Asynchronous deliveries are not tracked by the delivery task. Wait for them to finish so that they
             //  do not touch the database after it has been disposed.

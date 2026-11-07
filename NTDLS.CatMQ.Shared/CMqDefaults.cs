@@ -14,6 +14,11 @@
         public const int QUEUE_THREAD_DELIVERY_BURNDOWN = 100;
 
         /// <summary>
+        /// The longest time in milliseconds that a queue will pause deliveries after consecutive delivery failures.
+        /// </summary>
+        public const int MAX_DELIVERY_FAILURE_BACKOFF_MS = 1000;
+
+        /// <summary>
         /// Amount of time in milliseconds to wait when attmeptig to acquire a lock before timing out and throwing an exception.
         /// </summary>
         public const int DEFAULT_LOCK_TIMEOUT_MS = 10 * 1000;
