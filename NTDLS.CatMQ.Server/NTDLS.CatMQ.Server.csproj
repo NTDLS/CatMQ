@@ -20,7 +20,7 @@
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<Authors>NetworkDLS</Authors>
 		<Company>NetworkDLS</Company>
-		<version>2.9.0</version>
+		<version>2.9.1</version>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<PackageIcon>Logo.png</PackageIcon>
 		<ApplicationIcon>Logo.ico</ApplicationIcon>
@@ -46,7 +46,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="RocksDB" Version="11.8.1.7098" />
+		<PackageReference Include="RocksDB" Version="11.12.0.7641" />
 	</ItemGroup>
 
 	<ItemGroup>
