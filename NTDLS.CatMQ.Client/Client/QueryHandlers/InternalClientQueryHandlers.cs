@@ -15,9 +15,12 @@ namespace NTDLS.CatMQ.Client.Client.QueryHandlers
         {
             try
             {
-                var message = new CMqReceivedMessage(param.QueueName, param.SerialNumber, param.AssemblyQualifiedTypeName, param.MessageJson)
+                var message = new CMqReceivedMessage(param.QueueName, param.SerialNumber, param.MessageType, param.Body)
                 {
                     MessageId = param.MessageId,
+                    ContentType = param.ContentType,
+                    Headers = param.Headers,
+                    BodyIsBase64 = param.BodyIsBase64,
                     Timestamp = param.Timestamp,
                     DeferredCount = param.DeferredCount,
                     DeferDuration = param.DeferDuration,

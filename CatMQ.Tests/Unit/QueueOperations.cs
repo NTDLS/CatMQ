@@ -327,16 +327,124 @@ namespace CatMQ.Tests.Unit
             client.DeleteQueue(NewQueueName());
         }
 
-        [Fact(DisplayName = "Creating an existing queue keeps the original configuration.")]
-        public void TestCreateExistingQueueKeepsConfiguration()
+        [Fact(DisplayName = "Creating an existing queue applies the new configuration.")]
+        public void TestCreateExistingQueueAppliesConfiguration()
+        {
+            using var client = ClientFactory.CreateAndConnect();
+            var queueName = NewQueueName();
+
+            client.CreateQueue(new CMqQueueConfiguration(queueName) { MaxDeliveryAttempts = 7, MaxOutstandingDeliveries = 2 });
+            client.CreateQueue(new CMqQueueConfiguration(queueName) { MaxDeliveryAttempts = 3, MaxOutstandingDeliveries = 9 });
+
+            var queue = fixture.Server.GetQueue(queueName);
+            Assert.Equal(3, queue?.MaxDeliveryAttempts);
+            Assert.Equal(9, queue?.MaxOutstandingDeliveries);
+        }
+
+        [Fact(DisplayName = "Creating a queue by name alone leaves an existing queue unchanged.")]
+        public void TestCreateByNameKeepsExistingConfiguration()
         {
             using var client = ClientFactory.CreateAndConnect();
             var queueName = NewQueueName();
 
             client.CreateQueue(new CMqQueueConfiguration(queueName) { MaxDeliveryAttempts = 7 });
-            client.CreateQueue(new CMqQueueConfiguration(queueName) { MaxDeliveryAttempts = 3 });
+            client.CreateQueue(queueName);
 
             Assert.Equal(7, fixture.Server.GetQueue(queueName)?.MaxDeliveryAttempts);
+        }
+
+        [Fact(DisplayName = "A new delivery limit takes effect on a running queue.")]
+        public void TestNewLimitAppliesToRunningQueue()
+        {
+            using var client = ClientFactory.CreateAndConnect();
+            var queueName = NewQueueName();
+            client.CreateQueue(new CMqQueueConfiguration(queueName) { MaxOutstandingDeliveries = 1 });
+
+            int inHandler = 0, peak = 0;
+            using var release = new ManualResetEventSlim(false);
+            client.Subscribe(queueName, async (_, _) =>
+            {
+                int current = Interlocked.Increment(ref inHandler);
+                InterlockedMax(ref peak, current);
+                await Task.Run(() => release.Wait());
+                Interlocked.Decrement(ref inHandler);
+                return CMqConsumeResult.Consumed();
+            });
+
+            for (int i = 0; i < 6; i++)
+            {
+                client.Enqueue(queueName, new KeyValueMessage(i, "x"));
+            }
+
+            Assert.True(Wait.Until(() => Volatile.Read(ref peak) == 1));
+            Thread.Sleep(200);
+            Assert.Equal(1, Volatile.Read(ref peak)); //The original limit is being honored.
+
+            client.CreateQueue(new CMqQueueConfiguration(queueName) { MaxOutstandingDeliveries = 4 });
+
+            Assert.True(Wait.Until(() => Volatile.Read(ref peak) == 4));
+            release.Set();
+            Assert.True(Wait.Until(() => fixture.Server.GetQueue(queueName)?.QueueDepth == 0));
+        }
+
+        private static void InterlockedMax(ref int target, int value)
+        {
+            int current;
+            while (value > (current = Volatile.Read(ref target))
+                && Interlocked.CompareExchange(ref target, value, current) != current)
+            {
+            }
+        }
+
+        [Fact(DisplayName = "The persistence scheme of an existing queue cannot be changed, and nothing else changes with it.")]
+        public void TestPersistenceChangeIsRejected()
+        {
+            using var client = ClientFactory.CreateAndConnect();
+            var queueName = NewQueueName();
+            client.CreateQueue(new CMqQueueConfiguration(queueName) { MaxDeliveryAttempts = 7 });
+
+            Assert.ThrowsAny<Exception>(() => client.CreateQueue(new CMqQueueConfiguration(queueName)
+            {
+                MaxDeliveryAttempts = 3,
+                PersistenceScheme = CMqPersistenceScheme.Persistent
+            }));
+
+            Assert.Equal(7, fixture.Server.GetQueue(queueName)?.MaxDeliveryAttempts);
+        }
+
+        [Fact(DisplayName = "A dead-letter queue can be added to an existing queue, and its settings can be changed.")]
+        public void TestDeadLetterQueueCanBeAddedAndUpdated()
+        {
+            using var client = ClientFactory.CreateAndConnect();
+            var queueName = NewQueueName();
+            client.CreateQueue(new CMqQueueConfiguration(queueName));
+            Assert.Null(fixture.Server.GetQueue($"{queueName}.dlq"));
+
+            client.CreateQueue(new CMqQueueConfiguration(queueName)
+            {
+                DeadLetterConfiguration = new CMqDeadLetterQueueConfiguration { MaxDeliveryAttempts = 4 }
+            });
+            Assert.Equal(4, fixture.Server.GetQueue($"{queueName}.dlq")?.MaxDeliveryAttempts);
+
+            client.CreateQueue(new CMqQueueConfiguration(queueName)
+            {
+                DeadLetterConfiguration = new CMqDeadLetterQueueConfiguration { MaxDeliveryAttempts = 6 }
+            });
+            Assert.Equal(6, fixture.Server.GetQueue($"{queueName}.dlq")?.MaxDeliveryAttempts);
+        }
+
+        [Fact(DisplayName = "Applying a configuration keeps the original queue name.")]
+        public void TestUpdateKeepsOriginalQueueName()
+        {
+            using var client = ClientFactory.CreateAndConnect();
+            var queueName = "MixedCase" + NewQueueName();
+            client.CreateQueue(new CMqQueueConfiguration(queueName) { MaxDeliveryAttempts = 7 });
+
+            client.CreateQueue(new CMqQueueConfiguration(queueName.ToUpperInvariant()) { MaxDeliveryAttempts = 3 });
+
+            var queue = fixture.Server.GetQueue(queueName);
+            Assert.Equal(queueName, queue?.QueueName);
+            Assert.Equal(3, queue?.MaxDeliveryAttempts);
         }
 
         [Fact(DisplayName = "Queue names are case-insensitive.")]
@@ -463,12 +571,12 @@ namespace CatMQ.Tests.Unit
             Assert.Equal(10, page.QueueDepth);
 
             var first = page.Messages.First();
-            Assert.Contains(nameof(KeyValueMessage), first.AssemblyQualifiedTypeName);
+            Assert.Contains(nameof(KeyValueMessage), first.MessageType);
 
             var single = fixture.Server.GetQueueMessage(queueName, first.SerialNumber, truncateToBytes: 20);
             Assert.NotNull(single);
             Assert.Equal(first.SerialNumber, single.SerialNumber);
-            Assert.Equal(20, single.MessageJson.Length);
+            Assert.Equal(20, single.Body.Length);
 
             Assert.ThrowsAny<Exception>(() => fixture.Server.GetQueueMessage(queueName, ulong.MaxValue));
         }

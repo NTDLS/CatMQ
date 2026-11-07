@@ -11,9 +11,12 @@ namespace NTDLS.CatMQ.Shared.Payload.ClientToServer
     /// content.</remarks>
     /// <param name="queueName"></param>
     /// <param name="deferDeliveryDuration"></param>
-    /// <param name="objectType"></param>
-    /// <param name="messageJson"></param>
-    public class CMqEnqueueMessageToQueueExpedient(string queueName, TimeSpan? deferDeliveryDuration, string objectType, string messageJson)
+    /// <param name="messageType"></param>
+    /// <param name="body"></param>
+    /// <param name="contentType"></param>
+    /// <param name="headers"></param>
+    /// <param name="bodyIsBase64"></param>
+    public class CMqEnqueueMessageToQueueExpedient(string queueName, TimeSpan? deferDeliveryDuration, string? messageType, string body, string? contentType = null, Dictionary<string, string>? headers = null, bool bodyIsBase64 = false)
         : IRmNotification
     {
         /// <summary>
@@ -27,13 +30,28 @@ namespace NTDLS.CatMQ.Shared.Payload.ClientToServer
         public TimeSpan? DeferDeliveryDuration { get; set; } = deferDeliveryDuration;
 
         /// <summary>
-        /// The full assembly qualified name of the type of MessageJson.
+        /// The name of the message type, which is optional and meaningful only to publishers and consumers.
         /// </summary>
-        public string ObjectType { get; set; } = objectType;
+        public string? MessageType { get; set; } = messageType;
 
         /// <summary>
-        /// Gets or sets the JSON representation of the message.
+        /// The message body.
         /// </summary>
-        public string MessageJson { get; set; } = messageJson;
+        public string Body { get; set; } = body;
+
+        /// <summary>
+        /// The media type of the body. Defaults to JSON when null.
+        /// </summary>
+        public string? ContentType { get; set; } = contentType;
+
+        /// <summary>
+        /// Optional application-defined headers.
+        /// </summary>
+        public Dictionary<string, string>? Headers { get; set; } = headers;
+
+        /// <summary>
+        /// Whether the body is base64 encoded binary content.
+        /// </summary>
+        public bool BodyIsBase64 { get; set; } = bodyIsBase64;
     }
 }

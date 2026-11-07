@@ -15,6 +15,12 @@ namespace NTDLS.CatMQ.Shared.Payload.ClientToServer
         /// Gets or sets the name of the queue used for message processing.
         /// </summary>
         public string QueueName { get; set; } = queueName;
+
+        /// <summary>
+        /// A stable name for the consumer. Connections that share a name act as competing workers
+        /// for one consumer. When null, the consumer is identified by its connection.
+        /// </summary>
+        public string? ConsumerName { get; set; }
     }
 
     /// <summary>

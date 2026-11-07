@@ -13,6 +13,12 @@ namespace NTDLS.CatMQ.Client
         public bool AutoReconnect { get; set; } = CMqDefaults.DEFAULT_AUTO_RECONNECT;
 
         /// <summary>
+        /// A stable name for this consumer. Clients that share a name act as competing workers for one consumer,
+        /// so each message goes to one of them. When null, the consumer is identified by its connection.
+        /// </summary>
+        public string? ConsumerName { get; set; }
+
+        /// <summary>
         /// The default amount of time to wait for a query to reply before throwing a timeout exception.
         /// </summary>
         public TimeSpan QueryTimeout { get; set; } = TimeSpan.FromSeconds(CMqDefaults.DEFAULT_ACK_TIMEOUT_SECONDS);

@@ -63,6 +63,15 @@ namespace NTDLS.CatMQ.Server.Server
             HistoricalStatistics = new HistoricalStatistics(_queueServer.Configuration);
         }
 
+        /// <summary>
+        /// Replaces the configuration of the running queue. The delivery thread picks up the new values on its next cycle.
+        /// </summary>
+        internal void ApplyConfiguration(CMqQueueConfiguration queueConfiguration)
+        {
+            Configuration = queueConfiguration;
+            DeliveryThreadWaitEvent.Set();
+        }
+
         private void DeliveryThreadProc()
         {
             var lastCheckpoint = DateTime.UtcNow;
@@ -366,14 +375,14 @@ namespace NTDLS.CatMQ.Server.Server
                 }
 
                 //Keep track of per-message-subscriber delivery metrics.
-                if (message.SubscriberMessageDeliveries.TryGetValue(subscriber.SubscriberId, out var subscriberDeliveryStatistics))
+                if (message.SubscriberMessageDeliveries.TryGetValue(subscriber.ConsumerId, out var subscriberDeliveryStatistics))
                 {
                     subscriberDeliveryStatistics.DeliveryAttemptCount++;
                 }
                 else
                 {
                     subscriberDeliveryStatistics = new SubscriberMessageDeliveryStatistics() { DeliveryAttemptCount = 1 };
-                    message.SubscriberMessageDeliveries.Add(subscriber.SubscriberId, subscriberDeliveryStatistics);
+                    message.SubscriberMessageDeliveries.Add(subscriber.ConsumerId, subscriberDeliveryStatistics);
                 }
 
                 try
@@ -391,8 +400,8 @@ namespace NTDLS.CatMQ.Server.Server
                         subscriber.IncrementConsumedDeliveryCount();
 
                         //The message was marked as consumed by the subscriber, so this subscriber is satisfied.
-                        message.SatisfiedDeliverySubscriberIDs.Add(subscriber.SubscriberId);
-                        message.ConsumedDeliverySubscriberIDs.Add(subscriber.SubscriberId);
+                        message.SatisfiedDeliverySubscriberIDs.Add(subscriber.ConsumerId);
+                        message.ConsumedDeliverySubscriberIDs.Add(subscriber.ConsumerId);
 
                         if (Configuration.ConsumptionScheme == CMqConsumptionScheme.FirstConsumedSubscriber)
                         {
@@ -415,7 +424,7 @@ namespace NTDLS.CatMQ.Server.Server
                     else if (deliveryResult.Disposition == CMqConsumptionDisposition.NotInterested)
                     {
                         //The message was marked as not-interested by the subscriber, so this subscriber is satisfied.
-                        message.SatisfiedDeliverySubscriberIDs.Add(subscriber.SubscriberId);
+                        message.SatisfiedDeliverySubscriberIDs.Add(subscriber.ConsumerId);
                     }
                     else if (deliveryResult.Disposition == CMqConsumptionDisposition.NotConsumed)
                     {
@@ -470,7 +479,7 @@ namespace NTDLS.CatMQ.Server.Server
                 }
                 catch (Exception ex) //Delivery failure.
                 {
-                    failureToDeliverSubscriberIDs.Add(subscriber.SubscriberId);
+                    failureToDeliverSubscriberIDs.Add(subscriber.ConsumerId);
                     ExtendDeliveryBackoff();
                     Statistics.IncrementFailedDeliveryCount();
                     subscriber.IncrementFailedDeliveryCount();
@@ -482,9 +491,9 @@ namespace NTDLS.CatMQ.Server.Server
                 {
                     //Even if we reached the max delivery count, there is no need to mark this as a failure if the
                     //  subscriber is satisfied (as that indicates that the latest delivery attempt was finally successful).
-                    if (message.SatisfiedDeliverySubscriberIDs.Contains(subscriber.SubscriberId) == false)
+                    if (message.SatisfiedDeliverySubscriberIDs.Contains(subscriber.ConsumerId) == false)
                     {
-                        message.DeliveryLimitReachedSubscriberIDs.Add(subscriber.SubscriberId);
+                        message.DeliveryLimitReachedSubscriberIDs.Add(subscriber.ConsumerId);
                     }
                 }
             }
@@ -494,7 +503,7 @@ namespace NTDLS.CatMQ.Server.Server
                 return CMqMessageState.Shutdown;
             }
 
-            bool allDeliveriesFailed = !subscriberDispositions.Remaining.Select(o => o.SubscriberId).Except(failureToDeliverSubscriberIDs).Any();
+            bool allDeliveriesFailed = !subscriberDispositions.Remaining.Select(o => o.ConsumerId).Except(failureToDeliverSubscriberIDs).Any();
 
             //Get fresh subscriber dispositions.
             subscriberDispositions = new SubscriberDispositions(this, message);

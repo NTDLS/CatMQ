@@ -9,7 +9,7 @@ namespace NTDLS.CatMQ.Shared.Payload.ServerToClient
     /// <remarks>This class encapsulates information about a message being delivered from a queue, such as its
     /// unique identifier,  serialized content, type information, and delivery statistics. It is used to track the
     /// delivery progress and manage  deferred delivery requests.</remarks>
-    public class CMqMessageDeliveryQuery(string queueName, ulong serialNumber, string assemblyQualifiedTypeName, string messageJson)
+    public class CMqMessageDeliveryQuery(string queueName, ulong serialNumber, string? messageType, string body)
     : IRmQuery<CMqMessageDeliveryQueryReply>
     {
         /// <summary>
@@ -18,14 +18,29 @@ namespace NTDLS.CatMQ.Shared.Payload.ServerToClient
         public string QueueName { get; set; } = queueName;
 
         /// <summary>
-        /// The full assembly qualified name of the type of MessageJson.
+        /// The name of the message type, which is optional and meaningful only to publishers and consumers.
         /// </summary>
-        public string AssemblyQualifiedTypeName { get; set; } = assemblyQualifiedTypeName;
+        public string? MessageType { get; set; } = messageType;
 
         /// <summary>
-        /// Json serialized object of type denoted by ObjectType.
+        /// The message body.
         /// </summary>
-        public string MessageJson { get; set; } = messageJson;
+        public string Body { get; set; } = body;
+
+        /// <summary>
+        /// The media type of the body.
+        /// </summary>
+        public string ContentType { get; set; } = CMqDefaults.DEFAULT_CONTENT_TYPE;
+
+        /// <summary>
+        /// Optional application-defined headers.
+        /// </summary>
+        public Dictionary<string, string>? Headers { get; set; }
+
+        /// <summary>
+        /// Whether the body is base64 encoded binary content.
+        /// </summary>
+        public bool BodyIsBase64 { get; set; }
 
         /// <summary>
         /// The unique ID of the message per queue.

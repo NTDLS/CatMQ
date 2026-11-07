@@ -1,0 +1,1184 @@
+openapi: 3.1.0
+info:
+  title: CatMQ HTTP API
+  version: 2.0.0-draft
+  summary: Create and manage queues, publish messages, and consume them from any language.
+  description: |
+    The CatMQ HTTP API is the language-neutral interface to CatMQ. Anything that can make an HTTP
+    request can publish and consume messages, with no client library.
+
+    ## Delivery guarantee
+    Delivery is **at-least-once**. A message can be delivered more than once, for example when a lease
+    expires while a consumer is still working. `messageId` never changes between deliveries, so
+    consumers can use it to detect a message that they have already handled.
+
+    ## Consuming messages
+    There are two ways to consume a queue, and both can be used on the same queue:
+
+    - **Leases (pull):** a consumer calls `receive`, works on the messages, then acks each lease.
+      A message that is not acked before its lease expires goes back to the queue.
+    - **Webhooks (push):** CatMQ POSTs each message to a registered URL. The response status is the ack.
+
+    Both count toward the queue's `maxOutstandingDeliveries`: a leased message and a webhook delivery
+    that is waiting on a response each occupy one slot.
+
+    ## Consumers
+    A consumer is identified by a stable name that the client chooses, not by its connection. It is
+    registered the first time it receives from a queue or when a webhook is created for it, and stays
+    registered until it is deleted.
+
+    With the `firstConsumer` consumption scheme, a message is removed once any consumer consumes it.
+    With the `allConsumers` scheme, each registered consumer receives its own copy.
+
+    ## Message bodies
+    A message has exactly one of `body` or `bodyBase64`:
+
+    - JSON content is sent and returned as ordinary JSON in `body`.
+    - Other text is a JSON string in `body`, with `contentType` describing it.
+    - Binary content is base64 encoded in `bodyBase64`.
+
+    ## Conventions
+    - Durations are whole seconds in fields ending in `Seconds`. `null` or `0` means no limit.
+    - Timestamps are UTC, in RFC 3339 format.
+    - `serialNumber` and all counters that can exceed 2^53 are strings, because JavaScript numbers
+      cannot represent them exactly.
+    - Errors use RFC 9457 problem details. `code` is stable and safe to branch on.
+    - When the server is overloaded it responds with `429` or `503` and a `Retry-After` header.
+  license:
+    name: MIT
+    identifier: MIT
+servers:
+  - url: http://localhost:45783/api/v2
+    description: Default local service address.
+security:
+  - bearerAuth: []
+  - apiKeyAuth: []
+tags:
+  - name: Queues
+    description: Create, inspect, change and delete queues.
+  - name: Messages
+    description: Publish, inspect and remove messages.
+  - name: Leases
+    description: Receive messages and report what happened to them.
+  - name: Webhooks
+    description: Have CatMQ push messages to a URL.
+  - name: Consumers
+    description: Inspect and remove named consumers.
+  - name: System
+    description: Service health.
+
+paths:
+  /health:
+    get:
+      tags: [System]
+      operationId: getHealth
+      summary: Reports whether the service is running.
+      security: []
+      responses:
+        '200':
+          description: The service is healthy.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /queues:
+    get:
+      tags: [Queues]
+      operationId: listQueues
+      summary: Lists all queues.
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: A page of queues.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [queues]
+                properties:
+                  queues:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Queue'
+                  nextCursor:
+                    type: [string, 'null']
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /queues/{queue}:
+    parameters:
+      - $ref: '#/components/parameters/QueueName'
+    put:
+      tags: [Queues]
+      operationId: createQueue
+      summary: Creates a queue, or applies these settings if it already exists.
+      description: |
+        Safe to call on every application startup. Changes take effect immediately on a running queue
+        and its dead-letter queue. As with any `PUT`, omitted fields return to their defaults, so use
+        `PATCH` to change only some settings.
+
+        `persistence` cannot be changed on an existing queue. Such a request fails with
+        `409 queue_persistence_immutable` and changes nothing.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QueueSettings'
+      responses:
+        '200':
+          description: The queue already existed, and now has these settings.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Queue'
+        '201':
+          description: The queue was created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Queue'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    get:
+      tags: [Queues]
+      operationId: getQueue
+      summary: Gets a queue's settings and statistics.
+      responses:
+        '200':
+          description: The queue.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Queue'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Queues]
+      operationId: updateQueue
+      summary: Changes the settings of an existing queue.
+      description: Only the fields that are supplied are changed. `persistence` cannot be changed.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QueueSettingsUpdate'
+      responses:
+        '200':
+          description: The updated queue.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Queue'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Queues]
+      operationId: deleteQueue
+      summary: Deletes a queue and all of its messages.
+      description: Deleting a queue that does not exist is not an error.
+      responses:
+        '204':
+          description: The queue no longer exists.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /queues/{queue}/redrive:
+    parameters:
+      - $ref: '#/components/parameters/QueueName'
+    post:
+      tags: [Queues]
+      operationId: redriveDeadLetters
+      summary: Moves messages from this queue's dead-letter queue back onto the queue.
+      description: Messages keep their `messageId`, and their delivery attempts are reset.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                max:
+                  type: integer
+                  minimum: 1
+                  description: The most messages to move. Omit to move all of them.
+      responses:
+        '200':
+          description: The messages were moved.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [moved]
+                properties:
+                  moved:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /queues/{queue}/messages:
+    parameters:
+      - $ref: '#/components/parameters/QueueName'
+    post:
+      tags: [Messages]
+      operationId: publishMessages
+      summary: Publishes one message or a batch.
+      description: |
+        A `202` response means that each accepted message is stored, and for a persistent queue that
+        it will survive a restart. The result of each message in a batch is reported separately, in
+        the same order as the request.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/PublishMessage'
+                - $ref: '#/components/schemas/PublishBatch'
+            examples:
+              single:
+                summary: One JSON message
+                value:
+                  messageType: orders.created
+                  body:
+                    orderId: 1234
+              batch:
+                summary: A batch
+                value:
+                  messages:
+                    - messageType: orders.created
+                      idempotencyKey: order-1234
+                      body:
+                        orderId: 1234
+                    - messageType: orders.created
+                      deferSeconds: 60
+                      body:
+                        orderId: 1235
+      responses:
+        '202':
+          description: The request was processed. Check each result in a batch.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublishResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+    get:
+      tags: [Messages]
+      operationId: listMessages
+      summary: Lists messages without consuming them.
+      description: |
+        For inspection and diagnostics. This does not lease or change any message. Use `cursor` to
+        page through a queue; it is far cheaper than an offset on a large queue.
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+        - name: includeBody
+          in: query
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: A page of messages.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [messages]
+                properties:
+                  messages:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Message'
+                  nextCursor:
+                    type: [string, 'null']
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Messages]
+      operationId: purgeQueue
+      summary: Removes every message from a queue.
+      responses:
+        '204':
+          description: The queue is empty.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /queues/{queue}/messages/{messageId}:
+    parameters:
+      - $ref: '#/components/parameters/QueueName'
+      - name: messageId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags: [Messages]
+      operationId: getMessage
+      summary: Gets one message without consuming it.
+      responses:
+        '200':
+          description: The message.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Messages]
+      operationId: deleteMessage
+      summary: Removes one message from a queue.
+      responses:
+        '204':
+          description: The message was removed.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /queues/{queue}/messages/receive:
+    parameters:
+      - $ref: '#/components/parameters/QueueName'
+    post:
+      tags: [Leases]
+      operationId: receiveMessages
+      summary: Leases up to `max` messages, waiting for them if necessary.
+      description: |
+        Returns as soon as at least one message is available, or an empty list when `waitSeconds`
+        passes. The number returned is also limited by the free delivery slots on the queue.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReceiveRequest'
+      responses:
+        '200':
+          description: The leased messages. The list is empty if none became available.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [messages]
+                properties:
+                  messages:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LeasedMessage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /leases/{leaseId}/ack:
+    parameters:
+      - $ref: '#/components/parameters/LeaseId'
+    post:
+      tags: [Leases]
+      operationId: ackLease
+      summary: Reports what happened to a leased message and frees its slot.
+      description: Repeating the same ack is safe and returns `204`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Ack'
+      responses:
+        '204':
+          description: The ack was recorded.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/LeaseExpired'
+
+  /leases/{leaseId}/extend:
+    parameters:
+      - $ref: '#/components/parameters/LeaseId'
+    post:
+      tags: [Leases]
+      operationId: extendLease
+      summary: Keeps a lease alive while a consumer is still working.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [leaseSeconds]
+              properties:
+                leaseSeconds:
+                  type: integer
+                  minimum: 1
+                  maximum: 43200
+                  description: Seconds from now until the lease expires.
+      responses:
+        '200':
+          description: The lease was extended.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [leaseExpiresAt]
+                properties:
+                  leaseExpiresAt:
+                    type: string
+                    format: date-time
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/LeaseExpired'
+
+  /leases/ack:
+    post:
+      tags: [Leases]
+      operationId: ackLeases
+      summary: Acks a batch of leases.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [acks]
+              properties:
+                acks:
+                  type: array
+                  minItems: 1
+                  maxItems: 1000
+                  items:
+                    allOf:
+                      - $ref: '#/components/schemas/Ack'
+                      - type: object
+                        required: [leaseId]
+                        properties:
+                          leaseId:
+                            type: string
+      responses:
+        '200':
+          description: The result of each ack, in the same order as the request.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [results]
+                properties:
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      required: [leaseId, status]
+                      properties:
+                        leaseId:
+                          type: string
+                        status:
+                          type: string
+                          enum: [acked, leaseExpired, notFound]
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /queues/{queue}/webhooks:
+    parameters:
+      - $ref: '#/components/parameters/QueueName'
+    get:
+      tags: [Webhooks]
+      operationId: listWebhooks
+      summary: Lists a queue's webhooks.
+      responses:
+        '200':
+          description: The webhooks.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [webhooks]
+                properties:
+                  webhooks:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Webhook'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /queues/{queue}/webhooks/{webhook}:
+    parameters:
+      - $ref: '#/components/parameters/QueueName'
+      - $ref: '#/components/parameters/WebhookName'
+    put:
+      tags: [Webhooks]
+      operationId: putWebhook
+      summary: Creates or replaces a webhook.
+      description: |
+        The webhook's name is also its consumer name. The signing secret is returned only when the
+        webhook is created. Replacing a webhook keeps its secret.
+
+        ### What CatMQ sends
+        CatMQ sends a `POST` whose body is a `WebhookDelivery`, with these headers:
+
+        - `X-CatMQ-Signature`: `t=<unix seconds>,v1=<hex HMAC-SHA256>`, computed over
+          `<unix seconds>.<raw request body>`. Reject requests with an old timestamp.
+        - `X-CatMQ-Delivery-Id`: identifies this delivery attempt.
+        - `X-CatMQ-Message-Id`: the `messageId`, which is the same on every attempt.
+
+        ### What the response means
+        | Response | Result |
+        | --- | --- |
+        | `2xx` | Consumed. |
+        | `410` | Dropped. |
+        | `422` | Dead-lettered. |
+        | `429`, `503` | Deferred, by `Retry-After` when present. Does not count as a failure. |
+        | Anything else, or a timeout | Failed delivery. Counts toward `maxDeliveryAttempts`. |
+
+        Redirects are not followed.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookSettings'
+      responses:
+        '200':
+          description: The webhook was replaced.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Webhook'
+        '201':
+          description: The webhook was created. `secret` is only ever returned here.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Webhook'
+                  - type: object
+                    required: [secret]
+                    properties:
+                      secret:
+                        type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    get:
+      tags: [Webhooks]
+      operationId: getWebhook
+      summary: Gets a webhook and its delivery status.
+      responses:
+        '200':
+          description: The webhook.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Webhook'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Webhooks]
+      operationId: deleteWebhook
+      summary: Deletes a webhook.
+      responses:
+        '204':
+          description: The webhook no longer exists.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /queues/{queue}/webhooks/{webhook}/rotate-secret:
+    parameters:
+      - $ref: '#/components/parameters/QueueName'
+      - $ref: '#/components/parameters/WebhookName'
+    post:
+      tags: [Webhooks]
+      operationId: rotateWebhookSecret
+      summary: Replaces a webhook's signing secret.
+      description: The old secret stays valid for 24 hours, and deliveries are signed with both.
+      responses:
+        '200':
+          description: The new secret.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [secret]
+                properties:
+                  secret:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /queues/{queue}/consumers:
+    parameters:
+      - $ref: '#/components/parameters/QueueName'
+    get:
+      tags: [Consumers]
+      operationId: listConsumers
+      summary: Lists a queue's registered consumers.
+      responses:
+        '200':
+          description: The consumers.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [consumers]
+                properties:
+                  consumers:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Consumer'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /queues/{queue}/consumers/{consumer}:
+    parameters:
+      - $ref: '#/components/parameters/QueueName'
+      - name: consumer
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/ConsumerName'
+    delete:
+      tags: [Consumers]
+      operationId: deleteConsumer
+      summary: Removes a consumer, so that `allConsumers` queues stop waiting for it.
+      description: Any leases that it holds are released.
+      responses:
+        '204':
+          description: The consumer no longer exists.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: 'An API key sent as `Authorization: Bearer <key>`.'
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-catmq-api-key
+
+  parameters:
+    QueueName:
+      name: queue
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 255
+    LeaseId:
+      name: leaseId
+      in: path
+      required: true
+      schema:
+        type: string
+    WebhookName:
+      name: webhook
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/ConsumerName'
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 1000
+        default: 100
+    Cursor:
+      name: cursor
+      in: query
+      description: The `nextCursor` from the previous page.
+      schema:
+        type: string
+
+  headers:
+    RetryAfter:
+      description: Seconds to wait before trying again.
+      schema:
+        type: integer
+
+  responses:
+    BadRequest:
+      description: The request is not valid.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Unauthorized:
+      description: The API key is missing or not valid.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    NotFound:
+      description: The resource does not exist.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Conflict:
+      description: The request conflicts with the current state, for example `queue_persistence_immutable`.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    LeaseExpired:
+      description: The lease has expired (`lease_expired`). The message may be with another consumer.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    PayloadTooLarge:
+      description: The message or batch is larger than the server allows.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    TooManyRequests:
+      description: The server is applying backpressure.
+      headers:
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    ServiceUnavailable:
+      description: The service cannot handle requests right now.
+      headers:
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+
+  schemas:
+    ConsumerName:
+      type: string
+      minLength: 1
+      maxLength: 128
+      pattern: '^[A-Za-z0-9._-]+$'
+      description: A stable name that the client chooses.
+
+    Disposition:
+      type: string
+      description: |
+        - `consumed`: finished. The message is removed, or this consumer is satisfied.
+        - `notInterested`: this consumer does not want the message, and is satisfied.
+        - `notConsumed`: not handled. The message stays on the queue for redelivery.
+        - `defer`: redeliver after `deferSeconds`. Does not count as a failed attempt.
+        - `deadLetter`: move the message to the dead-letter queue.
+        - `drop`: remove the message.
+      enum: [consumed, notInterested, notConsumed, defer, deadLetter, drop]
+
+    QueueSettings:
+      type: object
+      description: Omitted fields use the server defaults.
+      properties:
+        persistence:
+          type: string
+          enum: [ephemeral, persistent]
+          default: ephemeral
+        consumptionScheme:
+          type: string
+          enum: [firstConsumer, allConsumers]
+          default: allConsumers
+        deliveryScheme:
+          type: string
+          enum: [balanced, random]
+          default: random
+        maxOutstandingDeliveries:
+          type: integer
+          minimum: 1
+          default: 5
+        maxDeliveryAttempts:
+          type: integer
+          minimum: 0
+          default: 10
+          description: 0 means unlimited.
+        maxMessageAgeSeconds:
+          type: [integer, 'null']
+          minimum: 0
+          description: '`null` or 0 means that messages never expire.'
+        deliveryThrottleMilliseconds:
+          type: integer
+          minimum: 0
+          default: 0
+        deadLetter:
+          oneOf:
+            - $ref: '#/components/schemas/DeadLetterSettings'
+            - type: 'null'
+          description: '`null` means that the queue has no dead-letter queue.'
+
+    QueueSettingsUpdate:
+      type: object
+      minProperties: 1
+      properties:
+        maxOutstandingDeliveries:
+          type: integer
+          minimum: 1
+        maxDeliveryAttempts:
+          type: integer
+          minimum: 0
+        maxMessageAgeSeconds:
+          type: [integer, 'null']
+          minimum: 0
+        deliveryThrottleMilliseconds:
+          type: integer
+          minimum: 0
+
+    DeadLetterSettings:
+      type: object
+      properties:
+        persistence:
+          type: string
+          enum: [ephemeral, persistent]
+          default: ephemeral
+        maxMessageAgeSeconds:
+          type: [integer, 'null']
+          minimum: 0
+          description: '`null` or 0 means that messages are kept until they are removed.'
+
+    Queue:
+      type: object
+      required: [name, settings, stats]
+      properties:
+        name:
+          type: string
+        isDeadLetter:
+          type: boolean
+        settings:
+          $ref: '#/components/schemas/QueueSettings'
+        stats:
+          $ref: '#/components/schemas/QueueStats'
+
+    QueueStats:
+      type: object
+      description: Lifetime totals are strings, because they can exceed 2^53.
+      required: [depth, outstandingDeliveries, consumerCount]
+      properties:
+        depth:
+          type: integer
+        outstandingDeliveries:
+          type: integer
+        consumerCount:
+          type: integer
+        receivedCount:
+          type: string
+        deliveredCount:
+          type: string
+        failedCount:
+          type: string
+        deferredCount:
+          type: string
+        expiredCount:
+          type: string
+        droppedCount:
+          type: string
+        deadLetteredCount:
+          type: string
+
+    PublishMessage:
+      type: object
+      properties:
+        messageType:
+          type: string
+          maxLength: 255
+          description: An optional name for routing or decoding, such as `orders.created`.
+        contentType:
+          type: string
+          default: application/json
+        body:
+          description: Any JSON value. Use `bodyBase64` instead for binary content.
+        bodyBase64:
+          type: string
+          contentEncoding: base64
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+        deferSeconds:
+          type: integer
+          minimum: 0
+        idempotencyKey:
+          type: string
+          maxLength: 255
+          description: Publishing the same key again within 24 hours returns the original `messageId`.
+      oneOf:
+        - required: [body]
+        - required: [bodyBase64]
+
+    PublishBatch:
+      type: object
+      required: [messages]
+      properties:
+        messages:
+          type: array
+          minItems: 1
+          maxItems: 1000
+          items:
+            $ref: '#/components/schemas/PublishMessage'
+
+    PublishResult:
+      type: object
+      required: [results]
+      properties:
+        results:
+          type: array
+          items:
+            type: object
+            required: [status]
+            properties:
+              status:
+                type: string
+                enum: [accepted, duplicate, rejected]
+              messageId:
+                type: string
+                format: uuid
+              error:
+                $ref: '#/components/schemas/Problem'
+
+    Message:
+      type: object
+      required: [messageId, serialNumber, enqueuedAt, contentType]
+      properties:
+        messageId:
+          type: string
+          format: uuid
+        serialNumber:
+          type: string
+        messageType:
+          type: [string, 'null']
+        contentType:
+          type: string
+        body:
+          description: Present for JSON and text content.
+        bodyBase64:
+          type: string
+          contentEncoding: base64
+          description: Present for binary content.
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+        enqueuedAt:
+          type: string
+          format: date-time
+        deferredUntil:
+          type: [string, 'null']
+          format: date-time
+        deliveryAttempt:
+          type: integer
+          description: How many times this message has been delivered to this consumer, including this time.
+
+    LeasedMessage:
+      allOf:
+        - $ref: '#/components/schemas/Message'
+        - type: object
+          required: [leaseId, leaseExpiresAt]
+          properties:
+            leaseId:
+              type: string
+            leaseExpiresAt:
+              type: string
+              format: date-time
+
+    ReceiveRequest:
+      type: object
+      required: [consumer]
+      properties:
+        consumer:
+          $ref: '#/components/schemas/ConsumerName'
+        max:
+          type: integer
+          minimum: 1
+          maximum: 1000
+          default: 1
+        waitSeconds:
+          type: integer
+          minimum: 0
+          maximum: 60
+          default: 20
+          description: How long to wait for a message. 0 returns immediately.
+        leaseSeconds:
+          type: integer
+          minimum: 1
+          maximum: 43200
+          default: 60
+          description: How long before an unacked message goes back to the queue.
+
+    Ack:
+      type: object
+      required: [disposition]
+      properties:
+        disposition:
+          $ref: '#/components/schemas/Disposition'
+        deferSeconds:
+          type: integer
+          minimum: 1
+          description: Required when `disposition` is `defer`.
+
+    WebhookSettings:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+          format: uri
+          description: Must be `https`, unless the server is configured to allow `http`.
+        timeoutSeconds:
+          type: integer
+          minimum: 1
+          maximum: 300
+          default: 30
+        maxConcurrency:
+          type: integer
+          minimum: 1
+          description: The most deliveries in flight to this webhook. Defaults to the queue's limit.
+        headers:
+          type: object
+          description: Extra headers to send, such as credentials for the receiving service.
+          additionalProperties:
+            type: string
+        enabled:
+          type: boolean
+          default: true
+
+    Webhook:
+      allOf:
+        - $ref: '#/components/schemas/WebhookSettings'
+        - type: object
+          required: [name, queue]
+          properties:
+            name:
+              type: string
+            queue:
+              type: string
+            lastSuccessAt:
+              type: [string, 'null']
+              format: date-time
+            lastFailureAt:
+              type: [string, 'null']
+              format: date-time
+            lastFailure:
+              type: [string, 'null']
+            consecutiveFailures:
+              type: integer
+
+    WebhookDelivery:
+      description: The request body that CatMQ POSTs to a webhook URL.
+      allOf:
+        - $ref: '#/components/schemas/Message'
+        - type: object
+          required: [queue, deliveryId]
+          properties:
+            queue:
+              type: string
+            deliveryId:
+              type: string
+
+    Consumer:
+      type: object
+      required: [name, kind]
+      properties:
+        name:
+          $ref: '#/components/schemas/ConsumerName'
+        kind:
+          type: string
+          enum: [lease, webhook, tcp]
+        activeLeases:
+          type: integer
+        firstSeenAt:
+          type: string
+          format: date-time
+        lastSeenAt:
+          type: string
+          format: date-time
+
+    Health:
+      type: object
+      required: [status, version]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        version:
+          type: string
+
+    Problem:
+      type: object
+      description: An RFC 9457 problem details document.
+      required: [title, status, code]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        code:
+          type: string
+          description: A stable identifier, such as `queue_not_found` or `lease_expired`.

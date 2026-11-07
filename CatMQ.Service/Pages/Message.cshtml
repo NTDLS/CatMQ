@@ -101,7 +101,7 @@
                         <td>@Model.Message.SubscriberCount.ToString("n0")</td>
                         <td>@Model.Message.SubscriberMessageDeliveries.Count.ToString("n0")</td>
                         <td>@Model.Message.SatisfiedSubscribersSubscriberIDs.Count.ToString("n0")</td>
-                        <td>@Model.Message.AssemblyQualifiedTypeName</td>
+                        <td>@Model.Message.MessageType</td>
                     </tr>
                 </tbody>
             </table>
@@ -117,7 +117,7 @@
                 <tbody>
                     <tr>
                         <td class="message-body">
-                            <pre class="message-body">@Model.Message.MessageJson</pre>
+                            <pre class="message-body">@Model.Message.Body</pre>
                         </td>
                     </tr>
                 </tbody>

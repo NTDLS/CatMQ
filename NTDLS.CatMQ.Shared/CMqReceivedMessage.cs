@@ -3,7 +3,7 @@
     /// <summary>
     /// A message received by the server.
     /// </summary>
-    public class CMqReceivedMessage(string queueName, ulong serialNumber, string assemblyQualifiedTypeName, string messageJson)
+    public class CMqReceivedMessage(string queueName, ulong serialNumber, string? messageType, string body)
     {
         /// <summary>
         /// Provides access to the custom serialization provider, if configured.
@@ -16,14 +16,35 @@
         public string QueueName { get; set; } = queueName;
 
         /// <summary>
-        /// The assembly qualified type name of the object stored in MessageJson.
+        /// The name of the message type. Null when the publisher did not supply one.
         /// </summary>
-        public string AssemblyQualifiedTypeName { get; set; } = assemblyQualifiedTypeName;
+        public string? MessageType { get; set; } = messageType;
 
         /// <summary>
-        /// Json serialized object of type denoted by ObjectType.
+        /// The message body.
         /// </summary>
-        public string MessageJson { get; set; } = messageJson;
+        public string Body { get; set; } = body;
+
+        /// <summary>
+        /// The media type of the body.
+        /// </summary>
+        public string ContentType { get; set; } = CMqDefaults.DEFAULT_CONTENT_TYPE;
+
+        /// <summary>
+        /// Optional application-defined headers.
+        /// </summary>
+        public Dictionary<string, string>? Headers { get; set; }
+
+        /// <summary>
+        /// Whether the body is base64 encoded binary content.
+        /// </summary>
+        public bool BodyIsBase64 { get; set; }
+
+        /// <summary>
+        /// Gets the raw bytes of the body, decoding it if it is base64 encoded.
+        /// </summary>
+        public byte[] GetBodyBytes()
+            => BodyIsBase64 ? Convert.FromBase64String(Body) : System.Text.Encoding.UTF8.GetBytes(Body);
 
         /// <summary>
         /// The unique ID of the message per queue.
@@ -72,9 +93,10 @@
             => CMqSerialization.Deserialize(this);
 
         /// <summary>
-        /// Deserializes the received message to its original type, casted to the given type.
+        /// Deserializes the received message to the given type. This also works for messages from publishers that do not
+        /// use .NET types, because the type is only used when it resolves to a compatible .NET type.
         /// </summary>
         public T? Deserialize<T>() where T : class
-            => CMqSerialization.Deserialize(this) as T;
+            => CMqSerialization.Deserialize<T>(this);
     }
 }

@@ -181,6 +181,37 @@ namespace CatMQ.Tests.Unit
             }
         }
 
+        [Fact(DisplayName = "Restart: configuration applied to an existing queue survives, along with its messages.")]
+        public void TestUpdatedConfigurationSurvivesRestart()
+        {
+            string queueName = "updated" + Guid.NewGuid().ToString("N");
+
+            var server = StartServer();
+            try
+            {
+                using var client = Connect();
+                client.CreateQueue(new CMqQueueConfiguration(queueName) { PersistenceScheme = CMqPersistenceScheme.Persistent, MaxOutstandingDeliveries = 2 });
+                client.Enqueue(queueName, new KeyValueMessage(1, "x"));
+                client.CreateQueue(new CMqQueueConfiguration(queueName) { PersistenceScheme = CMqPersistenceScheme.Persistent, MaxOutstandingDeliveries = 9 });
+            }
+            finally
+            {
+                server.Stop();
+            }
+
+            server = StartServer();
+            try
+            {
+                var queue = server.GetQueue(queueName);
+                Assert.Equal(9, queue?.MaxOutstandingDeliveries);
+                Assert.Equal(1, queue?.QueueDepth);
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
         [Fact(DisplayName = "Restart: a deleted queue stays deleted.")]
         public void TestDeletedQueueStaysDeleted()
         {

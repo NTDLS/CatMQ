@@ -13,6 +13,51 @@ namespace NTDLS.CatMQ.Shared
     public static class CMqSerialization
     {
         private static readonly ConcurrentDictionary<string, Func<string, ICMqSerializationProvider?, ICMqMessage>> _deserializationCache = new();
+        private static readonly ConcurrentDictionary<string, Type> _registeredTypes = new();
+        private static readonly ConcurrentDictionary<Type, string> _registeredTypeNames = new();
+
+        /// <summary>
+        /// Associates a language-neutral message type name, such as "orders.created", with a .NET type. The name is
+        /// sent in place of the assembly-qualified type name, and resolves back to the type when messages are received.
+        /// </summary>
+        public static void RegisterMessageType<T>(string messageType) where T : ICMqMessage
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(messageType);
+
+            _registeredTypes[messageType] = typeof(T);
+            _registeredTypeNames[typeof(T)] = messageType;
+            _deserializationCache.TryRemove(messageType, out _);
+        }
+
+        /// <summary>
+        /// Gets the message type name to send for an object: its registered name if there is one, otherwise its assembly-qualified type name.
+        /// </summary>
+        public static string GetMessageTypeName(object obj)
+            => _registeredTypeNames.TryGetValue(obj.GetType(), out var messageType) ? messageType : GetAssemblyQualifiedTypeName(obj);
+
+        /// <summary>
+        /// Finds the .NET type for a message type name. Names from other languages will usually not resolve, which is not an error.
+        /// </summary>
+        private static Type? ResolveMessageType(string? messageType)
+        {
+            if (string.IsNullOrWhiteSpace(messageType))
+            {
+                return null;
+            }
+            if (_registeredTypes.TryGetValue(messageType, out var registeredType))
+            {
+                return registeredType;
+            }
+
+            try
+            {
+                return Type.GetType(messageType);
+            }
+            catch
+            {
+                return null;
+            }
+        }
 
         /// <summary>
         /// Deserialization function called from MessageDeliveryQuery via reflection.
@@ -80,7 +125,26 @@ namespace NTDLS.CatMQ.Shared
         /// Deserializes the received message to its original type.
         /// </summary>
         internal static ICMqMessage Deserialize(CMqReceivedMessage message)
-            => DeserializeAs(message.AssemblyQualifiedTypeName, message.MessageJson, message.SerializationProvider);
+        {
+            if (string.IsNullOrWhiteSpace(message.MessageType))
+            {
+                throw new Exception("The message has no message type. Use Deserialize<T>() to choose the type to deserialize to.");
+            }
+            return DeserializeAs(message.MessageType, message.Body, message.SerializationProvider);
+        }
+
+        /// <summary>
+        /// Deserializes the received message to the given type, preferring the message's own type when it is compatible.
+        /// </summary>
+        internal static T? Deserialize<T>(CMqReceivedMessage message) where T : class
+        {
+            var messageType = ResolveMessageType(message.MessageType);
+            if (messageType != null && typeof(T).IsAssignableFrom(messageType) && typeof(ICMqMessage).IsAssignableFrom(messageType))
+            {
+                return DeserializeAs(message.MessageType!, message.Body, message.SerializationProvider) as T;
+            }
+            return MqDeserializeToObject<T>(message.Body, message.SerializationProvider);
+        }
 
         /// <summary>
         /// Deserializes JSON to an object of type T using its assembly-qualified name.
@@ -100,7 +164,7 @@ namespace NTDLS.CatMQ.Shared
         {
             var deserializeMethod = _deserializationCache.GetOrAdd(assemblyQualifiedTypeName, typeName =>
             {
-                var genericType = Type.GetType(typeName)
+                var genericType = ResolveMessageType(typeName)
                     ?? throw new Exception($"Unknown extraction message type [{typeName}].");
 
                 if (!typeof(ICMqMessage).IsAssignableFrom(genericType))

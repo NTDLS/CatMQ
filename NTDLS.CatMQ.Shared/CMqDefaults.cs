@@ -14,6 +14,11 @@
         public const int QUEUE_THREAD_DELIVERY_BURNDOWN = 100;
 
         /// <summary>
+        /// The content type of a message when the publisher does not supply one.
+        /// </summary>
+        public const string DEFAULT_CONTENT_TYPE = "application/json";
+
+        /// <summary>
         /// The longest time in milliseconds that a queue will pause deliveries after consecutive delivery failures.
         /// </summary>
         public const int MAX_DELIVERY_FAILURE_BACKOFF_MS = 1000;

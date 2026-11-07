@@ -530,8 +530,11 @@ namespace NTDLS.CatMQ.Server
                                             DeferredDeliveryCount = message.DeferredCount,
                                             SubscriberMessageDeliveries = message.SubscriberMessageDeliveries.Keys.ToHashSet(),
                                             SatisfiedSubscribersSubscriberIDs = message.SatisfiedDeliverySubscriberIDs,
-                                            AssemblyQualifiedTypeName = message.AssemblyQualifiedTypeName,
-                                            MessageJson = message.MessageJson,
+                                            MessageType = message.MessageType,
+                                            ContentType = message.ContentType,
+                                            Headers = message.Headers,
+                                            BodyIsBase64 = message.BodyIsBase64,
+                                            Body = message.Body,
                                         });
                                     }
                                 }
@@ -563,8 +566,11 @@ namespace NTDLS.CatMQ.Server
                                                 DeferredDeliveryCount = persistedMessage.DeferredCount,
                                                 SubscriberMessageDeliveries = persistedMessage.SubscriberMessageDeliveries.Keys.ToHashSet(),
                                                 SatisfiedSubscribersSubscriberIDs = persistedMessage.SatisfiedDeliverySubscriberIDs,
-                                                AssemblyQualifiedTypeName = persistedMessage.AssemblyQualifiedTypeName,
-                                                MessageJson = persistedMessage.MessageJson,
+                                                MessageType = persistedMessage.MessageType,
+                                                ContentType = persistedMessage.ContentType,
+                                                Headers = persistedMessage.Headers,
+                                                BodyIsBase64 = persistedMessage.BodyIsBase64,
+                                                Body = persistedMessage.Body,
                                             });
                                         }
                                         iterator.Next();
@@ -637,8 +643,11 @@ namespace NTDLS.CatMQ.Server
                                     Timestamp = message.Timestamp,
                                     SubscriberMessageDeliveries = message.SubscriberMessageDeliveries.Keys.ToHashSet(),
                                     SatisfiedSubscribersSubscriberIDs = message.SatisfiedDeliverySubscriberIDs,
-                                    AssemblyQualifiedTypeName = message.AssemblyQualifiedTypeName,
-                                    MessageJson = message.MessageJson,
+                                    MessageType = message.MessageType,
+                                    ContentType = message.ContentType,
+                                    Headers = message.Headers,
+                                    BodyIsBase64 = message.BodyIsBase64,
+                                    Body = message.Body,
                                     DeferredUntil = message.DeferredUntil,
                                     DeferredDeliveryCount = message.DeferredCount
                                 };
@@ -659,8 +668,11 @@ namespace NTDLS.CatMQ.Server
                                     Timestamp = persistedMessage.Timestamp,
                                     SubscriberMessageDeliveries = persistedMessage.SubscriberMessageDeliveries.Keys.ToHashSet(),
                                     SatisfiedSubscribersSubscriberIDs = persistedMessage.SatisfiedDeliverySubscriberIDs,
-                                    AssemblyQualifiedTypeName = persistedMessage.AssemblyQualifiedTypeName,
-                                    MessageJson = persistedMessage.MessageJson,
+                                    MessageType = persistedMessage.MessageType,
+                                    ContentType = persistedMessage.ContentType,
+                                    Headers = persistedMessage.Headers,
+                                    BodyIsBase64 = persistedMessage.BodyIsBase64,
+                                    Body = persistedMessage.Body,
                                     DeferredUntil = persistedMessage.DeferredUntil,
                                     DeferredDeliveryCount = persistedMessage.DeferredCount
                                 };
@@ -677,9 +689,9 @@ namespace NTDLS.CatMQ.Server
                 {
                     if (truncateToBytes != null)
                     {
-                        if (result.MessageJson.Length > truncateToBytes)
+                        if (result.Body.Length > truncateToBytes)
                         {
-                            result.MessageJson = result.MessageJson.Substring(0, truncateToBytes.Value);
+                            result.Body = result.Body.Substring(0, truncateToBytes.Value);
                         }
                     }
 
@@ -972,9 +984,12 @@ namespace NTDLS.CatMQ.Server
         internal async Task<CMqConsumeResult> DeliverMessageWithResultAsync(Guid subscriberId, string queueName, EnqueuedMessage enqueuedMessage)
         {
             var message = new CMqMessageDeliveryQuery(queueName, enqueuedMessage.SerialNumber,
-                enqueuedMessage.AssemblyQualifiedTypeName, enqueuedMessage.MessageJson)
+                enqueuedMessage.MessageType, enqueuedMessage.Body)
             {
                 MessageId = enqueuedMessage.MessageId,
+                ContentType = enqueuedMessage.ContentType,
+                Headers = enqueuedMessage.Headers,
+                BodyIsBase64 = enqueuedMessage.BodyIsBase64,
                 Timestamp = enqueuedMessage.Timestamp,
                 DeferDuration = enqueuedMessage.DeferDuration,
                 DeferredCount = enqueuedMessage.DeferredCount,
@@ -996,9 +1011,25 @@ namespace NTDLS.CatMQ.Server
         #region Client interactions.
 
         /// <summary>
-        /// Creates a new empty queue if it does not already exist.
+        /// Creates a new empty queue, or applies the given configuration to the queue if it already exists.
+        /// Changes take effect immediately and are persisted. The PersistenceScheme of an existing queue cannot be changed.
         /// </summary>
         public void CreateQueue(CMqQueueConfiguration queueConfiguration)
+        {
+            ValidateNewQueueConfiguration(queueConfiguration);
+            CreateQueueInternal(queueConfiguration, updateExisting: true);
+        }
+
+        /// <summary>
+        /// Creates a new empty queue if it does not already exist. An existing queue is left unchanged.
+        /// </summary>
+        public void CreateQueueIfMissing(CMqQueueConfiguration queueConfiguration)
+        {
+            ValidateNewQueueConfiguration(queueConfiguration);
+            CreateQueueInternal(queueConfiguration, updateExisting: false);
+        }
+
+        private static void ValidateNewQueueConfiguration(CMqQueueConfiguration queueConfiguration)
         {
             if (queueConfiguration.IsDeadLetter)
             {
@@ -1008,14 +1039,62 @@ namespace NTDLS.CatMQ.Server
             {
                 throw new ArgumentException("Queue names cannot end with '.dlq'.");
             }
-
-            CreateQueueInternal(queueConfiguration);
         }
 
         /// <summary>
-        /// Creates a new empty queue if it does not already exist.
+        /// Applies a configuration to a running queue and to its dead-letter queue. The caller must hold the write lock on the message queues.
+        /// Everything is validated first, so that a rejected configuration changes nothing.
         /// </summary>
-        private void CreateQueueInternal(CMqQueueConfiguration queueConfiguration)
+        private void UpdateExistingQueue(MessageQueueDictionary mqd, SingleMessageQueueServer messageQueue, CMqQueueConfiguration queueConfiguration)
+        {
+            //Work on a copy that the caller cannot change later. The original name is kept because
+            //  it determines the persistence path, and queue names are not case-sensitive.
+            var updatedConfiguration = JsonSerializer.Deserialize<CMqQueueConfiguration>(JsonSerializer.Serialize(queueConfiguration))
+                ?? throw new Exception($"Failed to copy the configuration for [{queueConfiguration.QueueName}].");
+            updatedConfiguration.QueueName = messageQueue.Configuration.QueueName;
+
+            ThrowIfPersistenceChanged(messageQueue, updatedConfiguration);
+
+            var deadLetterConfiguration = updatedConfiguration.DeadLetterConfiguration?.ToConfiguration(updatedConfiguration.QueueName);
+            if (deadLetterConfiguration != null
+                && mqd.TryGetValue(deadLetterConfiguration.QueueName.ToLowerInvariant(), out var deadLetterQueue))
+            {
+                ThrowIfPersistenceChanged(deadLetterQueue, deadLetterConfiguration);
+            }
+
+            if (JsonSerializer.Serialize(updatedConfiguration) == JsonSerializer.Serialize(messageQueue.Configuration))
+            {
+                return;
+            }
+
+            OnLog?.Invoke(this, CMqErrorLevel.Information, $"Updating configuration for queue: [{updatedConfiguration.QueueName}].");
+
+            if (deadLetterConfiguration != null)
+            {
+                CreateQueueInternal(deadLetterConfiguration, updateExisting: true);
+            }
+
+            messageQueue.ApplyConfiguration(updatedConfiguration);
+
+            if (string.IsNullOrEmpty(_configuration.PersistencePath) == false)
+            {
+                CheckpointPersistentMessageQueues(mqd);
+            }
+        }
+
+        private static void ThrowIfPersistenceChanged(SingleMessageQueueServer messageQueue, CMqQueueConfiguration queueConfiguration)
+        {
+            if (messageQueue.Configuration.PersistenceScheme != queueConfiguration.PersistenceScheme)
+            {
+                throw new ArgumentException($"The PersistenceScheme of [{messageQueue.Configuration.QueueName}] cannot be changed from"
+                    + $" [{messageQueue.Configuration.PersistenceScheme}] to [{queueConfiguration.PersistenceScheme}].");
+            }
+        }
+
+        /// <summary>
+        /// Creates a new empty queue, or optionally applies the configuration if the queue already exists.
+        /// </summary>
+        private void CreateQueueInternal(CMqQueueConfiguration queueConfiguration, bool updateExisting)
         {
             if (string.IsNullOrEmpty(queueConfiguration.QueueName))
             {
@@ -1027,7 +1106,14 @@ namespace NTDLS.CatMQ.Server
             _messageQueues.Write(mqd =>
             {
                 string queueKey = queueConfiguration.QueueName.ToLowerInvariant();
-                if (mqd.ContainsKey(queueKey) == false)
+                if (mqd.TryGetValue(queueKey, out var existingQueue))
+                {
+                    if (updateExisting)
+                    {
+                        UpdateExistingQueue(mqd, existingQueue, queueConfiguration);
+                    }
+                }
+                else
                 {
                     if (queueConfiguration.PersistenceScheme == CMqPersistenceScheme.Persistent
                         && string.IsNullOrEmpty(_configuration.PersistencePath))
@@ -1051,7 +1137,7 @@ namespace NTDLS.CatMQ.Server
                         if (queueConfiguration.DeadLetterConfiguration != null)
                         {
                             var dlqConfig = queueConfiguration.DeadLetterConfiguration.ToConfiguration(queueConfiguration.QueueName);
-                            CreateQueueInternal(dlqConfig);
+                            CreateQueueInternal(dlqConfig, updateExisting: true);
                         }
 
                         if (string.IsNullOrEmpty(_configuration.PersistencePath) == false)
@@ -1149,7 +1235,7 @@ namespace NTDLS.CatMQ.Server
         /// <summary>
         /// Creates a subscription to a queue for a given connection id.
         /// </summary>
-        internal void Subscribe(Guid subscriberId, IPEndPoint? localEndpoint, IPEndPoint? remoteEndpoint, string queueName, TimeSpan? timeout = null)
+        internal void Subscribe(Guid subscriberId, IPEndPoint? localEndpoint, IPEndPoint? remoteEndpoint, string queueName, string? consumerName = null, TimeSpan? timeout = null)
         {
             OnLog?.Invoke(this, CMqErrorLevel.Verbose, $"Subscribing connection [{subscriberId}] to queue: [{queueName}].");
 
@@ -1175,7 +1261,7 @@ namespace NTDLS.CatMQ.Server
                         {
                             if (s.ContainsKey(subscriberId) == false)
                             {
-                                s.Add(subscriberId, new CMqSubscriberDescriptor(subscriberId)
+                                s.Add(subscriberId, new CMqSubscriberDescriptor(subscriberId, consumerName)
                                 {
                                     LocalAddress = localEndpoint?.Address?.ToString(),
                                     RemoteAddress = remoteEndpoint?.Address?.ToString(),
@@ -1248,15 +1334,12 @@ namespace NTDLS.CatMQ.Server
         /// <summary>
         /// Places a message into the given queue.
         /// </summary>
-        public void Enqueue(string queueName, TimeSpan? deferDeliveryDuration, string assemblyQualifiedTypeName, string messageJson, TimeSpan? timeout = null)
+        public void Enqueue(string queueName, TimeSpan? deferDeliveryDuration, string? messageType, string body, string? contentType = null,
+            Dictionary<string, string>? headers = null, bool bodyIsBase64 = false, TimeSpan? timeout = null)
         {
-            if (string.IsNullOrWhiteSpace(assemblyQualifiedTypeName))
+            if (string.IsNullOrEmpty(body))
             {
-                throw new ArgumentException("A message type is required.", nameof(assemblyQualifiedTypeName));
-            }
-            if (string.IsNullOrEmpty(messageJson))
-            {
-                throw new ArgumentException("A message body is required.", nameof(messageJson));
+                throw new ArgumentException("A message body is required.", nameof(body));
             }
 
             OnLog?.Invoke(this, CMqErrorLevel.Verbose, $"Enqueuing message to queue: [{queueName}].");
@@ -1297,9 +1380,12 @@ namespace NTDLS.CatMQ.Server
                                     throw new Exception($"Persistence database has not been initialized for [{queueName}].");
                                 }
 
-                                var message = new EnqueuedMessage(messageQueue.Configuration.QueueName, assemblyQualifiedTypeName, messageJson, messageQueue.Statistics.GetNextSerialNumber())
+                                var message = new EnqueuedMessage(messageQueue.Configuration.QueueName, messageType, body, messageQueue.Statistics.GetNextSerialNumber())
                                 {
                                     MessageId = Guid.NewGuid(),
+                                    ContentType = contentType ?? CMqDefaults.DEFAULT_CONTENT_TYPE,
+                                    Headers = headers,
+                                    BodyIsBase64 = bodyIsBase64,
                                     DeferDuration = deferDeliveryDuration,
                                     DeferredUntil = deferDeliveryDuration == null ? null : DateTime.UtcNow + deferDeliveryDuration
                                 };
@@ -1330,9 +1416,12 @@ namespace NTDLS.CatMQ.Server
                             {
                                 ticketEnqueueMessageEphemeralWriteLock?.Accumulate();
 
-                                var message = new EnqueuedMessage(messageQueue.Configuration.QueueName, assemblyQualifiedTypeName, messageJson, messageQueue.Statistics.GetNextSerialNumber())
+                                var message = new EnqueuedMessage(messageQueue.Configuration.QueueName, messageType, body, messageQueue.Statistics.GetNextSerialNumber())
                                 {
                                     MessageId = Guid.NewGuid(),
+                                    ContentType = contentType ?? CMqDefaults.DEFAULT_CONTENT_TYPE,
+                                    Headers = headers,
+                                    BodyIsBase64 = bodyIsBase64,
                                     DeferDuration = deferDeliveryDuration,
                                     DeferredUntil = deferDeliveryDuration == null ? null : DateTime.UtcNow + deferDeliveryDuration
                                 };

@@ -237,7 +237,7 @@ namespace CatMQ.Tests.Unit
             var deadLetters = fixture.Server.GetQueueMessages($"{queueName}.dlq", 0, int.MaxValue);
             Assert.NotNull(deadLetters);
             Assert.Equal(25, deadLetters.Count);
-            Assert.Equal(25, deadLetters.Messages.Select(o => o.MessageJson).Distinct().Count());
+            Assert.Equal(25, deadLetters.Messages.Select(o => o.Body).Distinct().Count());
         }
 
         [Fact(DisplayName = "Persistent: expired messages are moved to the dead-letter queue.")]

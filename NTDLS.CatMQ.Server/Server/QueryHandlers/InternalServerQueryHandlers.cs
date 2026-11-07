@@ -13,7 +13,14 @@ namespace NTDLS.CatMQ.Server.Server.QueryHandlers
         {
             try
             {
-                _mqServer.CreateQueue(param.QueueConfiguration);
+                if (param.OnlyIfMissing)
+                {
+                    _mqServer.CreateQueueIfMissing(param.QueueConfiguration);
+                }
+                else
+                {
+                    _mqServer.CreateQueue(param.QueueConfiguration);
+                }
                 return new CMqCreateQueueQueryReply(true);
             }
             catch (Exception ex)
@@ -55,7 +62,8 @@ namespace NTDLS.CatMQ.Server.Server.QueryHandlers
                 _mqServer.Subscribe(context.ConnectionId,
                     context.TcpClient.Client.LocalEndPoint as IPEndPoint,
                     context.TcpClient.Client.RemoteEndPoint as IPEndPoint,
-                    param.QueueName);
+                    param.QueueName,
+                    param.ConsumerName);
 
                 return new CMqSubscribeToQueueQueryReply(true);
             }
@@ -82,7 +90,7 @@ namespace NTDLS.CatMQ.Server.Server.QueryHandlers
         {
             try
             {
-                _mqServer.Enqueue(param.QueueName, param.DeferDeliveryDuration, param.ObjectType, param.MessageJson);
+                _mqServer.Enqueue(param.QueueName, param.DeferDeliveryDuration, param.MessageType, param.Body, param.ContentType, param.Headers, param.BodyIsBase64);
                 return new CMqEnqueueMessageToQueueWithConfirmationReply(true);
             }
             catch (Exception ex)
@@ -93,7 +101,7 @@ namespace NTDLS.CatMQ.Server.Server.QueryHandlers
 
         public void EnqueueMessageToQueueExpedient(RmContext context, CMqEnqueueMessageToQueueExpedient param)
         {
-            _mqServer.Enqueue(param.QueueName, param.DeferDeliveryDuration, param.ObjectType, param.MessageJson);
+            _mqServer.Enqueue(param.QueueName, param.DeferDeliveryDuration, param.MessageType, param.Body, param.ContentType, param.Headers, param.BodyIsBase64);
         }
     }
 }
