@@ -68,6 +68,11 @@ namespace NTDLS.CatMQ.Shared.Payload.ServerToClient
         public TimeSpan? DeferDuration { get; set; }
 
         /// <summary>
+        /// How many times this message has been delivered to this consumer, including this time.
+        /// </summary>
+        public int DeliveryAttempt { get; set; }
+
+        /// <summary>
         /// The number of subscribers that this message has been successfully delivered to.
         /// </summary>
         public int SubscriberDeliveryCount { get; set; }

@@ -39,6 +39,12 @@
         public const int DEFAULT_PERSISTENT_MESSAGES_MIN_BUFFER = 1000;
 
         /// <summary>
+        /// The number of buffered messages at which a persistent queue stops loading more from the database. This limits
+        /// memory use when the buffered messages cannot be delivered yet, such as when they are waiting on an idle consumer.
+        /// </summary>
+        public const int DEFAULT_PERSISTENT_MESSAGES_MAX_BUFFER = 20000;
+
+        /// <summary>
         /// The amount of time to wait when performing deadlock avoidance locks.
         /// </summary>
         public const int DEFAULT_DEADLOCK_AVOIDANCE_WAIT_MS = 1;

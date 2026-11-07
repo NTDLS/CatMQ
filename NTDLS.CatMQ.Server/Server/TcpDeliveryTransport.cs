@@ -19,6 +19,7 @@ namespace NTDLS.CatMQ.Server.Server
                 ContentType = message.ContentType,
                 Headers = message.Headers,
                 BodyIsBase64 = message.BodyIsBase64,
+                DeliveryAttempt = message.DeliveryAttempt,
                 Timestamp = message.Timestamp,
                 DeferDuration = message.DeferDuration,
                 DeferredCount = message.DeferredCount,

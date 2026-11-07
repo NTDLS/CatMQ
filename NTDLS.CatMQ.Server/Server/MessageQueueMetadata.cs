@@ -10,6 +10,11 @@ namespace NTDLS.CatMQ.Server.Server
         public CMqQueueConfiguration Configuration { get; set; } = new();
         public MessageQueueStatistics Statistics { get; set; } = new();
 
+        /// <summary>
+        /// The names of the consumers that receive messages by asking for them, which stay registered across restarts.
+        /// </summary>
+        public List<string> LeaseConsumers { get; set; } = new();
+
         public MessageQueueMetadata(CMqQueueConfiguration configuration, MessageQueueStatistics statistics)
         {
             Configuration = configuration;

@@ -21,6 +21,7 @@ namespace NTDLS.CatMQ.Client.Client.QueryHandlers
                     ContentType = param.ContentType,
                     Headers = param.Headers,
                     BodyIsBase64 = param.BodyIsBase64,
+                    DeliveryAttempt = param.DeliveryAttempt,
                     Timestamp = param.Timestamp,
                     DeferredCount = param.DeferredCount,
                     DeferDuration = param.DeferDuration,

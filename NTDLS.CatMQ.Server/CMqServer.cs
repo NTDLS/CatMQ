@@ -25,6 +25,8 @@ namespace NTDLS.CatMQ.Server
         private readonly JsonSerializerOptions _indentedJsonOptions = new() { WriteIndented = true };
         private readonly OptimisticCriticalResource<MessageQueueDictionary> _messageQueues = new();
         private readonly RmServer _rmServer;
+        private readonly LeaseManager _leases = new();
+        private readonly object _checkpointLock = new();
 
         internal CMqServerConfiguration Configuration => _configuration;
 
@@ -195,7 +197,10 @@ namespace NTDLS.CatMQ.Server
                 OnLog?.Invoke(this, CMqErrorLevel.Verbose, "Checkpoint persistent queues.");
 
                 var queueMetas = mqd.Where(q => q.Value.Configuration.PersistenceScheme == CMqPersistenceScheme.Persistent)
-                    .Select(q => new MessageQueueMetadata(q.Value.Configuration, q.Value.Statistics)).ToList();
+                    .Select(q => new MessageQueueMetadata(q.Value.Configuration, q.Value.Statistics)
+                    {
+                        LeaseConsumers = q.Value.LeaseConsumers.Keys.ToList()
+                    }).ToList();
 
                 try
                 {
@@ -212,8 +217,13 @@ namespace NTDLS.CatMQ.Server
                 // This approach minimizes the risk of data corruption if the application crashes during the write operation.
                 var fileName = Path.Join(_configuration.PersistencePath, "queues.json");
                 var tempfileName = fileName + ".tmp";
-                File.WriteAllText(tempfileName, persistedQueuesJson);
-                File.Move(tempfileName, fileName, overwrite: true);
+
+                //Checkpoints can be requested from several threads at once, and they share the temporary file.
+                lock (_checkpointLock)
+                {
+                    File.WriteAllText(tempfileName, persistedQueuesJson);
+                    File.Move(tempfileName, fileName, overwrite: true);
+                }
             }
         }
 
@@ -725,6 +735,7 @@ namespace NTDLS.CatMQ.Server
             var messageQueuesToLoad = new List<SingleMessageQueueServer>();
             var deadLetterQueuesToLoad = new List<SingleMessageQueueServer>();
             var queuesToStart = new List<SingleMessageQueueServer>();
+            var leaseConsumersToRestore = new List<(SingleMessageQueueServer Queue, string ConsumerName)>();
 
             if (_configuration.PersistencePath != null)
             {
@@ -761,6 +772,7 @@ namespace NTDLS.CatMQ.Server
                                            messageQueuesToLoad.Add(messageQueue);
                                        }
                                        mqd.Add(queueMeta.Configuration.QueueName.ToLowerInvariant(), messageQueue);
+                                       leaseConsumersToRestore.AddRange(queueMeta.LeaseConsumers.Select(o => (messageQueue, o)));
 
                                        if (queueMeta.Configuration.DeadLetterConfiguration != null
                                            && queueMeta.Configuration.DeadLetterConfiguration.PersistenceScheme == CMqPersistenceScheme.Ephemeral)
@@ -790,6 +802,11 @@ namespace NTDLS.CatMQ.Server
 
             loadTasks = messageQueuesToLoad.Select(m => Task.Run(() => m.InitializePersistentDatabase())).ToArray();
             Task.WaitAll(loadTasks);
+
+            foreach (var (queue, consumerName) in leaseConsumersToRestore)
+            {
+                GetOrAddLeaseConsumer(queue, consumerName, persist: false);
+            }
 
             OnLog?.Invoke(this, CMqErrorLevel.Information, "Starting queues.");
             foreach (var mq in queuesToStart.Where(o => o.IsInitialized == true))
@@ -833,6 +850,15 @@ namespace NTDLS.CatMQ.Server
                         {
                             OnLog?.Invoke(this, CMqErrorLevel.Error, "An error occurred while touching HistoricalStatistics", ex);
                         }
+                    }
+
+                    try
+                    {
+                        _leases.Sweep();
+                    }
+                    catch (Exception ex)
+                    {
+                        OnLog?.Invoke(this, CMqErrorLevel.Error, "An error occurred while sweeping leases", ex);
                     }
 
                     try
@@ -1230,6 +1256,113 @@ namespace NTDLS.CatMQ.Server
                 RemotePort = remoteEndpoint?.Port
             }, timeout);
         }
+
+        #region Leases.
+
+        private SingleMessageQueueServer GetQueueOrThrow(string queueName)
+        {
+            string queueKey = queueName.ToLowerInvariant();
+            return _messageQueues.Read(mqd => mqd.TryGetValue(queueKey, out var messageQueue) ? messageQueue : null)
+                ?? throw new Exception($"Queue not found: [{queueName}].");
+        }
+
+        private LeaseDeliveryTransport GetOrAddLeaseConsumer(SingleMessageQueueServer messageQueue, string consumerName, bool persist = true)
+        {
+            var created = new LeaseDeliveryTransport(_leases, () => messageQueue.DeliveryThreadWaitEvent.Set());
+            var transport = messageQueue.LeaseConsumers.GetOrAdd(consumerName, created);
+
+            if (ReferenceEquals(transport, created))
+            {
+                AddSubscriber(messageQueue.Configuration.QueueName,
+                    new CMqSubscriberDescriptor(transport.SubscriberId, transport, consumerName), null);
+
+                if (persist)
+                {
+                    CheckpointPersistentMessageQueues();
+                }
+            }
+
+            return transport;
+        }
+
+        /// <summary>
+        /// Leases up to max messages to a named consumer, which is registered with the queue if this is its first request.
+        /// Returns as soon as there are messages, or an empty list if none arrive in time. The number returned is also
+        /// limited by the queue's free delivery slots. Each message must be acknowledged before its lease expires.
+        /// Delivery is at-least-once: an unacknowledged message is delivered again after its lease expires or after a restart.
+        /// </summary>
+        /// <param name="queueName">The name of the queue.</param>
+        /// <param name="consumerName">The stable name of the consumer. Requests with the same name compete for messages.</param>
+        /// <param name="max">The most messages to return.</param>
+        /// <param name="wait">How long to wait for a message. Defaults to 20 seconds.</param>
+        /// <param name="leaseDuration">How long the consumer has to acknowledge each message. Defaults to 60 seconds.</param>
+        /// <param name="cancellationToken">Cancels the request. Any messages already leased to it go back to the queue.</param>
+        public async Task<IReadOnlyList<CMqLeasedMessage>> ReceiveAsync(string queueName, string consumerName, int max = 1,
+            TimeSpan? wait = null, TimeSpan? leaseDuration = null, CancellationToken cancellationToken = default)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(consumerName);
+            ArgumentOutOfRangeException.ThrowIfLessThan(max, 1);
+
+            var effectiveWait = wait ?? TimeSpan.FromSeconds(20);
+            var effectiveLeaseDuration = leaseDuration ?? TimeSpan.FromSeconds(60);
+            ArgumentOutOfRangeException.ThrowIfLessThan(effectiveWait, TimeSpan.Zero, nameof(wait));
+            ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(effectiveLeaseDuration, TimeSpan.Zero, nameof(leaseDuration));
+
+            var messageQueue = GetQueueOrThrow(queueName);
+            var transport = GetOrAddLeaseConsumer(messageQueue, consumerName);
+
+            using var linkedToken = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, messageQueue.ShutdownToken);
+            try
+            {
+                return await transport.ReceiveAsync(max, effectiveWait, effectiveLeaseDuration, linkedToken.Token);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested == false)
+            {
+                return []; //The queue is shutting down or was deleted.
+            }
+        }
+
+        /// <summary>
+        /// Reports what happened to a leased message and frees its delivery slot. Repeating an acknowledgment is safe.
+        /// </summary>
+        public CMqLeaseStatus AcknowledgeLease(string leaseId, CMqConsumeResult result)
+        {
+            ArgumentNullException.ThrowIfNull(result);
+            return _leases.Acknowledge(leaseId, result);
+        }
+
+        /// <summary>
+        /// Gives a consumer more time, from now, to work on a leased message.
+        /// </summary>
+        public CMqLeaseStatus ExtendLease(string leaseId, TimeSpan duration, out DateTime expiresAt)
+        {
+            ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(duration, TimeSpan.Zero);
+            return _leases.Extend(leaseId, duration, out expiresAt);
+        }
+
+        /// <summary>
+        /// Removes a consumer that receives by asking for messages, so that queues stop waiting for it.
+        /// Messages leased to it go back to the queue.
+        /// </summary>
+        /// <returns>True if the consumer existed.</returns>
+        public bool RemoveLeaseConsumer(string queueName, string consumerName)
+        {
+            var messageQueue = GetQueueOrThrow(queueName);
+
+            if (messageQueue.LeaseConsumers.TryRemove(consumerName, out var transport) == false)
+            {
+                return false;
+            }
+
+            Unsubscribe(transport.SubscriberId, queueName);
+            transport.Close();
+            _leases.ReleaseOwnedBy(transport);
+            messageQueue.DeliveryThreadWaitEvent.Set();
+            CheckpointPersistentMessageQueues();
+            return true;
+        }
+
+        #endregion
 
         /// <summary>
         /// Adds a consumer that receives messages through the given transport rather than through a TCP connection.

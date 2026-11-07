@@ -212,6 +212,90 @@ namespace CatMQ.Tests.Unit
             }
         }
 
+        [Fact(DisplayName = "Restart: consumers stay registered, unacknowledged messages come back, and old leases are unknown.")]
+        public async Task TestLeasesAcrossRestart()
+        {
+            string queueName = "leased" + Guid.NewGuid().ToString("N");
+            string leaseId;
+            Guid messageId;
+
+            var server = StartServer();
+            try
+            {
+                server.CreateQueue(new CMqQueueConfiguration(queueName)
+                {
+                    PersistenceScheme = CMqPersistenceScheme.Persistent,
+                    ConsumptionScheme = CMqConsumptionScheme.AllSubscribersSatisfied
+                });
+                Assert.Empty(await server.ReceiveAsync(queueName, "billing", 1, TimeSpan.Zero));
+                Assert.Empty(await server.ReceiveAsync(queueName, "audit", 1, TimeSpan.Zero));
+
+                server.Enqueue(queueName, null, "orders.created", "{}");
+
+                var leased = Assert.Single(await server.ReceiveAsync(queueName, "billing", 1, TimeSpan.FromSeconds(5)));
+                leaseId = leased.LeaseId;
+                messageId = leased.Message.MessageId;
+            }
+            finally
+            {
+                server.Stop();
+            }
+
+            server = StartServer();
+            try
+            {
+                var consumers = server.GetSubscribers(queueName)!;
+                Assert.Equal(2, consumers.Count);
+                Assert.All(consumers, o => Assert.Equal("lease", o.TransportName));
+                Assert.Contains(consumers, o => o.ConsumerName == "audit");
+
+                Assert.Equal(CMqLeaseStatus.NotFound, server.AcknowledgeLease(leaseId, CMqConsumeResult.Consumed()));
+                Assert.Equal(1, server.GetQueue(queueName)?.QueueDepth);
+
+                var redelivered = Assert.Single(await server.ReceiveAsync(queueName, "billing", 1, TimeSpan.FromSeconds(5)));
+                Assert.Equal(messageId, redelivered.Message.MessageId);
+                Assert.Equal("orders.created", redelivered.Message.MessageType);
+                server.AcknowledgeLease(redelivered.LeaseId, CMqConsumeResult.Consumed());
+
+                var audit = Assert.Single(await server.ReceiveAsync(queueName, "audit", 1, TimeSpan.FromSeconds(5)));
+                server.AcknowledgeLease(audit.LeaseId, CMqConsumeResult.Consumed());
+
+                Assert.True(Wait.Until(() => server.GetQueue(queueName)?.QueueDepth == 0));
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Fact(DisplayName = "Restart: a removed consumer stays removed.")]
+        public async Task TestRemovedConsumerStaysRemoved()
+        {
+            string queueName = "removed" + Guid.NewGuid().ToString("N");
+
+            var server = StartServer();
+            try
+            {
+                server.CreateQueue(new CMqQueueConfiguration(queueName) { PersistenceScheme = CMqPersistenceScheme.Persistent });
+                Assert.Empty(await server.ReceiveAsync(queueName, "billing", 1, TimeSpan.Zero));
+                Assert.True(server.RemoveLeaseConsumer(queueName, "billing"));
+            }
+            finally
+            {
+                server.Stop();
+            }
+
+            server = StartServer();
+            try
+            {
+                Assert.Empty(server.GetSubscribers(queueName)!);
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
         [Fact(DisplayName = "Restart: a deleted queue stays deleted.")]
         public void TestDeletedQueueStaysDeleted()
         {

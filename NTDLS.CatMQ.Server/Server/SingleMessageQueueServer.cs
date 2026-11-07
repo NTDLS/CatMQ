@@ -2,6 +2,7 @@
 using NTDLS.CatMQ.Shared;
 using NTDLS.Semaphore;
 using RocksDbSharp;
+using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json;
 
@@ -55,6 +56,16 @@ namespace NTDLS.CatMQ.Server.Server
         internal MessageQueueStatistics Statistics { get; set; } = new();
 
         internal HistoricalStatistics HistoricalStatistics { get; private set; }
+
+        /// <summary>
+        /// The consumers that receive messages by asking for them, by consumer name.
+        /// </summary>
+        internal ConcurrentDictionary<string, LeaseDeliveryTransport> LeaseConsumers { get; } = new();
+
+        /// <summary>
+        /// Signaled when the queue is shutting down or being deleted.
+        /// </summary>
+        internal CancellationToken ShutdownToken => _cts.Token;
 
         public SingleMessageQueueServer(CMqServer mqServer, CMqQueueConfiguration queueConfiguration)
         {
@@ -196,6 +207,7 @@ namespace NTDLS.CatMQ.Server.Server
                                         //  top-message because it could be that we do not have any qualified messages in the buffer
                                         //  (because all of them are deferred) even though we do have messages in the buffer.
                                         if (Statistics.QueueDepth > m.MessageBuffer.Count
+                                            && m.MessageBuffer.Count < CMqDefaults.DEFAULT_PERSISTENT_MESSAGES_MAX_BUFFER
                                             && (topMessage == null || m.MessageBuffer.Count < CMqDefaults.DEFAULT_PERSISTENT_MESSAGES_MIN_BUFFER))
                                         {
                                             //If we have more items in the queue than we have in the buffer, then trigger a rehydrate.
@@ -357,7 +369,7 @@ namespace NTDLS.CatMQ.Server.Server
         /// <summary>
         /// Creates the transport-neutral form of a message, as it stands for this delivery attempt.
         /// </summary>
-        private CMqReceivedMessage CreateDelivery(EnqueuedMessage message)
+        private CMqReceivedMessage CreateDelivery(EnqueuedMessage message, int deliveryAttempt)
         {
             return new CMqReceivedMessage(Configuration.QueueName, message.SerialNumber, message.MessageType, message.Body)
             {
@@ -365,6 +377,7 @@ namespace NTDLS.CatMQ.Server.Server
                 ContentType = message.ContentType,
                 Headers = message.Headers,
                 BodyIsBase64 = message.BodyIsBase64,
+                DeliveryAttempt = deliveryAttempt,
                 Timestamp = message.Timestamp,
                 DeferDuration = message.DeferDuration,
                 DeferredCount = message.DeferredCount,
@@ -425,7 +438,7 @@ namespace NTDLS.CatMQ.Server.Server
                 {
                     subscriber.IncrementAttemptedDeliveryCount();
 
-                    var deliveryResult = await subscriber.Transport.DeliverAsync(CreateDelivery(message), _cts.Token);
+                    var deliveryResult = await subscriber.Transport.DeliverAsync(CreateDelivery(message, subscriberDeliveryStatistics.DeliveryAttemptCount), _cts.Token);
 
                     ResetDeliveryBackoff();
                     Statistics.IncrementDeliveredMessageCount();
@@ -512,6 +525,13 @@ namespace NTDLS.CatMQ.Server.Server
                     {
                         throw new Exception($"Unexpected delivery disposition [{deliveryResult.Disposition}] for queue [{Configuration.QueueName}].");
                     }
+                }
+                catch (CMqDeliveryNotAcceptedException)
+                {
+                    //The consumer never had this message, so it is left in the queue with nothing held against it.
+                    subscriberDeliveryStatistics.DeliveryAttemptCount--;
+                    failureToDeliverSubscriberIDs.Add(subscriber.ConsumerId);
+                    continue;
                 }
                 catch (Exception ex) //Delivery failure.
                 {
