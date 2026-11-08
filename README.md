@@ -2,8 +2,9 @@
 CatMQ is a high-performance and reliable persistent message queue designed for efficient inter-process communication, task queuing, load balancing, and data buffering.
 
 Applications written in any language can publish and consume messages. .NET applications connect with the native TCP client,
-and Python, JavaScript, Go, Java, shell scripts and everything else use the [HTTP API](#http-api). They all share the same
-queues, so a message published from one language can be consumed in another.
+Python and JavaScript have client libraries, and Go, Java, shell scripts and everything else use the [HTTP API](#http-api)
+directly, or have CatMQ push messages to them with [webhooks](#webhooks). They all share the same queues, so a message
+published from one language can be consumed in another.
 
 ## Testing Status
 [![Regression Tests](https://github.com/NTDLS/CatMQ/actions/workflows/Regression%20Tests.yml/badge.svg)](https://github.com/NTDLS/CatMQ/actions/workflows/Regression%20Tests.yml)
@@ -18,6 +19,8 @@ So, we built one. __Welcome to CatMQ: a reliable yet slim message queue.__
 ## Packages 📦
 - Dedicated server install, with the web UI and the HTTP API: https://github.com/NTDLS/CatMQ/releases
 - HTTP API for any language, described by an OpenAPI document: [docs/api/catmq.openapi.yaml](docs/api/catmq.openapi.yaml)
+- Python client, standard library only: [clients/python](clients/python)
+- JavaScript and TypeScript client, no dependencies: [clients/javascript](clients/javascript)
 - .NET client Nuget package: https://www.nuget.org/packages/NTDLS.CatMQ.Client
 - .NET server Nuget package, for running the server in-process: https://www.nuget.org/packages/NTDLS.CatMQ.Server
 
@@ -270,36 +273,36 @@ A consumer is identified by its name, and requests that use the same name compet
 registered across restarts. With `allConsumers`, messages wait until every registered consumer has them, so remove a
 consumer that has gone away for good with `DELETE /api/v1/queues/{queue}/consumers/{consumer}`.
 
-### A complete consumer in Python
-Using only the standard library:
+### Python
+The [Python client](clients/python) uses only the standard library.
 ```python
-import json, os, urllib.request
+import os
+from catmq import CatMQ
 
-BASE = "http://127.0.0.1:45783/api/v1"
-KEY = os.environ["CATMQ_KEY"]
+mq = CatMQ("http://127.0.0.1:45783", api_key=os.environ["CATMQ_KEY"])
+mq.publish("orders", {"orderId": 1234}, message_type="orders.created")
 
-def call(method, path, body=None):
-    request = urllib.request.Request(BASE + path, method=method, data=None if body is None else json.dumps(body).encode(),
-                                     headers={"Authorization": f"Bearer {KEY}", "Content-Type": "application/json"})
-    with urllib.request.urlopen(request, timeout=30) as response:
-        text = response.read()
-        return json.loads(text) if text else None
+def handle(message):
+    print("order", message.body["orderId"])   # returning acknowledges it; raising has it delivered again
 
-while True:
-    batch = call("POST", "/queues/orders/messages/receive", {"consumer": "billing", "max": 10, "waitSeconds": 20})
-    for message in batch["messages"]:
-        print("order", message["body"]["orderId"])
-        call("POST", f"/leases/{message['leaseId']}/ack", {"disposition": "consumed"})
+mq.consume("orders", "billing", handle)
 ```
 
-### Publishing from JavaScript
+### JavaScript and TypeScript
+The [JavaScript client](clients/javascript) has no dependencies, and runs on Node.js 20 or later, Deno, Bun and browsers.
 ```javascript
-await fetch("http://127.0.0.1:45783/api/v1/queues/orders/messages", {
-    method: "POST",
-    headers: { "Authorization": `Bearer ${process.env.CATMQ_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ messageType: "orders.created", body: { orderId: 1234 } })
+import { CatMQ } from "catmq";
+
+const mq = new CatMQ({ url: "http://127.0.0.1:45783", apiKey: process.env.CATMQ_KEY });
+await mq.publish("orders", { orderId: 1234 }, { messageType: "orders.created" });
+
+await mq.consume("orders", "billing", async (message) => {
+    console.log("order", message.body.orderId);  // resolving acknowledges it; throwing has it delivered again
 });
 ```
+
+Both clients cover the whole API, including batches, idempotency keys, leases, webhooks and signature checks, and
+both pass the same [conformance scenarios](clients/conformance/scenarios.json), run against a real service by the test suite.
 
 ### Everything else
 The API can also list queues, change some of a queue's settings with `PATCH`, list and delete messages without
@@ -307,7 +310,42 @@ consuming them, purge a queue, move messages from a dead-letter queue back onto 
 and list and remove consumers. Every error is returned as an RFC 9457 problem document with a stable `code`, such as
 `queue_not_found` or `lease_expired`.
 
-Webhooks, where CatMQ pushes messages to a URL, are described in the OpenAPI document but are not available yet.
+### Webhooks
+Instead of asking for messages, a service can have CatMQ `POST` each one to a URL. The response is the acknowledgment:
+`2xx` consumes the message, `410` drops it, `422` dead-letters it, and `429` or `503` defers it by `Retry-After`. Anything
+else, a timeout, or no connection is a failed delivery, which is retried up to the queue's `maxDeliveryAttempts`.
+```bash
+curl -X PUT http://127.0.0.1:45783/api/v1/queues/orders/webhooks/billing -H "Authorization: Bearer $CATMQ_KEY" -H "Content-Type: application/json" -d '{"url":"https://billing.example.com/catmq","headers":{"Authorization":"Bearer RECEIVER_TOKEN"},"maxConcurrency":4}'
+```
+
+The webhook's name is its consumer name, so with `allConsumers` it receives its own copy of every message, and its
+deliveries count toward `maxOutstandingDeliveries` like any other consumer's. `maxConcurrency` limits how many are in
+flight to it at once, `timeoutSeconds` (30 by default) is how long CatMQ waits for a response, and `enabled: false` pauses
+it. Webhooks are kept across restarts.
+
+The body is the message, in the same form `receive` returns it, with the `queue`, a `deliveryId` and the `deliveryAttempt`.
+Every delivery is signed. The response that creates the webhook includes its secret, once; keep it. The
+`X-CatMQ-Signature` header is `t=<unix seconds>,v1=<hex>`, where the hex is the HMAC-SHA256 of `<unix seconds>.<raw body>`
+with the secret. Receivers should check it before trusting a delivery, and reject old timestamps so a captured delivery
+cannot be replayed. The Python and JavaScript clients do both (`verify_webhook` and `verifyWebhook`). In any language:
+```python
+import hashlib, hmac, time
+
+def is_genuine(raw_body: bytes, signature_header: str, secret: str) -> bool:
+    parts = [part.split("=", 1) for part in signature_header.split(",")]
+    timestamp = next(value for key, value in parts if key == "t")
+    expected = hmac.new(secret.encode(), timestamp.encode() + b"." + raw_body, hashlib.sha256).hexdigest()
+    return abs(time.time() - int(timestamp)) < 300 and any(
+        key == "v1" and hmac.compare_digest(value, expected) for key, value in parts)
+```
+
+`POST /api/v1/queues/{queue}/webhooks/{webhook}/rotate-secret` replaces the secret. For the next 24 hours deliveries carry a
+signature made with each secret, so receivers can switch without rejecting any. Reading a webhook back never returns its
+secret or its header values.
+
+Webhook URLs must be `https`. For testing, or a receiver on a trusted network, `AllowHttpWebhooks` in the service's
+configuration also allows `http`. CatMQ calls whatever URL it is given, including addresses on its own network, so give API
+keys only to clients you trust with that. Redirects are not followed.
 
 ## Technologies
 CatMQ is based heavily on internally built technologies that leverage the works by people

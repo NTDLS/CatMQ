@@ -106,6 +106,14 @@
                         <option value="false">@Localize("False")</option>
                     </select>
                 </div>
+                <div class="mb-3">
+                    <label for="allowHttpWebhooks" class="form-label fw-bold">@Localize("Allow http Webhooks")</label>
+                    <span asp-validation-for="ServerConfig.AllowHttpWebhooks" class="text-danger"></span>
+                    <select id="allowHttpWebhooks" asp-for="ServerConfig.AllowHttpWebhooks" class="form-select">
+                        <option value="true">@Localize("True")</option>
+                        <option value="false">@Localize("False")</option>
+                    </select>
+                </div>
             </div>
         </div>
 

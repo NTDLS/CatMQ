@@ -18,5 +18,19 @@ namespace CatMQ.Tests
             }
             return condition();
         }
+
+        public static async Task<bool> UntilAsync(Func<Task<bool>> condition, int timeoutSeconds = 10)
+        {
+            var deadline = DateTime.UtcNow.AddSeconds(timeoutSeconds);
+            while (DateTime.UtcNow < deadline)
+            {
+                if (await condition())
+                {
+                    return true;
+                }
+                await Task.Delay(20);
+            }
+            return await condition();
+        }
     }
 }

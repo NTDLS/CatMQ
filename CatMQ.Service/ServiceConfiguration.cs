@@ -20,6 +20,11 @@ namespace CatMQ.Service
         public bool EnableInstrumentation { get; set; } = false;
 
         /// <summary>
+        /// Whether webhooks may use plain http URLs rather than only https.
+        /// </summary>
+        public bool AllowHttpWebhooks { get; set; } = false;
+
+        /// <summary>
         /// Whether or not the web UI is enabled.
         /// </summary>
         public bool EnableWebUI { get; set; } = true;

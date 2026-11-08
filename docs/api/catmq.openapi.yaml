@@ -629,16 +629,25 @@ paths:
       operationId: putWebhook
       summary: Creates or replaces a webhook.
       description: |
-        The webhook's name is also its consumer name. The signing secret is returned only when the
-        webhook is created. Replacing a webhook keeps its secret.
+        The webhook's name is also its consumer name, so it cannot be the name of a lease consumer on
+        the same queue. The signing secret (`whsec_...`) is returned only when the webhook is created.
+        Replacing a webhook keeps its secret. Webhooks and their secrets survive a restart.
+
+        The URL must be `https`, unless the server's `AllowHttpWebhooks` setting is on. CatMQ calls
+        whatever URL it is given, including addresses on its own network, so only give API keys to
+        clients you trust with that.
 
         ### What CatMQ sends
-        CatMQ sends a `POST` whose body is a `WebhookDelivery`, with these headers:
+        CatMQ sends a `POST` whose body is a `WebhookDelivery` (`application/json`), with the
+        webhook's own `headers` and these:
 
-        - `X-CatMQ-Signature`: `t=<unix seconds>,v1=<hex HMAC-SHA256>`, computed over
-          `<unix seconds>.<raw request body>`. Reject requests with an old timestamp.
-        - `X-CatMQ-Delivery-Id`: identifies this delivery attempt.
+        - `X-CatMQ-Signature`: `t=<unix seconds>,v1=<hex HMAC-SHA256>`, where the HMAC is computed
+          with the secret over `<unix seconds>.<raw request body>`. For 24 hours after the secret is
+          rotated there is a second `v1=` signature, made with the old secret. Accept the delivery if
+          any `v1` matches, and reject deliveries whose timestamp is more than a few minutes old.
+        - `X-CatMQ-Delivery-Id`: identifies this delivery attempt; it is also `deliveryId` in the body.
         - `X-CatMQ-Message-Id`: the `messageId`, which is the same on every attempt.
+        - `User-Agent`: `CatMQ-Webhook/1`.
 
         ### What the response means
         | Response | Result |
@@ -646,10 +655,10 @@ paths:
         | `2xx` | Consumed. |
         | `410` | Dropped. |
         | `422` | Dead-lettered. |
-        | `429`, `503` | Deferred, by `Retry-After` when present. Does not count as a failure. |
-        | Anything else, or a timeout | Failed delivery. Counts toward `maxDeliveryAttempts`. |
+        | `429`, `503` | Deferred, by `Retry-After` (seconds or a date; 30 seconds when absent, at most an hour). Does not count as a failure. |
+        | Anything else, a timeout, or no connection | Failed delivery. Counts toward `maxDeliveryAttempts`. |
 
-        Redirects are not followed.
+        Redirects are not followed; a `3xx` is a failed delivery.
       requestBody:
         required: true
         content:
@@ -685,6 +694,7 @@ paths:
       tags: [Webhooks]
       operationId: getWebhook
       summary: Gets a webhook and its delivery status.
+      description: Header values are never returned; each is replaced with `********`.
       responses:
         '200':
           description: The webhook.
@@ -700,6 +710,7 @@ paths:
       tags: [Webhooks]
       operationId: deleteWebhook
       summary: Deletes a webhook.
+      description: Deliveries already in flight finish; no more are made. Deleting its consumer does the same.
       responses:
         '204':
           description: The webhook no longer exists.
@@ -1179,7 +1190,7 @@ components:
         url:
           type: string
           format: uri
-          description: Must be `https`, unless the server is configured to allow `http`.
+          description: An absolute URL. Must be `https`, unless the server's `AllowHttpWebhooks` setting is on.
         timeoutSeconds:
           type: integer
           minimum: 1
@@ -1188,15 +1199,18 @@ components:
         maxConcurrency:
           type: integer
           minimum: 1
-          description: The most deliveries in flight to this webhook. Defaults to the queue's limit.
+          description: The most deliveries in flight to this webhook. Without it, the queue's `maxOutstandingDeliveries` is the limit.
         headers:
           type: object
-          description: Extra headers to send, such as credentials for the receiving service.
+          description: |
+            Extra headers to send, such as credentials for the receiving service. Values cannot contain
+            line breaks. They are stored, but never returned: responses show `********` for each value.
           additionalProperties:
             type: string
         enabled:
           type: boolean
           default: true
+          description: A disabled webhook keeps its settings and secret, but receives nothing.
 
     Webhook:
       allOf:
@@ -1218,18 +1232,44 @@ components:
               type: [string, 'null']
             consecutiveFailures:
               type: integer
+              description: Failed deliveries since the last successful one.
 
     WebhookDelivery:
       description: The request body that CatMQ POSTs to a webhook URL.
-      allOf:
-        - $ref: '#/components/schemas/Message'
-        - type: object
-          required: [queue, deliveryId]
-          properties:
-            queue:
-              type: string
-            deliveryId:
-              type: string
+      type: object
+      required: [queue, deliveryId, messageId, serialNumber, contentType, enqueuedAt, deliveryAttempt]
+      properties:
+        queue:
+          type: string
+        deliveryId:
+          type: string
+          description: Identifies this delivery attempt. Also sent as `X-CatMQ-Delivery-Id`.
+        messageId:
+          type: string
+          format: uuid
+          description: The same on every attempt, so a receiver can detect a message it has already handled.
+        serialNumber:
+          type: string
+        messageType:
+          type: [string, 'null']
+        contentType:
+          type: string
+        body:
+          description: Present for JSON and text content.
+        bodyBase64:
+          type: string
+          contentEncoding: base64
+          description: Present for binary content.
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+        enqueuedAt:
+          type: string
+          format: date-time
+        deliveryAttempt:
+          type: integer
+          description: How many times this message has been delivered to this webhook, including this time.
 
     Consumer:
       type: object

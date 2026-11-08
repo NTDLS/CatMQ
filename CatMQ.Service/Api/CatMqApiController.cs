@@ -446,6 +446,62 @@ namespace CatMQ.Service.Api
 
         #endregion
 
+        #region Webhooks.
+
+        [HttpGet("queues/{queue}/webhooks")]
+        public IActionResult ListWebhooks(string queue)
+            => Ok(new { webhooks = mqServer.GetWebhooks(queue).Select(o => WebhookDto.From(o)) });
+
+        [HttpPut("queues/{queue}/webhooks/{webhook}")]
+        public IActionResult PutWebhook(string queue, string webhook, [FromBody] WebhookSettingsDto settings)
+        {
+            if (string.IsNullOrWhiteSpace(settings.Url))
+            {
+                throw new ArgumentException("url is required.");
+            }
+
+            var defaults = new CMqWebhookSettings();
+            var result = mqServer.PutWebhook(queue, webhook, new CMqWebhookSettings
+            {
+                Url = settings.Url,
+                TimeoutSeconds = settings.TimeoutSeconds ?? defaults.TimeoutSeconds,
+                MaxConcurrency = settings.MaxConcurrency,
+                Headers = settings.Headers,
+                Enabled = settings.Enabled ?? defaults.Enabled
+            }, out var secret);
+
+            return secret == null
+                ? Ok(WebhookDto.From(result))
+                : StatusCode(StatusCodes.Status201Created, WebhookDto.From(result, secret));
+        }
+
+        [HttpGet("queues/{queue}/webhooks/{webhook}")]
+        public IActionResult GetWebhook(string queue, string webhook)
+        {
+            var result = mqServer.GetWebhook(queue, webhook);
+            return result == null
+                ? Problems.NotFound("webhook_not_found", $"Webhook not found: [{webhook}].")
+                : Ok(WebhookDto.From(result));
+        }
+
+        [HttpDelete("queues/{queue}/webhooks/{webhook}")]
+        public IActionResult DeleteWebhook(string queue, string webhook)
+        {
+            mqServer.DeleteWebhook(queue, webhook);
+            return NoContent();
+        }
+
+        [HttpPost("queues/{queue}/webhooks/{webhook}/rotate-secret")]
+        public IActionResult RotateWebhookSecret(string queue, string webhook)
+        {
+            var secret = mqServer.RotateWebhookSecret(queue, webhook);
+            return secret == null
+                ? Problems.NotFound("webhook_not_found", $"Webhook not found: [{webhook}].")
+                : Ok(new { secret });
+        }
+
+        #endregion
+
         #region Consumers.
 
         [HttpGet("queues/{queue}/consumers")]
@@ -482,10 +538,14 @@ namespace CatMQ.Service.Api
                     continue;
                 }
 
-                //A lease consumer has to be removed as a whole. Removing only its subscription would leave it registered, unable to receive.
+                //A lease consumer or a webhook has to be removed as a whole. Removing only its subscription would leave it registered, unable to receive.
                 if (subscriber.TransportName == "lease" && subscriber.ConsumerName != null)
                 {
                     mqServer.RemoveLeaseConsumer(queue, subscriber.ConsumerName);
+                }
+                else if (subscriber.TransportName == "webhook" && subscriber.ConsumerName != null)
+                {
+                    mqServer.DeleteWebhook(queue, subscriber.ConsumerName);
                 }
                 else
                 {

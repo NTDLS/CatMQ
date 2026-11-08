@@ -199,7 +199,8 @@ namespace NTDLS.CatMQ.Server
                 var queueMetas = mqd.Where(q => q.Value.Configuration.PersistenceScheme == CMqPersistenceScheme.Persistent)
                     .Select(q => new MessageQueueMetadata(q.Value.Configuration, q.Value.Statistics)
                     {
-                        LeaseConsumers = q.Value.LeaseConsumers.Keys.ToList()
+                        LeaseConsumers = q.Value.LeaseConsumers.Keys.ToList(),
+                        Webhooks = q.Value.Webhooks.Values.Select(o => o.Registration).ToList()
                     }).ToList();
 
                 try
@@ -738,6 +739,7 @@ namespace NTDLS.CatMQ.Server
             var deadLetterQueuesToLoad = new List<SingleMessageQueueServer>();
             var queuesToStart = new List<SingleMessageQueueServer>();
             var leaseConsumersToRestore = new List<(SingleMessageQueueServer Queue, string ConsumerName)>();
+            var webhooksToRestore = new List<(SingleMessageQueueServer Queue, WebhookRegistration Registration)>();
 
             if (_configuration.PersistencePath != null)
             {
@@ -775,6 +777,7 @@ namespace NTDLS.CatMQ.Server
                                        }
                                        mqd.Add(queueMeta.Configuration.QueueName.ToLowerInvariant(), messageQueue);
                                        leaseConsumersToRestore.AddRange(queueMeta.LeaseConsumers.Select(o => (messageQueue, o)));
+                                       webhooksToRestore.AddRange(queueMeta.Webhooks.Select(o => (messageQueue, o)));
 
                                        if (queueMeta.Configuration.DeadLetterConfiguration != null
                                            && queueMeta.Configuration.DeadLetterConfiguration.PersistenceScheme == CMqPersistenceScheme.Ephemeral)
@@ -808,6 +811,11 @@ namespace NTDLS.CatMQ.Server
             foreach (var (queue, consumerName) in leaseConsumersToRestore)
             {
                 GetOrAddLeaseConsumer(queue, consumerName, persist: false);
+            }
+
+            foreach (var (queue, registration) in webhooksToRestore)
+            {
+                AddWebhookTransport(queue, registration);
             }
 
             OnLog?.Invoke(this, CMqErrorLevel.Information, "Starting queues.");
@@ -1423,6 +1431,164 @@ namespace NTDLS.CatMQ.Server
 
         #endregion
 
+        #region Webhooks.
+
+        private static readonly System.Text.RegularExpressions.Regex _consumerNameRegex = new("^[A-Za-z0-9._-]{1,128}$");
+
+        private void ValidateWebhook(string webhookName, CMqWebhookSettings settings)
+        {
+            if (_consumerNameRegex.IsMatch(webhookName) == false)
+            {
+                throw new ArgumentException("A webhook name may contain only letters, numbers, dots, underscores and hyphens, up to 128 of them.");
+            }
+            if (Uri.TryCreate(settings.Url, UriKind.Absolute, out var url) == false || (url.Scheme != Uri.UriSchemeHttps && url.Scheme != Uri.UriSchemeHttp))
+            {
+                throw new ArgumentException("The webhook URL must be an absolute http or https URL.");
+            }
+            if (url.Scheme == Uri.UriSchemeHttp && _configuration.AllowHttpWebhooks == false)
+            {
+                throw new ArgumentException("The webhook URL must use https. The server can be configured to allow http with AllowHttpWebhooks.");
+            }
+            if (settings.TimeoutSeconds is < 1 or > 300)
+            {
+                throw new ArgumentException("The webhook timeout must be between 1 and 300 seconds.");
+            }
+            if (settings.MaxConcurrency < 1)
+            {
+                throw new ArgumentException("The webhook's maximum concurrency must be at least 1.");
+            }
+            if (settings.Headers?.Any(o => string.IsNullOrWhiteSpace(o.Key) || o.Key.IndexOfAny(['\r', '\n', ':']) >= 0 || o.Value.IndexOfAny(['\r', '\n']) >= 0) == true)
+            {
+                throw new ArgumentException("Webhook header names must not be empty, and names and values must not contain line breaks.");
+            }
+        }
+
+        private WebhookDeliveryTransport AddWebhookTransport(SingleMessageQueueServer messageQueue, WebhookRegistration registration)
+        {
+            var transport = new WebhookDeliveryTransport(messageQueue.Configuration.QueueName, registration);
+            messageQueue.Webhooks[registration.Name] = transport;
+            AddSubscriber(messageQueue.Configuration.QueueName, new CMqSubscriberDescriptor(transport.SubscriberId, transport, registration.Name), null);
+            return transport;
+        }
+
+        /// <summary>
+        /// Creates a webhook, which POSTs each of the queue's messages to a URL, or replaces the settings of an existing one.
+        /// The webhook's name is also its consumer name.
+        /// </summary>
+        /// <param name="queueName">The queue to deliver from.</param>
+        /// <param name="webhookName">The name of the webhook.</param>
+        /// <param name="settings">Where and how to deliver.</param>
+        /// <param name="secret">The new webhook's signing secret, which is only ever given here. Null when an existing webhook was replaced, which keeps its secret.</param>
+        public CMqWebhookDescriptor PutWebhook(string queueName, string webhookName, CMqWebhookSettings settings, out string? secret)
+        {
+            ArgumentNullException.ThrowIfNull(settings);
+            ValidateWebhook(webhookName, settings);
+            var messageQueue = GetQueueOrThrow(queueName);
+
+            //A copy, so that the caller cannot change a registered webhook's settings afterwards.
+            var copy = new CMqWebhookSettings
+            {
+                Url = settings.Url,
+                TimeoutSeconds = settings.TimeoutSeconds,
+                MaxConcurrency = settings.MaxConcurrency,
+                Headers = settings.Headers == null ? null : new Dictionary<string, string>(settings.Headers),
+                Enabled = settings.Enabled
+            };
+
+            lock (messageQueue.Webhooks)
+            {
+                if (messageQueue.Webhooks.TryGetValue(webhookName, out var existing))
+                {
+                    var current = existing.Registration;
+                    existing.Registration = new WebhookRegistration
+                    {
+                        Name = webhookName,
+                        Settings = copy,
+                        Secret = current.Secret,
+                        PreviousSecret = current.PreviousSecret,
+                        PreviousSecretExpiresAt = current.PreviousSecretExpiresAt
+                    };
+                    secret = null;
+                    messageQueue.DeliveryThreadWaitEvent.Set();
+                    CheckpointPersistentMessageQueues();
+                    return existing.ToDescriptor();
+                }
+
+                if (messageQueue.LeaseConsumers.ContainsKey(webhookName))
+                {
+                    throw new ArgumentException($"The name [{webhookName}] is already used by a consumer that receives by asking for messages.");
+                }
+
+                secret = WebhookRegistration.NewSecret();
+                var transport = AddWebhookTransport(messageQueue, new WebhookRegistration { Name = webhookName, Settings = copy, Secret = secret });
+                CheckpointPersistentMessageQueues();
+                return transport.ToDescriptor();
+            }
+        }
+
+        /// <summary>
+        /// Lists a queue's webhooks, and how their deliveries have been going.
+        /// </summary>
+        public IReadOnlyList<CMqWebhookDescriptor> GetWebhooks(string queueName)
+            => GetQueueOrThrow(queueName).Webhooks.Values.Select(o => o.ToDescriptor()).OrderBy(o => o.Name, StringComparer.Ordinal).ToList();
+
+        /// <summary>
+        /// Gets a webhook, or null if the queue has none by that name.
+        /// </summary>
+        public CMqWebhookDescriptor? GetWebhook(string queueName, string webhookName)
+            => GetQueueOrThrow(queueName).Webhooks.TryGetValue(webhookName, out var transport) ? transport.ToDescriptor() : null;
+
+        /// <summary>
+        /// Deletes a webhook. Deliveries to it that are in progress finish.
+        /// </summary>
+        /// <returns>True if the webhook existed.</returns>
+        public bool DeleteWebhook(string queueName, string webhookName)
+        {
+            var messageQueue = GetQueueOrThrow(queueName);
+            if (messageQueue.Webhooks.TryRemove(webhookName, out var transport) == false)
+            {
+                return false;
+            }
+
+            Unsubscribe(transport.SubscriberId, queueName);
+            messageQueue.DeliveryThreadWaitEvent.Set();
+            CheckpointPersistentMessageQueues();
+            return true;
+        }
+
+        /// <summary>
+        /// Replaces a webhook's signing secret. For the next 24 hours deliveries are signed with both the new and the old
+        /// secret, so that the receiver can be moved to the new one without rejecting deliveries in between.
+        /// </summary>
+        /// <returns>The new secret, or null if the queue has no webhook by that name.</returns>
+        public string? RotateWebhookSecret(string queueName, string webhookName)
+        {
+            var messageQueue = GetQueueOrThrow(queueName);
+
+            lock (messageQueue.Webhooks)
+            {
+                if (messageQueue.Webhooks.TryGetValue(webhookName, out var transport) == false)
+                {
+                    return null;
+                }
+
+                var current = transport.Registration;
+                var secret = WebhookRegistration.NewSecret();
+                transport.Registration = new WebhookRegistration
+                {
+                    Name = current.Name,
+                    Settings = current.Settings,
+                    Secret = secret,
+                    PreviousSecret = current.Secret,
+                    PreviousSecretExpiresAt = DateTime.UtcNow.AddHours(24)
+                };
+                CheckpointPersistentMessageQueues();
+                return secret;
+            }
+        }
+
+        #endregion
+
         #region Leases.
 
         private SingleMessageQueueServer GetQueueOrThrow(string queueName)
@@ -1435,6 +1601,11 @@ namespace NTDLS.CatMQ.Server
         private LeaseDeliveryTransport GetOrAddLeaseConsumer(SingleMessageQueueServer messageQueue, string consumerName, bool persist = true)
         {
             var created = new LeaseDeliveryTransport(_leases, () => messageQueue.DeliveryThreadWaitEvent.Set());
+            if (messageQueue.Webhooks.ContainsKey(consumerName))
+            {
+                throw new ArgumentException($"The name [{consumerName}] is already used by a webhook.");
+            }
+
             var transport = messageQueue.LeaseConsumers.GetOrAdd(consumerName, created);
 
             if (ReferenceEquals(transport, created))

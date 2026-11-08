@@ -1,0 +1,25 @@
+{
+  "description": "Scenarios every CatMQ HTTP client must pass against a running service. Each client's conformance runner implements every scenario under the same id, and prints one JSON line per scenario: {\"scenario\": \"<id>\", \"passed\": true|false, \"error\": \"...\"}.",
+  "environment": {
+    "CATMQ_URL": "The service's base URL, such as http://127.0.0.1:45783. The API is under /api/v1.",
+    "CATMQ_API_KEY": "An API key the service accepts.",
+    "CATMQ_WEBHOOK_HOST": "A host name the service can reach the runner's own HTTP listener at, for webhook deliveries. The service must allow http webhooks."
+  },
+  "scenarios": [
+    { "id": "health", "description": "health() needs no API key and returns status ok and a version." },
+    { "id": "unauthorized", "description": "A wrong API key raises an error with status 401 and code unauthorized." },
+    { "id": "queue_lifecycle", "description": "Create a queue (created), create it again (not created), read it, update one setting, find it while paging through queues, delete it, and get queue_not_found (404) reading it." },
+    { "id": "invalid_request", "description": "Invalid settings raise an error with status 400 and code invalid_request, with a title." },
+    { "id": "publish_receive_ack", "description": "Publish a JSON object, a text body and a binary body, receive them as an object, a string and bytes with their message type and headers, and acknowledge each so the queue is empty." },
+    { "id": "batch_publish", "description": "A batch publish returns a result per message in order; an invalid message is rejected without failing the others." },
+    { "id": "idempotency", "description": "Publishing twice with the same idempotency key returns duplicate and the same message ID, and stores one message." },
+    { "id": "queue_full", "description": "Publishing to a queue at its maxDepth raises an error with status 429 and code queue_full." },
+    { "id": "lease_dispositions", "description": "Extending a lease returns its new expiry; notConsumed redelivers with the next delivery attempt; defer hides the message until the delay passes; acknowledging an unknown lease raises lease_not_found (404)." },
+    { "id": "batch_ack", "description": "Acknowledging several leases at once returns a status per lease, notFound for an unknown one." },
+    { "id": "consume_loop", "description": "The consume helper acknowledges messages the handler accepts, redelivers a message whose handler raised, honors a disposition the handler returns, and stops when the queue is idle." },
+    { "id": "dead_letter_redrive", "description": "A deadLetter acknowledgment moves the message to the queue's .dlq, and redrive moves it back." },
+    { "id": "browse_messages", "description": "List messages in pages with a cursor, read one by serial number with its body, delete one, and purge the rest." },
+    { "id": "consumers", "description": "A named consumer that has received is listed with kind lease, and deleting it removes it." },
+    { "id": "webhooks", "description": "Register a webhook (a secret is returned once), receive a signed delivery on a local listener, verify it with the client's helper, reject it with a wrong secret or an old timestamp, rotate the secret, and delete the webhook." }
+  ]
+}

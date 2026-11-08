@@ -146,6 +146,53 @@ namespace CatMQ.Service.Api
         public int? Max { get; set; }
     }
 
+    public class WebhookSettingsDto
+    {
+        public string? Url { get; set; }
+        public int? TimeoutSeconds { get; set; }
+        public int? MaxConcurrency { get; set; }
+        public Dictionary<string, string>? Headers { get; set; }
+        public bool? Enabled { get; set; }
+    }
+
+    public class WebhookDto
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Queue { get; set; } = string.Empty;
+        public string Url { get; set; } = string.Empty;
+        public int TimeoutSeconds { get; set; }
+        public int? MaxConcurrency { get; set; }
+
+        /// <summary>
+        /// Header names only. The values can be credentials, so they are never sent back.
+        /// </summary>
+        public Dictionary<string, string>? Headers { get; set; }
+        public bool Enabled { get; set; }
+        public DateTime? LastSuccessAt { get; set; }
+        public DateTime? LastFailureAt { get; set; }
+        public string? LastFailure { get; set; }
+        public int ConsecutiveFailures { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? Secret { get; set; }
+
+        public static WebhookDto From(CMqWebhookDescriptor webhook, string? secret = null) => new()
+        {
+            Name = webhook.Name,
+            Queue = webhook.QueueName,
+            Url = webhook.Settings.Url,
+            TimeoutSeconds = webhook.Settings.TimeoutSeconds,
+            MaxConcurrency = webhook.Settings.MaxConcurrency,
+            Headers = webhook.Settings.Headers?.ToDictionary(o => o.Key, _ => "********"),
+            Enabled = webhook.Settings.Enabled,
+            LastSuccessAt = webhook.LastSuccessAt,
+            LastFailureAt = webhook.LastFailureAt,
+            LastFailure = webhook.LastFailure,
+            ConsecutiveFailures = webhook.ConsecutiveFailures,
+            Secret = secret
+        };
+    }
+
     public class ConsumerDto
     {
         public string Name { get; set; } = string.Empty;

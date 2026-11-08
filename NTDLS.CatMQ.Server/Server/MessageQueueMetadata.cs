@@ -15,6 +15,11 @@ namespace NTDLS.CatMQ.Server.Server
         /// </summary>
         public List<string> LeaseConsumers { get; set; } = new();
 
+        /// <summary>
+        /// The queue's webhooks, including their signing secrets.
+        /// </summary>
+        public List<WebhookRegistration> Webhooks { get; set; } = new();
+
         public MessageQueueMetadata(CMqQueueConfiguration configuration, MessageQueueStatistics statistics)
         {
             Configuration = configuration;

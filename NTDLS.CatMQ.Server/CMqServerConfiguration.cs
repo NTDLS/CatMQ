@@ -57,5 +57,11 @@ namespace NTDLS.CatMQ.Server
         /// Frames smaller than this many bytes are not compressed, because compressing them costs more time than the bytes it saves.
         /// </summary>
         public int CompressionThreshold { get; set; } = CMqDefaults.DEFAULT_COMPRESSION_THRESHOLD;
+
+        /// <summary>
+        /// Whether webhooks may use plain http URLs. When false, only https URLs are accepted, so that messages and the
+        /// headers sent with them (which can include credentials) are encrypted on their way to the receiver.
+        /// </summary>
+        public bool AllowHttpWebhooks { get; set; } = false;
     }
 }

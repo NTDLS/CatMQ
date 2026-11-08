@@ -72,6 +72,7 @@ namespace CatMQ.Tests
                 WebListenURL = $"http://127.0.0.1:{WebPort}",
                 EnableWebApi = true,
                 EnableWebUI = true,
+                AllowHttpWebhooks = true,
                 AcknowledgmentTimeoutSeconds = 30
             }));
             File.WriteAllText(Path.Join(_folder, "config", "accounts.json"), JsonSerializer.Serialize(new[]

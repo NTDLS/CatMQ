@@ -63,6 +63,11 @@ namespace NTDLS.CatMQ.Server.Server
         internal ConcurrentDictionary<string, LeaseDeliveryTransport> LeaseConsumers { get; } = new();
 
         /// <summary>
+        /// The queue's webhooks, by name.
+        /// </summary>
+        internal ConcurrentDictionary<string, WebhookDeliveryTransport> Webhooks { get; } = new();
+
+        /// <summary>
         /// Makes checking the depth limit and storing a message one step, for queues that have a limit.
         /// </summary>
         internal object DepthLimitLock { get; } = new();
