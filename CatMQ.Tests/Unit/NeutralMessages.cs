@@ -3,7 +3,6 @@ using NTDLS.CatMQ.Client;
 using NTDLS.CatMQ.Server;
 using NTDLS.CatMQ.Shared;
 using System.Collections.Concurrent;
-using System.Text;
 using System.Text.Json;
 
 namespace CatMQ.Tests.Unit

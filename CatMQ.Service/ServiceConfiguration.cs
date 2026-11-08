@@ -1,6 +1,5 @@
 ﻿using NTDLS.CatMQ.Shared;
 using NTDLS.Helpers;
-using System.ComponentModel.DataAnnotations;
 using System.Reflection;
 
 namespace CatMQ.Service
