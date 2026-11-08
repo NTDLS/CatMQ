@@ -43,6 +43,11 @@ namespace NTDLS.CatMQ.Server.Management
         public int MaxDeliveryAttempts { get; internal set; }
 
         /// <summary>
+        /// The most messages that the queue will hold. Null means unlimited.
+        /// </summary>
+        public int? MaxDepth { get; internal set; }
+
+        /// <summary>
         /// The maximum time that a message item can remain in the queue without being delivered before being removed. 0 = infinite.
         /// </summary>
         public TimeSpan? MaxMessageAge { get; internal set; }

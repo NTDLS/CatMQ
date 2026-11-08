@@ -285,6 +285,7 @@ namespace NTDLS.CatMQ.Server
                                 DeliveryThrottle = mqKVP.Value.Configuration.DeliveryThrottle,
                                 MaxOutstandingDeliveries = mqKVP.Value.Configuration.MaxOutstandingDeliveries,
                                 MaxDeliveryAttempts = mqKVP.Value.Configuration.MaxDeliveryAttempts,
+                                MaxDepth = mqKVP.Value.Configuration.MaxDepth,
                                 MaxMessageAge = mqKVP.Value.Configuration.MaxMessageAge,
                                 PersistenceScheme = mqKVP.Value.Configuration.PersistenceScheme,
                                 QueueName = mqKVP.Value.Configuration.QueueName,
@@ -361,6 +362,7 @@ namespace NTDLS.CatMQ.Server
                                 DeliveryThrottle = queue.Configuration.DeliveryThrottle,
                                 MaxOutstandingDeliveries = queue.Configuration.MaxOutstandingDeliveries,
                                 MaxDeliveryAttempts = queue.Configuration.MaxDeliveryAttempts,
+                                MaxDepth = queue.Configuration.MaxDepth,
                                 MaxMessageAge = queue.Configuration.MaxMessageAge,
                                 PersistenceScheme = queue.Configuration.PersistenceScheme,
                                 QueueName = queue.Configuration.QueueName,
@@ -1373,7 +1375,7 @@ namespace NTDLS.CatMQ.Server
         /// </summary>
         /// <param name="queueName">The name of the queue, not of its dead-letter queue.</param>
         /// <param name="max">The most messages to move, or null to move all of them.</param>
-        /// <returns>The number of messages that were moved.</returns>
+        /// <returns>The number of messages that were moved. Moving stops early if the queue reaches its MaxDepth.</returns>
         public int RedriveDeadLetters(string queueName, int? max = null)
         {
             var deadLetterQueueName = $"{GetQueueOrThrow(queueName).Configuration.QueueName}.dlq";
@@ -1382,7 +1384,9 @@ namespace NTDLS.CatMQ.Server
             int moved = 0;
             ulong? after = null;
 
-            while (max == null || moved < max)
+            bool isFull = false;
+
+            while ((max == null || moved < max) && isFull == false)
             {
                 var page = GetMessagesAfter(deadLetterQueueName, after, Math.Min(max - moved ?? 500, 500));
                 if (page.Count == 0)
@@ -1405,6 +1409,11 @@ namespace NTDLS.CatMQ.Server
                     {
                         //A consumer of the dead-letter queue has this one, and the copy we just made is the safe side to fail on.
                         moved++;
+                    }
+                    catch (CMqQueueFullException)
+                    {
+                        isFull = true;
+                        break;
                     }
                 }
             }
@@ -1633,6 +1642,15 @@ namespace NTDLS.CatMQ.Server
             Dictionary<string, string>? headers = null, bool bodyIsBase64 = false, TimeSpan? timeout = null)
             => EnqueueInternal(queueName, deferDeliveryDuration, messageType, body, contentType, headers, bodyIsBase64, timeout, Guid.NewGuid());
 
+        private static void ThrowIfQueueFull(SingleMessageQueueServer messageQueue)
+        {
+            var maxDepth = messageQueue.Configuration.MaxDepth;
+            if (maxDepth > 0 && messageQueue.Statistics.QueueDepth >= maxDepth)
+            {
+                throw new CMqQueueFullException(messageQueue.Configuration.QueueName, maxDepth.Value);
+            }
+        }
+
         private Guid EnqueueInternal(string queueName, TimeSpan? deferDeliveryDuration, string? messageType, string body, string? contentType,
             Dictionary<string, string>? headers, bool bodyIsBase64, TimeSpan? timeout, Guid messageId)
         {
@@ -1679,25 +1697,44 @@ namespace NTDLS.CatMQ.Server
                                     throw new Exception($"Persistence database has not been initialized for [{queueName}].");
                                 }
 
-                                var message = new EnqueuedMessage(messageQueue.Configuration.QueueName, messageType, body, messageQueue.Statistics.GetNextSerialNumber())
+                                //Persistent publishes run in parallel, so a queue with a limit makes checking it and storing the
+                                //  message one step. Queues without a limit skip this, so that they do not pay for it.
+                                var depthLimitLock = messageQueue.Configuration.MaxDepth > 0 ? messageQueue.DepthLimitLock : null;
+                                if (depthLimitLock != null)
                                 {
-                                    MessageId = messageId,
-                                    ContentType = contentType ?? CMqDefaults.DEFAULT_CONTENT_TYPE,
-                                    Headers = headers,
-                                    BodyIsBase64 = bodyIsBase64,
-                                    DeferDuration = deferDeliveryDuration,
-                                    DeferredUntil = deferDeliveryDuration == null ? null : DateTime.UtcNow + deferDeliveryDuration
-                                };
+                                    Monitor.Enter(depthLimitLock);
+                                }
+                                try
+                                {
+                                    ThrowIfQueueFull(messageQueue);
 
-                                var ticketDatabaseStore = Instrumentation?.CreateTicket(CMqInstrumentationEventType.PersistenceStore);
-                                //For persistent queues, the messages are only loaded into the database.
-                                //They will be buffered into the message buffer by the message queue delivery thread.
-                                messages.Database.Store(message);
-                                ticketDatabaseStore?.Accumulate();
+                                    var message = new EnqueuedMessage(messageQueue.Configuration.QueueName, messageType, body, messageQueue.Statistics.GetNextSerialNumber())
+                                    {
+                                        MessageId = messageId,
+                                        ContentType = contentType ?? CMqDefaults.DEFAULT_CONTENT_TYPE,
+                                        Headers = headers,
+                                        BodyIsBase64 = bodyIsBase64,
+                                        DeferDuration = deferDeliveryDuration,
+                                        DeferredUntil = deferDeliveryDuration == null ? null : DateTime.UtcNow + deferDeliveryDuration
+                                    };
 
-                                //Only count the message once it has actually been stored.
-                                messageQueue.Statistics.IncrementReceivedMessageCount();
-                                messageQueue.Statistics.IncrementQueueDepth();
+                                    var ticketDatabaseStore = Instrumentation?.CreateTicket(CMqInstrumentationEventType.PersistenceStore);
+                                    //For persistent queues, the messages are only loaded into the database.
+                                    //They will be buffered into the message buffer by the message queue delivery thread.
+                                    messages.Database.Store(message);
+                                    ticketDatabaseStore?.Accumulate();
+
+                                    //Only count the message once it has actually been stored.
+                                    messageQueue.Statistics.IncrementReceivedMessageCount();
+                                    messageQueue.Statistics.IncrementQueueDepth();
+                                }
+                                finally
+                                {
+                                    if (depthLimitLock != null)
+                                    {
+                                        Monitor.Exit(depthLimitLock);
+                                    }
+                                }
 
                                 messageQueue.DeliveryThreadWaitEvent.Set();
                             }) && success;
@@ -1714,6 +1751,8 @@ namespace NTDLS.CatMQ.Server
                             success = messageQueue.EnqueuedMessages.TryWrite(CMqDefaults.DEFAULT_TRY_WAIT_MS, messages =>
                             {
                                 ticketEnqueueMessageEphemeralWriteLock?.Accumulate();
+
+                                ThrowIfQueueFull(messageQueue); //The write lock already makes this exact.
 
                                 var message = new EnqueuedMessage(messageQueue.Configuration.QueueName, messageType, body, messageQueue.Statistics.GetNextSerialNumber())
                                 {

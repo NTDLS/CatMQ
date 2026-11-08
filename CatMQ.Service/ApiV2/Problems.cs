@@ -46,6 +46,10 @@ namespace CatMQ.Service.ApiV2
                 case CMqQueuePersistenceChangeException ex:
                     context.Result = Problems.Create(StatusCodes.Status409Conflict, "queue_persistence_immutable", ex.Message);
                     break;
+                case CMqQueueFullException ex:
+                    context.HttpContext.Response.Headers.RetryAfter = "1";
+                    context.Result = Problems.Create(StatusCodes.Status429TooManyRequests, "queue_full", ex.Message);
+                    break;
                 case CMqMessageInDeliveryException ex:
                     context.Result = Problems.Create(StatusCodes.Status409Conflict, "message_in_delivery", ex.Message);
                     break;

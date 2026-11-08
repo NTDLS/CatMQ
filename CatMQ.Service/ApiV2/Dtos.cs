@@ -32,6 +32,7 @@ namespace CatMQ.Service.ApiV2
         public int? MaxDeliveryAttempts { get; set; }
         public int? MaxMessageAgeSeconds { get; set; }
         public int? DeliveryThrottleMilliseconds { get; set; }
+        public int? MaxDepth { get; set; }
         public DeadLetterSettingsDto? DeadLetter { get; set; }
     }
 
@@ -46,6 +47,11 @@ namespace CatMQ.Service.ApiV2
         /// </summary>
         public JsonElement MaxMessageAgeSeconds { get; set; }
         public int? DeliveryThrottleMilliseconds { get; set; }
+
+        /// <summary>
+        /// Null removes the limit, as does 0. Left out, the limit is unchanged.
+        /// </summary>
+        public JsonElement MaxDepth { get; set; }
     }
 
     public class QueueStatsDto
@@ -222,6 +228,7 @@ namespace CatMQ.Service.ApiV2
             RequireAtLeast(settings.MaxMessageAgeSeconds, 0, "maxMessageAgeSeconds");
             RequireAtLeast(settings.DeliveryThrottleMilliseconds, 0, "deliveryThrottleMilliseconds");
             RequireAtLeast(settings.DeadLetter?.MaxMessageAgeSeconds, 0, "deadLetter.maxMessageAgeSeconds");
+            RequireAtLeast(settings.MaxDepth, 0, "maxDepth");
 
             var configuration = new CMqQueueConfiguration(queueName)
             {
@@ -234,6 +241,7 @@ namespace CatMQ.Service.ApiV2
             configuration.MaxDeliveryAttempts = settings.MaxDeliveryAttempts ?? configuration.MaxDeliveryAttempts;
             configuration.MaxMessageAge = ToAge(settings.MaxMessageAgeSeconds);
             configuration.DeliveryThrottle = TimeSpan.FromMilliseconds(settings.DeliveryThrottleMilliseconds ?? 0);
+            configuration.MaxDepth = settings.MaxDepth is null or 0 ? null : settings.MaxDepth;
 
             if (settings.DeadLetter != null)
             {
@@ -262,6 +270,23 @@ namespace CatMQ.Service.ApiV2
             if (update.DeliveryThrottleMilliseconds != null)
             {
                 configuration.DeliveryThrottle = TimeSpan.FromMilliseconds(update.DeliveryThrottleMilliseconds.Value);
+            }
+
+            var maxDepth = update.MaxDepth;
+            if (maxDepth.ValueKind != JsonValueKind.Undefined)
+            {
+                if (maxDepth.ValueKind == JsonValueKind.Null)
+                {
+                    configuration.MaxDepth = null;
+                }
+                else if (maxDepth.TryGetInt32(out var depth) && depth >= 0)
+                {
+                    configuration.MaxDepth = depth == 0 ? null : depth;
+                }
+                else
+                {
+                    throw new ArgumentException("maxDepth must be null or at least 0.");
+                }
             }
 
             var age = update.MaxMessageAgeSeconds;
@@ -297,6 +322,7 @@ namespace CatMQ.Service.ApiV2
                     MaxDeliveryAttempts = configuration.MaxDeliveryAttempts,
                     MaxMessageAgeSeconds = (int?)configuration.MaxMessageAge?.TotalSeconds,
                     DeliveryThrottleMilliseconds = (int)configuration.DeliveryThrottle.TotalMilliseconds,
+                    MaxDepth = configuration.MaxDepth,
                     DeadLetter = configuration.DeadLetterConfiguration == null ? null : new DeadLetterSettingsDto
                     {
                         Persistence = Format(configuration.DeadLetterConfiguration.PersistenceScheme),

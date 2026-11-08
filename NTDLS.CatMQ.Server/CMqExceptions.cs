@@ -13,6 +13,23 @@ namespace NTDLS.CatMQ.Server
     }
 
     /// <summary>
+    /// Thrown when a message is published to a queue that has reached its MaxDepth.
+    /// </summary>
+    public class CMqQueueFullException(string queueName, int maxDepth)
+        : Exception($"Queue [{queueName}] is full: it has reached its limit of {maxDepth:n0} messages.")
+    {
+        /// <summary>
+        /// The name of the queue that is full.
+        /// </summary>
+        public string QueueName { get; } = queueName;
+
+        /// <summary>
+        /// The most messages that the queue will hold.
+        /// </summary>
+        public int MaxDepth { get; } = maxDepth;
+    }
+
+    /// <summary>
     /// Thrown when a configuration would change the persistence scheme of an existing queue.
     /// </summary>
     public class CMqQueuePersistenceChangeException(string message)

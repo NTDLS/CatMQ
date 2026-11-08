@@ -76,6 +76,12 @@ namespace NTDLS.CatMQ.Shared
         public TimeSpan? MaxMessageAge { get; set; }
 
         /// <summary>
+        /// The most messages that the queue will hold. Publishing to a full queue fails, which tells publishers to slow
+        /// down rather than letting the queue grow without limit. Null or 0 means unlimited. Dead-letter queues are unlimited.
+        /// </summary>
+        public int? MaxDepth { get; set; }
+
+        /// <summary>
         /// Determines when to remove messages from the queue as they are distributed to subscribers.
         /// </summary>
         [JsonConverter(typeof(JsonStringEnumConverter))]

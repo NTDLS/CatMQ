@@ -192,7 +192,7 @@ namespace CatMQ.Tests.Unit
                 using var client = Connect();
                 client.CreateQueue(new CMqQueueConfiguration(queueName) { PersistenceScheme = CMqPersistenceScheme.Persistent, MaxOutstandingDeliveries = 2 });
                 client.Enqueue(queueName, new KeyValueMessage(1, "x"));
-                client.CreateQueue(new CMqQueueConfiguration(queueName) { PersistenceScheme = CMqPersistenceScheme.Persistent, MaxOutstandingDeliveries = 9 });
+                client.CreateQueue(new CMqQueueConfiguration(queueName) { PersistenceScheme = CMqPersistenceScheme.Persistent, MaxOutstandingDeliveries = 9, MaxDepth = 1 });
             }
             finally
             {
@@ -204,7 +204,11 @@ namespace CatMQ.Tests.Unit
             {
                 var queue = server.GetQueue(queueName);
                 Assert.Equal(9, queue?.MaxOutstandingDeliveries);
+                Assert.Equal(1, queue?.MaxDepth);
                 Assert.Equal(1, queue?.QueueDepth);
+
+                //The depth that was loaded from disk counts toward the limit.
+                Assert.Throws<CMqQueueFullException>(() => server.Enqueue(queueName, null, null, "{}"));
             }
             finally
             {

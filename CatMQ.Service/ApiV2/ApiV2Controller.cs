@@ -240,6 +240,14 @@ namespace CatMQ.Service.ApiV2
                             Error = new ProblemDto { Status = StatusCodes.Status400BadRequest, Code = "invalid_request", Title = ex.Message }
                         });
                     }
+                    catch (CMqQueueFullException ex)
+                    {
+                        results.Add(new PublishItemResultDto
+                        {
+                            Status = "rejected",
+                            Error = new ProblemDto { Status = StatusCodes.Status429TooManyRequests, Code = "queue_full", Title = ex.Message }
+                        });
+                    }
                 }
                 return Accepted(new { results });
             }

@@ -123,6 +123,12 @@ the configuration to the queue if it already exists, and the change takes effect
 creates the queue with default settings if it does not exist, and otherwise leaves it alone.
 The `PersistenceScheme` of an existing queue cannot be changed.
 
+A queue accepts messages without limit unless it has a `MaxDepth`. Once a queue holds that many messages, publishing
+to it fails with `CMqQueueFullException`, which tells publishers to slow down rather than letting the queue grow until
+the server runs out of memory or disk. Set one on any queue whose publishers could outpace its consumers, especially an
+ephemeral queue, which keeps every message in memory. `EnqueueExpedient` does not wait for a reply, so it is not told
+when a queue is full and the message is lost. Dead-letter queues are always unlimited.
+
 ### Message types
 A message's type is just a name. By default the .NET client sends the class's assembly-qualified name, so that
 `Deserialize()` can recreate it. To use a name that other languages can work with as well, register one:
@@ -176,6 +182,10 @@ curl -X POST http://127.0.0.1:45783/api/v2/queues/orders/messages -H "Authorizat
 To publish many at once, send `{"messages": [...]}`. The response reports each message separately. Publishing again
 with the same `idempotencyKey` within 24 hours returns the original message rather than adding another, which makes
 retries safe. Keys are held in memory, so they do not survive a restart.
+
+A queue with a `maxDepth` refuses messages once it is full, with `429` and the error code `queue_full`, so publishers
+should wait for the number of seconds in the `Retry-After` header and try again. In a batch, each message that does not
+fit is rejected individually. A queue without a `maxDepth` never refuses a message.
 
 ### Consuming
 A consumer asks for messages, works on them, then acknowledges each one. `receive` waits up to `waitSeconds` for a

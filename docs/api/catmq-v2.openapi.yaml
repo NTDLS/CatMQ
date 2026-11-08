@@ -45,7 +45,10 @@ info:
     - `serialNumber` and all counters that can exceed 2^53 are strings, because JavaScript numbers
       cannot represent them exactly.
     - Errors use RFC 9457 problem details. `code` is stable and safe to branch on.
-    - When the server is overloaded it responds with `429` or `503` and a `Retry-After` header.
+    - Publishing to a queue that has reached its `maxDepth` fails with `429 queue_full` and a
+      `Retry-After` header, which tells publishers to slow down. A queue without a `maxDepth` never
+      refuses a message, so set one on any queue whose publishers could outpace its consumers.
+    - When the server is too busy to handle a request it responds with `503` and a `Retry-After` header.
   license:
     name: MIT
     identifier: MIT
@@ -208,7 +211,9 @@ paths:
       tags: [Queues]
       operationId: redriveDeadLetters
       summary: Moves messages from this queue's dead-letter queue back onto the queue.
-      description: Messages keep their `messageId`, and their delivery attempts are reset.
+      description: |
+        Messages keep their `messageId`, and their delivery attempts are reset. Moving stops early
+        if the queue reaches its `maxDepth`, and `moved` reports how many messages were moved.
       requestBody:
         content:
           application/json:
@@ -246,6 +251,9 @@ paths:
         A `202` response means that each accepted message is stored, and for a persistent queue that
         it will survive a restart. The result of each message in a batch is reported separately, in
         the same order as the request.
+
+        Publishing a single message to a full queue fails with `429 queue_full`. In a batch, each
+        message that does not fit is `rejected` with the error code `queue_full`.
       requestBody:
         required: true
         content:
@@ -410,8 +418,6 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
 
   /leases/{leaseId}/ack:
     parameters:
@@ -801,7 +807,7 @@ components:
           schema:
             $ref: '#/components/schemas/Problem'
     TooManyRequests:
-      description: The server is applying backpressure.
+      description: The queue is full (`queue_full`). Try again after `Retry-After` seconds.
       headers:
         Retry-After:
           $ref: '#/components/headers/RetryAfter'
@@ -871,6 +877,12 @@ components:
           type: integer
           minimum: 0
           default: 0
+        maxDepth:
+          type: [integer, 'null']
+          minimum: 0
+          description: |
+            The most messages that the queue will hold. `null` or 0 means unlimited.
+            Dead-letter queues are always unlimited, so dead-lettering never fails.
         deadLetter:
           oneOf:
             - $ref: '#/components/schemas/DeadLetterSettings'
@@ -893,6 +905,10 @@ components:
         deliveryThrottleMilliseconds:
           type: integer
           minimum: 0
+        maxDepth:
+          type: [integer, 'null']
+          minimum: 0
+          description: '`null` or 0 removes the limit.'
 
     DeadLetterSettings:
       type: object

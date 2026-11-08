@@ -289,6 +289,38 @@ namespace CatMQ.Tests.Unit
 
         #endregion
 
+        [Fact(DisplayName = "HTTP: a full queue refuses messages with 429, and the limit can be changed.")]
+        public async Task TestQueueFull()
+        {
+            var queueName = await CreateQueue(new { maxDepth = 2 });
+            Assert.Equal(2, (await Json(await Http.GetAsync($"queues/{queueName}"))).GetProperty("settings").GetProperty("maxDepth").GetInt32());
+
+            await Publish(queueName, new { body = 1 });
+            await Publish(queueName, new { body = 2 });
+
+            var full = await Http.PostAsJsonAsync($"queues/{queueName}/messages", new { body = 3 });
+            await AssertProblem(full, HttpStatusCode.TooManyRequests, "queue_full");
+            Assert.NotNull(full.Headers.RetryAfter);
+
+            var raised = await Json(await Http.PatchAsJsonAsync($"queues/{queueName}", new { maxDepth = 3 }));
+            Assert.Equal(3, raised.GetProperty("settings").GetProperty("maxDepth").GetInt32());
+
+            var batch = await Publish(queueName, new { messages = new[] { new { body = 3 }, new { body = 4 } } });
+            Assert.Equal("accepted", batch[0].GetProperty("status").GetString());
+            Assert.Equal("rejected", batch[1].GetProperty("status").GetString());
+            Assert.Equal("queue_full", batch[1].GetProperty("error").GetProperty("code").GetString());
+            Assert.Equal(429, batch[1].GetProperty("error").GetProperty("status").GetInt32());
+
+            //An idempotency key is not used up by a publish that was refused.
+            await AssertProblem(await Http.PostAsJsonAsync($"queues/{queueName}/messages", new { idempotencyKey = "k", body = 5 }), HttpStatusCode.TooManyRequests, "queue_full");
+            var removed = await Json(await Http.PatchAsJsonAsync($"queues/{queueName}", new { maxDepth = (int?)null }));
+            Assert.Equal(JsonValueKind.Null, removed.GetProperty("settings").GetProperty("maxDepth").ValueKind);
+            Assert.Equal("accepted", (await Publish(queueName, new { idempotencyKey = "k", body = 5 }))[0].GetProperty("status").GetString());
+            Assert.Equal(4, (await Stats(queueName)).GetProperty("depth").GetInt32());
+
+            await AssertProblem(await Http.PatchAsJsonAsync($"queues/{queueName}", new { maxDepth = -1 }), HttpStatusCode.BadRequest, "invalid_request");
+        }
+
         #region Inspecting messages.
 
         [Theory(DisplayName = "HTTP: messages can be listed, read and deleted without consuming them.")]
