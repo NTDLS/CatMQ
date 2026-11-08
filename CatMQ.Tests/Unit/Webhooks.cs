@@ -135,13 +135,25 @@ namespace CatMQ.Tests.Unit
         [Fact(DisplayName = "Webhook: an error response is a failed delivery, which is retried and recorded.")]
         public void TestFailureIsRetried()
         {
+            //The third attempt is held until the test has seen the two failures, because its success resets the count,
+            //  and it follows the second failure within milliseconds.
             int calls = 0;
-            _receiver.Respond = _ => Interlocked.Increment(ref calls) <= 2 ? new WebhookReceiver.Response(500) : new WebhookReceiver.Response(200);
+            using var release = new ManualResetEventSlim();
+            _receiver.Respond = _ =>
+            {
+                if (Interlocked.Increment(ref calls) <= 2)
+                {
+                    return new WebhookReceiver.Response(500);
+                }
+                release.Wait(TimeSpan.FromSeconds(30));
+                return new WebhookReceiver.Response(200);
+            };
             var queueName = CreateQueueWithWebhook();
 
             _server.Enqueue(queueName, null, null, "{}");
             Assert.True(Wait.Until(() => _server.GetWebhook(queueName, "hook")?.ConsecutiveFailures == 2));
             Assert.Contains("500", _server.GetWebhook(queueName, "hook")!.LastFailure);
+            release.Set();
 
             Assert.True(Wait.Until(() => Depth(queueName) == 0));
             Assert.Equal(3, _receiver.Deliveries.Last().Json.GetProperty("deliveryAttempt").GetInt32());
