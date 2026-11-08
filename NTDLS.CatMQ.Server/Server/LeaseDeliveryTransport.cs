@@ -1,4 +1,5 @@
 using NTDLS.CatMQ.Shared;
+using System.Diagnostics;
 
 namespace NTDLS.CatMQ.Server.Server
 {
@@ -17,7 +18,7 @@ namespace NTDLS.CatMQ.Server.Server
         /// <summary>
         /// How long to collect more messages for a batch after the first one has arrived.
         /// </summary>
-        private static readonly TimeSpan BATCH_WINDOW = TimeSpan.FromMilliseconds(5);
+        private static readonly long BATCH_WINDOW_TICKS = Stopwatch.Frequency / 1000; //One millisecond.
 
         private class Waiter(int max, TimeSpan leaseDuration)
         {
@@ -92,7 +93,7 @@ namespace NTDLS.CatMQ.Server.Server
                 try
                 {
                     await waiter.FirstMessage.Task.WaitAsync(wait < MINIMUM_WAIT ? MINIMUM_WAIT : wait, cancellationToken);
-                    await Task.Delay(BATCH_WINDOW, cancellationToken);
+                    await CollectBatchAsync(waiter);
                 }
                 catch (TimeoutException)
                 {
@@ -117,6 +118,36 @@ namespace NTDLS.CatMQ.Server.Server
                 abandoned.ForEach(o => o.Release());
                 throw;
             }
+        }
+
+        /// <summary>
+        /// Gives the delivery thread a moment to add more messages to a batch that has started. This spins rather than
+        /// waiting on a timer, because a timer wait is at least one tick, about 15ms on Windows, which would cap a consumer
+        /// at one batch per tick. A batch that is already full returns at once.
+        /// </summary>
+        private Task CollectBatchAsync(Waiter waiter)
+        {
+            bool IsFull()
+            {
+                lock (_lock)
+                {
+                    return waiter.HasCapacity == false;
+                }
+            }
+
+            if (IsFull())
+            {
+                return Task.CompletedTask;
+            }
+
+            return Task.Run(() =>
+            {
+                var until = Stopwatch.GetTimestamp() + BATCH_WINDOW_TICKS;
+                while (IsFull() == false && Stopwatch.GetTimestamp() < until)
+                {
+                    Thread.SpinWait(50);
+                }
+            });
         }
 
         /// <summary>

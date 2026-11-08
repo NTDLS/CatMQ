@@ -73,7 +73,7 @@ static void Main()
         PersistenceScheme = CMqPersistenceScheme.Ephemeral
     });
 
-    //Subscribe to the queue we just created.
+    //Subscribe to the queue we just created. The handler is asynchronous, so no thread is held while it waits.
     client.Subscribe("MyFirstQueue", OnMessageReceived);
 
     //Enqueue a few messages, note that the message is just a class and it must inherit from ICMqMessage.
@@ -89,7 +89,7 @@ static void Main()
     client.Disconnect();
 }
 
-private static CMqConsumeResult OnMessageReceived(CMqClient client, CMqReceivedMessage rawMessage)
+private static async Task<CMqConsumeResult> OnMessageReceived(CMqClient client, CMqReceivedMessage rawMessage)
 {
     var message = rawMessage.Deserialize();
 
@@ -97,18 +97,25 @@ private static CMqConsumeResult OnMessageReceived(CMqClient client, CMqReceivedM
     //  and we can use pattern matching to determine what message was received.
     if (message is MyMessage myMessage)
     {
-        Console.WriteLine($"Received: '{myMessage.Text}'");
+        await Console.Out.WriteLineAsync($"Received: '{myMessage.Text}'");
     }
     else
     {
-        Console.WriteLine($"Received unknown message type.");
+        await Console.Out.WriteLineAsync("Received unknown message type.");
     }
     return CMqConsumeResult.Consumed();
 }
 ```
 
-If the handler awaits I/O (database calls, HTTP, etc.), subscribe with an asynchronous handler instead. No thread is held while it is pending,
-so slow handlers cannot starve the thread-pool. Avoid blocking on tasks (.Result, .Wait()) inside a synchronous handler for the same reason.
+### Use asynchronous handlers
+Subscribe with an asynchronous handler, as above, and `await` anything that waits: database calls, HTTP requests, file access and
+delays. Several messages are delivered at once (up to the queue's `MaxOutstandingDeliveries`), and an asynchronous handler holds no
+thread while it waits, however slow the work is.
+
+A synchronous handler holds a thread-pool thread for as long as it runs. A few slow synchronous handlers can use up the pool's
+threads, and while they are waiting, everything else in the process that needs a pool thread waits too, including the client's
+own replies to the server. Deliveries then time out and fail even though the handler did its work. Synchronous handlers are
+fine for work that never waits, and never block on a task (`.Result`, `.Wait()`) inside one.
 ```csharp
 client.Subscribe("MyFirstQueue", async (client, rawMessage) =>
 {
@@ -158,6 +165,49 @@ so each message goes to one of them. Clients with a different name still get the
 ```csharp
 var client = new CMqClient(new CMqClientConfiguration { ConsumerName = "billing" });
 ```
+
+## Choosing TCP or HTTP
+The native TCP protocol is CatMQ's primary interface, and the right choice for .NET applications. The HTTP API is for
+everything else: other languages, scripts, and services where adding a .NET client is not practical. Both reach the same
+queues, so a .NET publisher can feed a Python consumer and the other way around.
+
+| | Native TCP (.NET) | HTTP API (any language) |
+|---|---|---|
+| Receiving | Pushed to a handler as messages arrive | Asked for with long-polling, then acknowledged |
+| Publishing many at once | One call per message | Batches of up to 1,000 per request |
+| Consumer identity | Ends when the connection does | Named, and kept across restarts |
+| Needs | The NuGet client | Any HTTP client |
+
+### Performance
+These were measured against the CatMQ service on one machine (Intel Core Ultra 7 155H, 22 logical processors, Windows),
+with the benchmark in a separate process connecting over localhost, persistent queues and 500-byte messages. Treat them
+as a rough comparison, not a guarantee: results varied by up to about 30% between runs on the same machine, and a network,
+other hardware or larger messages will change them.
+
+| Publishing | Messages per second |
+|---|---|
+| TCP `Enqueue`, 1 client | 4,600 |
+| TCP `Enqueue`, 8 clients | 18,800 |
+| TCP `EnqueueExpedient` (no confirmation), 1 client | 22,500 |
+| HTTP, one message per request, 1 at a time | 4,200 |
+| HTTP, one message per request, 8 at a time | 26,800 |
+| HTTP, batches of 100, 1 at a time | 47,500 |
+| HTTP, batches of 100, 4 at a time | 84,700 |
+
+| Consuming (handler or consumer does no work) | Messages per second |
+|---|---|
+| TCP subscriber, `MaxOutstandingDeliveries` 5 | 5,700 to 10,300 |
+| TCP subscriber, `MaxOutstandingDeliveries` 64 | 7,700 to 10,700 |
+| HTTP, 1 consumer receiving up to 5, limit 5 | 7,400 |
+| HTTP, 4 consumers receiving up to 16 each, limit 64 | 15,600 |
+
+| Latency, from publish to the consumer having the message | Median | 99th percentile |
+|---|---|---|
+| TCP publisher to TCP subscriber | 0.8 ms | 10.4 ms |
+| HTTP publisher to an HTTP consumer that is already waiting | 1.8 ms | 10.4 ms |
+
+In practice, a consumer's own work usually limits throughput long before either protocol does, and
+`MaxOutstandingDeliveries` decides how much of that work happens at once.
 
 ## HTTP API
 When enabled, the CatMQ service also has an HTTP API, so that queues can be managed, and messages published and consumed,

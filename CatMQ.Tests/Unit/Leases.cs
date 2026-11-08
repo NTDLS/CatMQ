@@ -163,8 +163,16 @@ namespace CatMQ.Tests.Unit
                 Server.Enqueue(queueName, null, null, "{}");
             }
 
-            var first = await Receive(queueName, max: 10, waitSeconds: 1);
+            //A receive returns what arrives quickly, which is not always every free slot at once, so collect until the limit is reached.
+            var first = new List<CMqLeasedMessage>();
+            while (first.Count < 3)
+            {
+                var batch = await Receive(queueName, max: 10, waitSeconds: 1);
+                Assert.NotEmpty(batch);
+                first.AddRange(batch);
+            }
             Assert.Equal(3, first.Count);
+            Assert.Equal(3, Server.GetQueue(queueName)?.CurrentOutstandingDeliveries);
             Assert.Empty(await Receive(queueName, max: 10, waitSeconds: 0.3));
 
             Server.AcknowledgeLease(first[0].LeaseId, CMqConsumeResult.Consumed());

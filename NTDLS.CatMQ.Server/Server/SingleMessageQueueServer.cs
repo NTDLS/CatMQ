@@ -321,7 +321,9 @@ namespace NTDLS.CatMQ.Server.Server
                     }
                 }
 
-                if (threadYieldBurndown >= CMqDefaults.QUEUE_THREAD_DELIVERY_BURNDOWN && _isRunning)
+                //Do not idle when messages need to be loaded from the database, because the wait would come before the load. A wait
+                //  is at least one timer tick, about 15ms on Windows, which every message arriving at an idle persistent queue would pay.
+                if (threadYieldBurndown >= CMqDefaults.QUEUE_THREAD_DELIVERY_BURNDOWN && _isRunning && attemptBufferRehydration == false)
                 {
                     threadYieldBurndown = CMqDefaults.QUEUE_THREAD_DELIVERY_BURNDOWN;
 

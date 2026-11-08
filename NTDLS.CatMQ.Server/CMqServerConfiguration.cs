@@ -46,5 +46,22 @@ namespace NTDLS.CatMQ.Server
         /// The number historical datapoints to retain per queue.
         /// </summary>
         public int MaxHistoricalStatisticsDatapoints { get; set; } = CMqDefaults.DEFAULT_MAX_HISTORICAL_STATISTICS_DATAPOINTS;
+
+        /// <summary>
+        /// How hard to compress frames that are at least CompressionThreshold bytes. Use NoCompression to turn compression off.
+        /// The other side reads frames whatever its own setting is.
+        /// </summary>
+        public System.IO.Compression.CompressionLevel CompressionLevel { get; set; } = CMqDefaults.DEFAULT_COMPRESSION_LEVEL;
+
+        /// <summary>
+        /// Frames smaller than this many bytes are not compressed, because compressing them costs more time than the bytes it saves.
+        /// </summary>
+        public int CompressionThreshold { get; set; } = CMqDefaults.DEFAULT_COMPRESSION_THRESHOLD;
+
+        /// <summary>
+        /// Whether to send small writes immediately rather than holding them back to combine them (Nagle's algorithm), which
+        /// delays messages and replies when several are in flight on one connection.
+        /// </summary>
+        public bool NoDelay { get; set; } = CMqDefaults.DEFAULT_NO_DELAY;
     }
 }

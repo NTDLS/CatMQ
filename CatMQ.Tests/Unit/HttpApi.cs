@@ -58,6 +58,21 @@ namespace CatMQ.Tests.Unit
             return (await Json(response)).GetProperty("messages").EnumerateArray().ToArray();
         }
 
+        /// <summary>
+        /// A receive returns the messages that arrive quickly, which is not always every free slot at once, so this keeps receiving.
+        /// </summary>
+        private async Task<JsonElement[]> ReceiveAtLeast(string queueName, int count, int max)
+        {
+            var received = new List<JsonElement>();
+            while (received.Count < count)
+            {
+                var batch = await Receive(queueName, max: max - received.Count);
+                Assert.NotEmpty(batch);
+                received.AddRange(batch);
+            }
+            return received.ToArray();
+        }
+
         private async Task Ack(JsonElement message, string disposition = "consumed")
         {
             var response = await Http.PostAsJsonAsync($"leases/{message.GetProperty("leaseId").GetString()}/ack", new { disposition });
@@ -447,7 +462,7 @@ namespace CatMQ.Tests.Unit
             var queueName = await CreateQueue();
             await Publish(queueName, new { messages = Enumerable.Range(0, 3).Select(i => new { body = i }).ToArray() });
 
-            var leased = await Receive(queueName, max: 3);
+            var leased = await ReceiveAtLeast(queueName, 3, max: 3);
             Assert.Equal(3, leased.Length);
 
             var response = await Http.PostAsJsonAsync("leases/ack", new
@@ -499,9 +514,10 @@ namespace CatMQ.Tests.Unit
             var queueName = await CreateQueue(new { maxOutstandingDeliveries = 2 });
             await Publish(queueName, new { messages = Enumerable.Range(0, 5).Select(i => new { body = i }).ToArray() });
 
-            var leased = await Receive(queueName, max: 5, waitSeconds: 1);
+            var leased = await ReceiveAtLeast(queueName, 2, max: 5);
             Assert.Equal(2, leased.Length);
             Assert.Equal(2, (await Stats(queueName)).GetProperty("outstandingDeliveries").GetInt32());
+            Assert.Empty(await Receive(queueName, max: 5, waitSeconds: 1)); //Both slots are taken.
 
             foreach (var message in leased)
             {

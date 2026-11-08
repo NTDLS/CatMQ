@@ -80,7 +80,7 @@ namespace NTDLS.CatMQ.Client
                 MaxReceiveBufferSize = _configuration.MaxReceiveBufferSize,
                 QueryTimeout = _configuration.QueryTimeout,
                 ReceiveBufferGrowthRate = _configuration.ReceiveBufferGrowthRate,
-                CompressionProvider = new RmDeflateCompressionProvider(),
+                CompressionProvider = new CMqCompressionProvider(_configuration.CompressionLevel, _configuration.CompressionThreshold),
                 AutoReconnect = _configuration.AutoReconnect,
             };
 
@@ -103,7 +103,7 @@ namespace NTDLS.CatMQ.Client
                 MaxReceiveBufferSize = _configuration.MaxReceiveBufferSize,
                 QueryTimeout = _configuration.QueryTimeout,
                 ReceiveBufferGrowthRate = _configuration.ReceiveBufferGrowthRate,
-                CompressionProvider = new RmDeflateCompressionProvider(),
+                CompressionProvider = new CMqCompressionProvider(_configuration.CompressionLevel, _configuration.CompressionThreshold),
                 AutoReconnect = _configuration.AutoReconnect,
             };
 
@@ -159,6 +159,8 @@ namespace NTDLS.CatMQ.Client
 
         private void RmClient_OnConnected(RmContext context, bool isReconnect)
         {
+            context.TcpClient.NoDelay = _configuration.NoDelay;
+
             if (isReconnect)
             {
                 //Subscriptions are tied to the server-side connection, so they are lost when the connection drops.
@@ -325,7 +327,8 @@ namespace NTDLS.CatMQ.Client
         /// Instructs the server to notify the client of messages sent to the given queue.
         /// </summary>
         /// <param name="queueName">Queue name to subscribe to.</param>
-        /// <param name="deliveryEvent">Delegate function to call for each message.</param>
+        /// <param name="deliveryEvent">Delegate function to call for each message. It holds a thread-pool thread for as long as it runs,
+        /// so for work that waits (database calls, HTTP, files), use the overload that takes an asynchronous handler instead.</param>
         public Task<CMqSubscription> SubscribeAsync(string queueName, OnMessageReceived deliveryEvent)
             => SubscribeAsync(new CMqSubscription(queueName, deliveryEvent));
 
@@ -341,7 +344,8 @@ namespace NTDLS.CatMQ.Client
         /// Instructs the server to notify the client of messages sent to the given queue.
         /// </summary>
         /// <param name="queueName">Queue name to subscribe to.</param>
-        /// <param name="deliveryEvent">Delegate function to call for each message.</param>
+        /// <param name="deliveryEvent">Delegate function to call for each message. It holds a thread-pool thread for as long as it runs,
+        /// so for work that waits (database calls, HTTP, files), use the overload that takes an asynchronous handler instead.</param>
         public CMqSubscription Subscribe(string queueName, OnMessageReceived deliveryEvent)
             => Subscribe(new CMqSubscription(queueName, deliveryEvent));
 
