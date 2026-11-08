@@ -5,7 +5,8 @@ CatMQ is a high-performance and reliable persistent message queue designed for e
 [![Regression Tests](https://github.com/NTDLS/CatMQ/actions/workflows/Regression%20Tests.yml/badge.svg)](https://github.com/NTDLS/CatMQ/actions/workflows/Regression%20Tests.yml)
 
 ## Another Message Queue?! Why?
-CatMQ is not “fully featured”, as in it does not natively support clustering, it is not multi-protocol (no AMQP nor MQTT), and it is not friendly to non-dot-net subscribers.
+CatMQ is not “fully featured”, as in it does not natively support clustering and it is not multi-protocol (no AMQP nor MQTT).
+.NET applications use the native TCP client, and anything else can publish and consume over the [HTTP API](#http-api).
 Ok, then what’s the deal?
 Well, we needed a MQ that was slim, straight forward and free of fat-runtimes such as java or additional dependencies such as erlang. We went on an internet fishing expedition and came up empty.
 
@@ -34,10 +35,11 @@ internal class Program
 {
     static void Main()
     {
-        var server = new CMqServer();
+        //A persistence path is only needed for persistent queues.
+        var server = new CMqServer(new CMqServerConfiguration { PersistencePath = "C:\\CatMQ" });
 
         //Listen for queue clients on port 45784
-        server.StartAsync(45784);
+        server.Start(45784);
 
         Console.WriteLine("Press [enter] to shutdown.");
         Console.ReadLine();
@@ -64,12 +66,11 @@ static void Main()
 {
     var client = new CMqClient(); //Create an instance of the client.
     client.Connect("127.0.0.1", 45784); //Connect to the queue server.
-    client.OnReceived += Client_OnReceived; //Wire up an event to listen for messages.
 
     //Create a queue. These are highly configurable.
     client.CreateQueue(new CMqQueueConfiguration("MyFirstQueue")
     {
-        Persistence = PMqPersistence.Ephemeral
+        PersistenceScheme = CMqPersistenceScheme.Ephemeral
     });
 
     //Subscribe to the queue we just created.
@@ -78,7 +79,7 @@ static void Main()
     //Enqueue a few messages, note that the message is just a class and it must inherit from ICMqMessage.
     for (int i = 0; i < 10; i++)
     {
-        client.Enqueue("MyFirstQueue", new MyMessage($"Test message {i++:n0}"));
+        client.Enqueue("MyFirstQueue", new MyMessage($"Test message {i:n0}"));
     }
 
     Console.WriteLine("Press [enter] to shutdown.");
@@ -102,7 +103,7 @@ private static CMqConsumeResult OnMessageReceived(CMqClient client, CMqReceivedM
     {
         Console.WriteLine($"Received unknown message type.");
     }
-    return new CMqConsumeResult(CMqConsumptionDisposition.Consumed);
+    return CMqConsumeResult.Consumed();
 }
 ```
 
@@ -116,63 +117,136 @@ client.Subscribe("MyFirstQueue", async (client, rawMessage) =>
 });
 ```
 
+### Creating and changing queues
+`CreateQueue` is safe to call every time an application starts. With a configuration, it creates the queue, or applies
+the configuration to the queue if it already exists, and the change takes effect immediately. With only a name, it
+creates the queue with default settings if it does not exist, and otherwise leaves it alone.
+The `PersistenceScheme` of an existing queue cannot be changed.
 
-## Web API
-When enabled, CatMQ also allows managing queues by the way of Web API, you'll first need to login to the web management UI, create a user and generate a API key. This API key will need to be passed in the "x-catmq-api-Key" header value.
-
-**Currently supported WebAPI calls**
-- `Enqueue/{queueName}/{objectType}` [json in body]
-- `CreateQueue/{queueName}`
-- `CreateQueue` [CMqQueueConfiguration json in body]
-- `Purge/{queueName}`
-- `DeleteQueue/{queueName}`
-
-### Example creating a queue using default settings with WebAPI via cURL
-**URL:** */api/CreateQueue/{queueName}*
-```
-curl --location --request POST 'http://127.0.0.1:45783/api/CreateQueue/MyDefault' \
---header 'x-catmq-api-Key: kk4IajpGUJHMR1dFlzXmvnt0VlvGhp'
+### Message types
+A message's type is just a name. By default the .NET client sends the class's assembly-qualified name, so that
+`Deserialize()` can recreate it. To use a name that other languages can work with as well, register one:
+```csharp
+CMqSerialization.RegisterMessageType<MyMessage>("my.message");
 ```
 
-### Example creating a queue using custom settings with WebAPI via cURL
-**URL:** */api/CreateQueue/{queueName}*
-```
-curl --location 'http://127.0.0.1:45783/api/CreateQueue' \
---header 'x-catmq-api-Key: kk4IajpGUJHMR1dFlzXmvnt0VlvGhp' \
---header 'Content-Type: application/json' \
---data '{
-    "QueueName": "MyQueue",
-    "BatchDeliveryInterval": "00:00:00",
-    "DeliveryThrottle": "00:00:00",
-    "MaxDeliveryAttempts": 5,
-    "MaxMessageAge": "01:00:00",
-    "ConsumptionScheme": "Delivered",
-    "DeliveryScheme": "Random",
-    "PersistenceScheme": "Persistent"
-}'
+Messages from other publishers, whose type is not a .NET class, can be read by naming the class to deserialize to.
+Property names are matched without regard to case, so `orderId` from a JavaScript publisher fills `OrderId`.
+```csharp
+var order = rawMessage.Deserialize<MyMessage>();
 ```
 
-### Example enqueuing a message with WebAPI via cURL
-**URL:** */api/Enqueue/{queueName}/{assemblyQualifiedTypeName}*
-```
-curl --location 'http://127.0.0.1:45783/api/Enqueue/MyFirstQueue/Test.QueueClient.Program%2BMyMessage%2C%20Test.QueueClient' \
---header 'x-catmq-api-Key: kk4IajpGUJHMR1dFlzXmvnt0VlvGhp' \
---header 'Content-Type: application/json' \
---data '{
-    "Text": "This is a test message"
-}'
+A message can also be published without a .NET class at all, with an optional content type and headers:
+```csharp
+client.Enqueue("MyFirstQueue", "orders.created", "{\"orderId\":1234}", new CMqEnqueueOptions
+{
+    ContentType = "application/json",
+    Headers = new Dictionary<string, string> { ["tenant"] = "acme" }
+});
 ```
 
-## Notes about Assembly Qualified Type names
-Messages are automatically deserialized by the QueueClient, so its necessary to provide the fully assembly qualified type name when enqueuing a message.
+### Named consumers
+By default each client is a separate consumer. Clients that share a consumer name act as competing workers instead,
+so each message goes to one of them. Clients with a different name still get their own copy when the queue's
+`ConsumptionScheme` is `AllSubscribersSatisfied`.
+```csharp
+var client = new CMqClient(new CMqClientConfiguration { ConsumerName = "billing" });
+```
 
-**Assembly Qualified Type Name format:**
-- Test.QueueClient.MyMessage, Test.QueueClient
-- Explanation: {ClassName}, {AssemblyName}
+## HTTP API
+When enabled, the CatMQ service also has an HTTP API, so that queues can be managed, and messages published and consumed,
+from any language. The full contract is an OpenAPI document: [docs/api/catmq-v2.openapi.yaml](docs/api/catmq-v2.openapi.yaml).
 
-**Assembly Qualified Type Name format for nested classes:**
-- Test.QueueClient.Program+MyMessage, Test.QueueClient
-- Explanation: {EnclosingClass}+{Class}, {AssemblyName}
+You'll first need to log in to the web management UI, create a user and generate an API key. Pass the key in the
+`Authorization: Bearer` header, or in the `x-catmq-api-key` header. The health check at `/api/v2/health` needs no key.
+
+### Creating a queue
+`PUT` creates the queue, or applies these settings if it already exists. Settings that are left out return to their
+defaults, so use `PATCH` to change only some of them.
+```bash
+curl -X PUT http://127.0.0.1:45783/api/v2/queues/orders -H "Authorization: Bearer $CATMQ_KEY" -H "Content-Type: application/json" -d '{"persistence":"persistent","consumptionScheme":"firstConsumer","maxOutstandingDeliveries":5}'
+```
+
+### Publishing
+A JSON body is sent as ordinary JSON. Other text goes in `body` with a `contentType`, and binary content goes in `bodyBase64`.
+```bash
+curl -X POST http://127.0.0.1:45783/api/v2/queues/orders/messages -H "Authorization: Bearer $CATMQ_KEY" -H "Content-Type: application/json" -d '{"messageType":"orders.created","body":{"orderId":1234},"idempotencyKey":"order-1234"}'
+```
+
+To publish many at once, send `{"messages": [...]}`. The response reports each message separately. Publishing again
+with the same `idempotencyKey` within 24 hours returns the original message rather than adding another, which makes
+retries safe. Keys are held in memory, so they do not survive a restart.
+
+### Consuming
+A consumer asks for messages, works on them, then acknowledges each one. `receive` waits up to `waitSeconds` for a
+message to arrive, and returns an empty list if none does. Each message is leased to the consumer for `leaseSeconds`.
+```bash
+curl -X POST http://127.0.0.1:45783/api/v2/queues/orders/messages/receive -H "Authorization: Bearer $CATMQ_KEY" -H "Content-Type: application/json" -d '{"consumer":"billing","max":10,"waitSeconds":20,"leaseSeconds":60}'
+```
+
+```bash
+curl -X POST http://127.0.0.1:45783/api/v2/leases/LEASE_ID/ack -H "Authorization: Bearer $CATMQ_KEY" -H "Content-Type: application/json" -d '{"disposition":"consumed"}'
+```
+
+The disposition can be `consumed`, `notInterested`, `notConsumed`, `defer` (with `deferSeconds`), `deadLetter` or `drop`.
+A consumer that needs more time can extend a lease with `POST /api/v2/leases/{leaseId}/extend`.
+
+Delivery is **at-least-once**. A message whose lease runs out goes back to the queue and counts as a failed delivery
+attempt, and an unacknowledged message is also delivered again after a restart. Use `messageId`, which never changes,
+to recognize a message that was already handled. Leased messages count toward the queue's `maxOutstandingDeliveries`,
+so a single `receive` returns no more messages than the queue has free delivery slots.
+
+A consumer is identified by its name, and requests that use the same name compete for messages. Consumers stay
+registered across restarts. With `allConsumers`, messages wait until every registered consumer has them, so remove a
+consumer that has gone away for good with `DELETE /api/v2/queues/{queue}/consumers/{consumer}`.
+
+### A complete consumer in Python
+Using only the standard library:
+```python
+import json, os, urllib.request
+
+BASE = "http://127.0.0.1:45783/api/v2"
+KEY = os.environ["CATMQ_KEY"]
+
+def call(method, path, body=None):
+    request = urllib.request.Request(BASE + path, method=method, data=None if body is None else json.dumps(body).encode(),
+                                     headers={"Authorization": f"Bearer {KEY}", "Content-Type": "application/json"})
+    with urllib.request.urlopen(request, timeout=30) as response:
+        text = response.read()
+        return json.loads(text) if text else None
+
+while True:
+    batch = call("POST", "/queues/orders/messages/receive", {"consumer": "billing", "max": 10, "waitSeconds": 20})
+    for message in batch["messages"]:
+        print("order", message["body"]["orderId"])
+        call("POST", f"/leases/{message['leaseId']}/ack", {"disposition": "consumed"})
+```
+
+### Publishing from JavaScript
+```javascript
+await fetch("http://127.0.0.1:45783/api/v2/queues/orders/messages", {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${process.env.CATMQ_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ messageType: "orders.created", body: { orderId: 1234 } })
+});
+```
+
+### Everything else
+The API can also list queues, change some of a queue's settings with `PATCH`, list and delete messages without
+consuming them, purge a queue, move messages from a dead-letter queue back onto its queue (`POST /queues/{queue}/redrive`),
+and list and remove consumers. Every error is returned as an RFC 9457 problem document with a stable `code`, such as
+`queue_not_found` or `lease_expired`.
+
+Webhooks, where CatMQ pushes messages to a URL, are described in the OpenAPI document but are not available yet.
+
+The original API at `/api/v1/queues` is still available for existing integrations, but new ones should use version 2.
+
+## Upgrading from 2.x
+- Clients and servers must be upgraded together, because the messages they exchange have changed.
+- `CMqReceivedMessage.AssemblyQualifiedTypeName` is now `MessageType`, and `MessageJson` is now `Body`.
+- Calling `CreateQueue` with a configuration now changes an existing queue, where before it was ignored. Check that the
+  configuration in each application's code is what you want the queue to have.
+- Messages that are already persisted keep working, and are delivered as before.
 
 ## Technologies
 CatMQ is based heavily on internally built technologies that leverage the works by people

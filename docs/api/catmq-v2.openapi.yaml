@@ -25,10 +25,12 @@ info:
     ## Consumers
     A consumer is identified by a stable name that the client chooses, not by its connection. It is
     registered the first time it receives from a queue or when a webhook is created for it, and stays
-    registered until it is deleted.
+    registered until it is deleted, including across restarts.
 
     With the `firstConsumer` consumption scheme, a message is removed once any consumer consumes it.
-    With the `allConsumers` scheme, each registered consumer receives its own copy.
+    With the `allConsumers` scheme, each registered consumer receives its own copy, one at a time, and
+    the message stays in the queue until all of them have it. A consumer that has gone away for good
+    should be deleted, or messages will wait for it until they expire.
 
     ## Message bodies
     A message has exactly one of `body` or `bodyBase64`:
@@ -334,15 +336,14 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
-  /queues/{queue}/messages/{messageId}:
+  /queues/{queue}/messages/{serialNumber}:
     parameters:
       - $ref: '#/components/parameters/QueueName'
-      - name: messageId
+      - name: serialNumber
         in: path
         required: true
         schema:
           type: string
-          format: uuid
     get:
       tags: [Messages]
       operationId: getMessage
@@ -362,6 +363,7 @@ paths:
       tags: [Messages]
       operationId: deleteMessage
       summary: Removes one message from a queue.
+      description: A message that is out for delivery cannot be removed (`409 message_in_delivery`).
       responses:
         '204':
           description: The message was removed.
@@ -369,6 +371,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
 
   /queues/{queue}/messages/receive:
     parameters:
@@ -379,7 +383,8 @@ paths:
       summary: Leases up to `max` messages, waiting for them if necessary.
       description: |
         Returns as soon as at least one message is available, or an empty list when `waitSeconds`
-        passes. The number returned is also limited by the free delivery slots on the queue.
+        passes. The number returned is also limited by the free delivery slots on the queue. If the
+        client disconnects while waiting, any messages leased to the request go back to the queue.
       requestBody:
         required: true
         content:
@@ -695,8 +700,10 @@ paths:
     delete:
       tags: [Consumers]
       operationId: deleteConsumer
-      summary: Removes a consumer, so that `allConsumers` queues stop waiting for it.
-      description: Any leases that it holds are released.
+      summary: Removes a lease consumer, so that `allConsumers` queues stop waiting for it.
+      description: |
+        Any leases that it holds are released. Removing a consumer that does not exist is not an error.
+        Consumers connected with the native TCP protocol end when they disconnect.
       responses:
         '204':
           description: The consumer no longer exists.
@@ -963,7 +970,9 @@ components:
         idempotencyKey:
           type: string
           maxLength: 255
-          description: Publishing the same key again within 24 hours returns the original `messageId`.
+          description: |
+            Publishing the same key to the same queue again within 24 hours returns the original `messageId`
+            with the status `duplicate`. Keys are held in memory, so they do not survive a restart.
       oneOf:
         - required: [body]
         - required: [bodyBase64]
@@ -1146,14 +1155,9 @@ components:
         kind:
           type: string
           enum: [lease, webhook, tcp]
-        activeLeases:
+        connections:
           type: integer
-        firstSeenAt:
-          type: string
-          format: date-time
-        lastSeenAt:
-          type: string
-          format: date-time
+          description: How many connections share this name. Lease consumers have one subscription.
 
     Health:
       type: object

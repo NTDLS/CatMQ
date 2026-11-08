@@ -31,6 +31,7 @@
 	<ItemGroup>
 		<ProjectReference Include="..\NTDLS.CatMQ.Client\NTDLS.CatMQ.Client.csproj" />
 		<ProjectReference Include="..\NTDLS.CatMQ.Server\NTDLS.CatMQ.Server.csproj" />
+		<ProjectReference Include="..\CatMQ.Service\CatMQ.Service.csproj" ReferenceOutputAssembly="false" />
 	</ItemGroup>
 
 	<ItemGroup>

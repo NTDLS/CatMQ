@@ -436,7 +436,7 @@ namespace NTDLS.CatMQ.Server
                     }
                     else
                     {
-                        throw new Exception($"Queue not found: [{queueName}].");
+                        throw new CMqQueueNotFoundException(queueName);
                     }
                 });
 
@@ -691,7 +691,7 @@ namespace NTDLS.CatMQ.Server
                     }
                     else
                     {
-                        throw new Exception($"Queue not found: [{queueName}].");
+                        throw new CMqQueueNotFoundException(queueName);
                     }
                 });
 
@@ -1097,7 +1097,7 @@ namespace NTDLS.CatMQ.Server
         {
             if (messageQueue.Configuration.PersistenceScheme != queueConfiguration.PersistenceScheme)
             {
-                throw new ArgumentException($"The PersistenceScheme of [{messageQueue.Configuration.QueueName}] cannot be changed from"
+                throw new CMqQueuePersistenceChangeException($"The PersistenceScheme of [{messageQueue.Configuration.QueueName}] cannot be changed from"
                     + $" [{messageQueue.Configuration.PersistenceScheme}] to [{queueConfiguration.PersistenceScheme}].");
             }
         }
@@ -1257,13 +1257,170 @@ namespace NTDLS.CatMQ.Server
             }, timeout);
         }
 
+        #region Message inspection.
+
+        /// <summary>
+        /// Returns a copy of a queue's configuration.
+        /// </summary>
+        public CMqQueueConfiguration GetQueueConfiguration(string queueName)
+        {
+            var configuration = GetQueueOrThrow(queueName).Configuration;
+            return JsonSerializer.Deserialize<CMqQueueConfiguration>(JsonSerializer.Serialize(configuration))
+                ?? throw new Exception($"Failed to copy the configuration for [{queueName}].");
+        }
+
+        private static CMqEnqueuedMessageDescriptor ToDescriptor(EnqueuedMessage message)
+        {
+            return new CMqEnqueuedMessageDescriptor(message.SerialNumber)
+            {
+                MessageId = message.MessageId,
+                Timestamp = message.Timestamp,
+                MessageType = message.MessageType,
+                ContentType = message.ContentType,
+                Headers = message.Headers,
+                BodyIsBase64 = message.BodyIsBase64,
+                Body = message.Body,
+                DeferredUntil = message.DeferredUntil,
+                DeferredDeliveryCount = message.DeferredCount
+            };
+        }
+
+        /// <summary>
+        /// Lists messages in serial number order, without consuming them. Pass the last serial number of one page to
+        /// get the next, which unlike an offset does not have to walk through everything before it.
+        /// </summary>
+        public IReadOnlyList<CMqEnqueuedMessageDescriptor> GetMessagesAfter(string queueName, ulong? afterSerialNumber, int take)
+        {
+            var messageQueue = GetQueueOrThrow(queueName);
+
+            return messageQueue.EnqueuedMessages.Read(m =>
+            {
+                var result = new List<CMqEnqueuedMessageDescriptor>();
+
+                if (m.Database != null)
+                {
+                    using var iterator = m.Database.NewIterator();
+                    if (afterSerialNumber != null)
+                    {
+                        iterator.Seek((afterSerialNumber.Value + 1).ToKey());
+                    }
+                    else
+                    {
+                        iterator.SeekToFirst();
+                    }
+
+                    for (; iterator.Valid() && result.Count < take; iterator.Next())
+                    {
+                        var message = JsonSerializer.Deserialize<EnqueuedMessage>(iterator.StringValue());
+                        if (message != null)
+                        {
+                            result.Add(ToDescriptor(message));
+                        }
+                    }
+                }
+                else
+                {
+                    result.AddRange(m.MessageBuffer
+                        .Where(o => afterSerialNumber == null || o.SerialNumber > afterSerialNumber)
+                        .OrderBy(o => o.SerialNumber).Take(take).Select(ToDescriptor));
+                }
+
+                return result;
+            }) ?? [];
+        }
+
+        /// <summary>
+        /// Removes a single message from a queue. A message that is out for delivery cannot be removed.
+        /// </summary>
+        /// <returns>True if the message existed.</returns>
+        public bool DeleteMessage(string queueName, ulong serialNumber)
+        {
+            var messageQueue = GetQueueOrThrow(queueName);
+
+            return messageQueue.EnqueuedMessages.Write(m =>
+            {
+                var message = m.MessageBuffer.FirstOrDefault(o => o.SerialNumber == serialNumber);
+                if (message != null)
+                {
+                    if (message.State == CMqMessageState.OutForDelivery)
+                    {
+                        throw new CMqMessageInDeliveryException($"Message [{serialNumber}] is out for delivery.");
+                    }
+
+                    m.RemoveFromBufferAndDatabase(this, message);
+                    messageQueue.Statistics.DecrementQueueDepth();
+                    return true;
+                }
+
+                if (m.Database != null)
+                {
+                    var keyBytes = serialNumber.ToKey();
+                    if (m.Database.Get(keyBytes, keyBytes.Length) != null)
+                    {
+                        m.Database.Remove(keyBytes, keyBytes.Length);
+                        messageQueue.Statistics.DecrementQueueDepth();
+                        return true;
+                    }
+                }
+
+                return false;
+            });
+        }
+
+        /// <summary>
+        /// Moves messages from a queue's dead-letter queue back onto the queue. They keep their message ID, and start again
+        /// with no delivery attempts and a new timestamp. A failure part way through can leave a message in both queues, but never in neither.
+        /// </summary>
+        /// <param name="queueName">The name of the queue, not of its dead-letter queue.</param>
+        /// <param name="max">The most messages to move, or null to move all of them.</param>
+        /// <returns>The number of messages that were moved.</returns>
+        public int RedriveDeadLetters(string queueName, int? max = null)
+        {
+            var deadLetterQueueName = $"{GetQueueOrThrow(queueName).Configuration.QueueName}.dlq";
+            GetQueueOrThrow(deadLetterQueueName);
+
+            int moved = 0;
+            ulong? after = null;
+
+            while (max == null || moved < max)
+            {
+                var page = GetMessagesAfter(deadLetterQueueName, after, Math.Min(max - moved ?? 500, 500));
+                if (page.Count == 0)
+                {
+                    break;
+                }
+
+                foreach (var message in page)
+                {
+                    after = message.SerialNumber;
+
+                    try
+                    {
+                        EnqueueInternal(queueName, null, message.MessageType, message.Body, message.ContentType,
+                            message.Headers, message.BodyIsBase64, null, message.MessageId);
+                        DeleteMessage(deadLetterQueueName, message.SerialNumber);
+                        moved++;
+                    }
+                    catch (CMqMessageInDeliveryException)
+                    {
+                        //A consumer of the dead-letter queue has this one, and the copy we just made is the safe side to fail on.
+                        moved++;
+                    }
+                }
+            }
+
+            return moved;
+        }
+
+        #endregion
+
         #region Leases.
 
         private SingleMessageQueueServer GetQueueOrThrow(string queueName)
         {
             string queueKey = queueName.ToLowerInvariant();
             return _messageQueues.Read(mqd => mqd.TryGetValue(queueKey, out var messageQueue) ? messageQueue : null)
-                ?? throw new Exception($"Queue not found: [{queueName}].");
+                ?? throw new CMqQueueNotFoundException(queueName);
         }
 
         private LeaseDeliveryTransport GetOrAddLeaseConsumer(SingleMessageQueueServer messageQueue, string consumerName, bool persist = true)
@@ -1410,7 +1567,7 @@ namespace NTDLS.CatMQ.Server
                     }
                     else
                     {
-                        throw new Exception("The specified queue does not exist.");
+                        throw new CMqQueueNotFoundException(queueName);
                     }
                 });
 
@@ -1471,8 +1628,13 @@ namespace NTDLS.CatMQ.Server
         /// <summary>
         /// Places a message into the given queue.
         /// </summary>
-        public void Enqueue(string queueName, TimeSpan? deferDeliveryDuration, string? messageType, string body, string? contentType = null,
+        /// <returns>The ID of the message.</returns>
+        public Guid Enqueue(string queueName, TimeSpan? deferDeliveryDuration, string? messageType, string body, string? contentType = null,
             Dictionary<string, string>? headers = null, bool bodyIsBase64 = false, TimeSpan? timeout = null)
+            => EnqueueInternal(queueName, deferDeliveryDuration, messageType, body, contentType, headers, bodyIsBase64, timeout, Guid.NewGuid());
+
+        private Guid EnqueueInternal(string queueName, TimeSpan? deferDeliveryDuration, string? messageType, string body, string? contentType,
+            Dictionary<string, string>? headers, bool bodyIsBase64, TimeSpan? timeout, Guid messageId)
         {
             if (string.IsNullOrEmpty(body))
             {
@@ -1519,7 +1681,7 @@ namespace NTDLS.CatMQ.Server
 
                                 var message = new EnqueuedMessage(messageQueue.Configuration.QueueName, messageType, body, messageQueue.Statistics.GetNextSerialNumber())
                                 {
-                                    MessageId = Guid.NewGuid(),
+                                    MessageId = messageId,
                                     ContentType = contentType ?? CMqDefaults.DEFAULT_CONTENT_TYPE,
                                     Headers = headers,
                                     BodyIsBase64 = bodyIsBase64,
@@ -1555,7 +1717,7 @@ namespace NTDLS.CatMQ.Server
 
                                 var message = new EnqueuedMessage(messageQueue.Configuration.QueueName, messageType, body, messageQueue.Statistics.GetNextSerialNumber())
                                 {
-                                    MessageId = Guid.NewGuid(),
+                                    MessageId = messageId,
                                     ContentType = contentType ?? CMqDefaults.DEFAULT_CONTENT_TYPE,
                                     Headers = headers,
                                     BodyIsBase64 = bodyIsBase64,
@@ -1580,14 +1742,14 @@ namespace NTDLS.CatMQ.Server
                     }
                     else
                     {
-                        throw new Exception($"Queue not found: [{queueName}].");
+                        throw new CMqQueueNotFoundException(queueName);
                     }
                 });
 
                 if (success)
                 {
                     ticketEnqueueMessage?.Accumulate();
-                    return;
+                    return messageId;
                 }
 
                 var ticketDeadlockAvoidance = Instrumentation?.CreateTicket(CMqInstrumentationEventType.DeadlockAvoidance);
@@ -1639,7 +1801,7 @@ namespace NTDLS.CatMQ.Server
                     }
                     else
                     {
-                        throw new Exception($"Queue not found: [{queueName}].");
+                        throw new CMqQueueNotFoundException(queueName);
                     }
                 });
 

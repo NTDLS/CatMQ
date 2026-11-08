@@ -14,6 +14,12 @@ namespace NTDLS.CatMQ.Shared
     {
         private static readonly ConcurrentDictionary<string, Func<string, ICMqSerializationProvider?, ICMqMessage>> _deserializationCache = new();
         private static readonly ConcurrentDictionary<string, Type> _registeredTypes = new();
+
+        /// <summary>
+        /// Messages can come from other languages, which usually name properties in camelCase. Without
+        /// this, those properties would silently be left with their default values rather than failing.
+        /// </summary>
+        private static readonly JsonSerializerOptions _deserializationOptions = new() { PropertyNameCaseInsensitive = true };
         private static readonly ConcurrentDictionary<Type, string> _registeredTypeNames = new();
 
         /// <summary>
@@ -66,7 +72,7 @@ namespace NTDLS.CatMQ.Shared
         {
             if (serializationProvider == null)
             {
-                return JsonSerializer.Deserialize<T>(json);
+                return JsonSerializer.Deserialize<T>(json, _deserializationOptions);
             }
             else
             {
