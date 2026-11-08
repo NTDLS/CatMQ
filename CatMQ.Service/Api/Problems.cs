@@ -2,10 +2,10 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using NTDLS.CatMQ.Server;
 
-namespace CatMQ.Service.ApiV2
+namespace CatMQ.Service.Api
 {
     /// <summary>
-    /// Builds RFC 9457 problem details, which is how every error in version 2 of the API is reported.
+    /// Builds RFC 9457 problem details, which is how every error in the API is reported.
     /// </summary>
     internal static class Problems
     {
@@ -32,7 +32,7 @@ namespace CatMQ.Service.ApiV2
     /// <summary>
     /// Translates exceptions from the queue server into problem details.
     /// </summary>
-    internal class ApiV2ExceptionFilterAttribute : ExceptionFilterAttribute
+    internal class ApiExceptionFilterAttribute : ExceptionFilterAttribute
     {
         public override void OnException(ExceptionContext context)
         {

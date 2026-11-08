@@ -85,7 +85,7 @@ namespace CatMQ.Service
 
                 if (serviceConfiguration.EnableWebApi)
                 {
-                    builder.Services.AddSingleton<ApiV2.IdempotencyStore>();
+                    builder.Services.AddSingleton<Api.IdempotencyStore>();
                     builder.Services.AddControllers()
                         .AddJsonOptions(options =>
                     {
@@ -93,11 +93,11 @@ namespace CatMQ.Service
                     })
                         .ConfigureApiBehaviorOptions(options =>
                     {
-                        //Version 2 of the API reports every error in the same format, including requests that cannot be parsed.
+                        //The API reports every error in the same format, including requests that cannot be parsed.
                         var defaultResponse = options.InvalidModelStateResponseFactory;
                         options.InvalidModelStateResponseFactory = context =>
-                            context.HttpContext.Request.Path.StartsWithSegments("/api/v2", StringComparison.OrdinalIgnoreCase)
-                                ? ApiV2.Problems.InvalidRequest("The request is not valid.",
+                            context.HttpContext.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase)
+                                ? Api.Problems.InvalidRequest("The request is not valid.",
                                     string.Join(" ", context.ModelState.Values.SelectMany(o => o.Errors).Select(o => o.ErrorMessage)))
                                 : defaultResponse(context);
                     });

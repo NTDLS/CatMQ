@@ -6,15 +6,15 @@ using System.Reflection;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
-namespace CatMQ.Service.ApiV2
+namespace CatMQ.Service.Api
 {
     /// <summary>
-    /// The language-neutral HTTP API. The contract is docs/api/catmq-v2.openapi.yaml.
+    /// The language-neutral HTTP API. The contract is docs/api/catmq.openapi.yaml.
     /// </summary>
     [ApiController]
-    [Route("api/v2")]
-    [ApiV2ExceptionFilter]
-    public partial class ApiV2Controller(CMqServer mqServer, IdempotencyStore idempotencyStore)
+    [Route("api/v1")]
+    [ApiExceptionFilter]
+    public partial class CatMqApiController(CMqServer mqServer, IdempotencyStore idempotencyStore)
         : ControllerBase
     {
         private const int MAX_BATCH_SIZE = 1000;

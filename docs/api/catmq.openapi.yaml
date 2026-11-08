@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: CatMQ HTTP API
-  version: 2.0.0-draft
+  version: 1.0.0
   summary: Create and manage queues, publish messages, and consume them from any language.
   description: |
     The CatMQ HTTP API is the language-neutral interface to CatMQ. Anything that can make an HTTP
@@ -53,7 +53,7 @@ info:
     name: MIT
     identifier: MIT
 servers:
-  - url: http://localhost:45783/api/v2
+  - url: http://localhost:45783/api/v1
     description: Default local service address.
 security:
   - bearerAuth: []

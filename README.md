@@ -180,53 +180,61 @@ queues, so a .NET publisher can feed a Python consumer and the other way around.
 
 ### Performance
 These were measured against the CatMQ service on one machine (Intel Core Ultra 7 155H, 22 logical processors, Windows),
-with the benchmark in a separate process connecting over localhost, persistent queues and 500-byte messages. Treat them
-as a rough comparison, not a guarantee: results varied by up to about 30% between runs on the same machine, and a network,
-other hardware or larger messages will change them.
+with the benchmark in a separate process connecting over localhost, persistent queues and 500-byte messages. The service
+and clients used their default settings: Deflate `Fastest` compression for frames of 1 KB or more (so these 500-byte
+messages were sent uncompressed) and Nagle's algorithm off. Where a range is shown, it is the lowest and highest of two runs.
+Treat them as a rough comparison, not a guarantee: a network, other hardware or larger messages will change them.
 
 | Publishing | Messages per second |
 |---|---|
-| TCP `Enqueue`, 1 client | 4,600 |
-| TCP `Enqueue`, 8 clients | 18,800 |
-| TCP `EnqueueExpedient` (no confirmation), 1 client | 22,500 |
-| HTTP, one message per request, 1 at a time | 4,200 |
-| HTTP, one message per request, 8 at a time | 26,800 |
-| HTTP, batches of 100, 1 at a time | 47,500 |
-| HTTP, batches of 100, 4 at a time | 84,700 |
+| TCP `Enqueue`, 1 client | 6,600 to 7,500 |
+| TCP `Enqueue`, 8 clients | 32,100 to 33,800 |
+| TCP `EnqueueExpedient` (no confirmation), 1 client | 43,100 to 56,900 |
+| HTTP, one message per request, 1 at a time | 4,000 to 4,800 |
+| HTTP, one message per request, 8 at a time | 24,100 to 24,800 |
+| HTTP, batches of 100, 1 at a time | 53,100 to 60,200 |
+| HTTP, batches of 100, 4 at a time | 118,400 to 126,900 |
 
 | Consuming (handler or consumer does no work) | Messages per second |
 |---|---|
-| TCP subscriber, `MaxOutstandingDeliveries` 5 | 5,700 to 10,300 |
-| TCP subscriber, `MaxOutstandingDeliveries` 64 | 7,700 to 10,700 |
-| HTTP, 1 consumer receiving up to 5, limit 5 | 7,400 |
-| HTTP, 4 consumers receiving up to 16 each, limit 64 | 15,600 |
+| TCP subscriber, `MaxOutstandingDeliveries` 5 | 10,800 to 14,000 |
+| TCP subscriber, `MaxOutstandingDeliveries` 64 | 11,900 to 14,400 |
+| HTTP, 1 consumer receiving up to 5, limit 5 | 10,600 to 10,800 |
+| HTTP, 4 consumers receiving up to 16 each, limit 64 | 16,900 to 17,000 |
 
 | Latency, from publish to the consumer having the message | Median | 99th percentile |
 |---|---|---|
-| TCP publisher to TCP subscriber | 0.8 ms | 10.4 ms |
-| HTTP publisher to an HTTP consumer that is already waiting | 1.8 ms | 10.4 ms |
+| TCP publisher to TCP subscriber | 0.7 ms | 1.6 to 2.3 ms |
+| HTTP publisher to an HTTP consumer that is already waiting | 1.8 ms | 10.8 to 11.8 ms |
+
+Publishing in batches over HTTP is the fastest way to add many messages, because the TCP client sends one message per call.
+For everything else the native TCP client is as fast or faster, and it has the lowest latency.
+
+Larger JSON messages are compressed. For JSON of 50 KB or more, `Fastest` makes them roughly twice the size that `Optimal`
+would, in about a fifth of the time (for 4 KB, about 1.5 times the size in 40% of the time), which suits a fast local network. On a slower link, set `CompressionLevel` to `Optimal` on the client and the server.
+They do not need to match, because each frame records how it was compressed.
 
 In practice, a consumer's own work usually limits throughput long before either protocol does, and
 `MaxOutstandingDeliveries` decides how much of that work happens at once.
 
 ## HTTP API
 When enabled, the CatMQ service also has an HTTP API, so that queues can be managed, and messages published and consumed,
-from any language. The full contract is an OpenAPI document: [docs/api/catmq-v2.openapi.yaml](docs/api/catmq-v2.openapi.yaml).
+from any language. The full contract is an OpenAPI document: [docs/api/catmq.openapi.yaml](docs/api/catmq.openapi.yaml).
 
 You'll first need to log in to the web management UI, create a user and generate an API key. Pass the key in the
-`Authorization: Bearer` header, or in the `x-catmq-api-key` header. The health check at `/api/v2/health` needs no key.
+`Authorization: Bearer` header, or in the `x-catmq-api-key` header. The health check at `/api/v1/health` needs no key.
 
 ### Creating a queue
 `PUT` creates the queue, or applies these settings if it already exists. Settings that are left out return to their
 defaults, so use `PATCH` to change only some of them.
 ```bash
-curl -X PUT http://127.0.0.1:45783/api/v2/queues/orders -H "Authorization: Bearer $CATMQ_KEY" -H "Content-Type: application/json" -d '{"persistence":"persistent","consumptionScheme":"firstConsumer","maxOutstandingDeliveries":5}'
+curl -X PUT http://127.0.0.1:45783/api/v1/queues/orders -H "Authorization: Bearer $CATMQ_KEY" -H "Content-Type: application/json" -d '{"persistence":"persistent","consumptionScheme":"firstConsumer","maxOutstandingDeliveries":5}'
 ```
 
 ### Publishing
 A JSON body is sent as ordinary JSON. Other text goes in `body` with a `contentType`, and binary content goes in `bodyBase64`.
 ```bash
-curl -X POST http://127.0.0.1:45783/api/v2/queues/orders/messages -H "Authorization: Bearer $CATMQ_KEY" -H "Content-Type: application/json" -d '{"messageType":"orders.created","body":{"orderId":1234},"idempotencyKey":"order-1234"}'
+curl -X POST http://127.0.0.1:45783/api/v1/queues/orders/messages -H "Authorization: Bearer $CATMQ_KEY" -H "Content-Type: application/json" -d '{"messageType":"orders.created","body":{"orderId":1234},"idempotencyKey":"order-1234"}'
 ```
 
 To publish many at once, send `{"messages": [...]}`. The response reports each message separately. Publishing again
@@ -241,15 +249,15 @@ fit is rejected individually. A queue without a `maxDepth` never refuses a messa
 A consumer asks for messages, works on them, then acknowledges each one. `receive` waits up to `waitSeconds` for a
 message to arrive, and returns an empty list if none does. Each message is leased to the consumer for `leaseSeconds`.
 ```bash
-curl -X POST http://127.0.0.1:45783/api/v2/queues/orders/messages/receive -H "Authorization: Bearer $CATMQ_KEY" -H "Content-Type: application/json" -d '{"consumer":"billing","max":10,"waitSeconds":20,"leaseSeconds":60}'
+curl -X POST http://127.0.0.1:45783/api/v1/queues/orders/messages/receive -H "Authorization: Bearer $CATMQ_KEY" -H "Content-Type: application/json" -d '{"consumer":"billing","max":10,"waitSeconds":20,"leaseSeconds":60}'
 ```
 
 ```bash
-curl -X POST http://127.0.0.1:45783/api/v2/leases/LEASE_ID/ack -H "Authorization: Bearer $CATMQ_KEY" -H "Content-Type: application/json" -d '{"disposition":"consumed"}'
+curl -X POST http://127.0.0.1:45783/api/v1/leases/LEASE_ID/ack -H "Authorization: Bearer $CATMQ_KEY" -H "Content-Type: application/json" -d '{"disposition":"consumed"}'
 ```
 
 The disposition can be `consumed`, `notInterested`, `notConsumed`, `defer` (with `deferSeconds`), `deadLetter` or `drop`.
-A consumer that needs more time can extend a lease with `POST /api/v2/leases/{leaseId}/extend`.
+A consumer that needs more time can extend a lease with `POST /api/v1/leases/{leaseId}/extend`.
 
 Delivery is **at-least-once**. A message whose lease runs out goes back to the queue and counts as a failed delivery
 attempt, and an unacknowledged message is also delivered again after a restart. Use `messageId`, which never changes,
@@ -258,14 +266,14 @@ so a single `receive` returns no more messages than the queue has free delivery 
 
 A consumer is identified by its name, and requests that use the same name compete for messages. Consumers stay
 registered across restarts. With `allConsumers`, messages wait until every registered consumer has them, so remove a
-consumer that has gone away for good with `DELETE /api/v2/queues/{queue}/consumers/{consumer}`.
+consumer that has gone away for good with `DELETE /api/v1/queues/{queue}/consumers/{consumer}`.
 
 ### A complete consumer in Python
 Using only the standard library:
 ```python
 import json, os, urllib.request
 
-BASE = "http://127.0.0.1:45783/api/v2"
+BASE = "http://127.0.0.1:45783/api/v1"
 KEY = os.environ["CATMQ_KEY"]
 
 def call(method, path, body=None):
@@ -284,7 +292,7 @@ while True:
 
 ### Publishing from JavaScript
 ```javascript
-await fetch("http://127.0.0.1:45783/api/v2/queues/orders/messages", {
+await fetch("http://127.0.0.1:45783/api/v1/queues/orders/messages", {
     method: "POST",
     headers: { "Authorization": `Bearer ${process.env.CATMQ_KEY}`, "Content-Type": "application/json" },
     body: JSON.stringify({ messageType: "orders.created", body: { orderId: 1234 } })
@@ -298,8 +306,6 @@ and list and remove consumers. Every error is returned as an RFC 9457 problem do
 `queue_not_found` or `lease_expired`.
 
 Webhooks, where CatMQ pushes messages to a URL, are described in the OpenAPI document but are not available yet.
-
-The original API at `/api/v1/queues` is still available for existing integrations, but new ones should use version 2.
 
 ## Upgrading from 2.x
 - Clients and servers must be upgraded together, because the messages they exchange have changed.

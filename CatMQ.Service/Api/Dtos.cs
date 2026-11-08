@@ -5,7 +5,7 @@ using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace CatMQ.Service.ApiV2
+namespace CatMQ.Service.Api
 {
     public class ProblemDto
     {

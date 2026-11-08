@@ -84,7 +84,7 @@ namespace CatMQ.Tests
             _process.BeginOutputReadLine();
             _process.BeginErrorReadLine();
 
-            Http = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{WebPort}/api/v2/"), Timeout = TimeSpan.FromSeconds(90) };
+            Http = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{WebPort}/api/v1/"), Timeout = TimeSpan.FromSeconds(90) };
             Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ApiKey);
 
             if (Wait.Until(IsHealthy, 30) == false)

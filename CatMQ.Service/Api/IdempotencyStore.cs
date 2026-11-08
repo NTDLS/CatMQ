@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 
-namespace CatMQ.Service.ApiV2
+namespace CatMQ.Service.Api
 {
     /// <summary>
     /// Remembers publishes that supplied an idempotency key, so that a publisher can safely retry after losing a response.
