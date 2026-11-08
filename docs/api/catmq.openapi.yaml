@@ -58,6 +58,7 @@ servers:
 security:
   - bearerAuth: []
   - apiKeyAuth: []
+  - webUiSession: []
 tags:
   - name: Queues
     description: Create, inspect, change and delete queues.
@@ -69,8 +70,10 @@ tags:
     description: Have CatMQ push messages to a URL.
   - name: Consumers
     description: Inspect and remove named consumers.
+  - name: Accounts
+    description: Remove accounts and API keys. Accounts and keys are created in the web UI.
   - name: System
-    description: Service health.
+    description: Service health and maintenance.
 
 paths:
   /health:
@@ -88,6 +91,64 @@ paths:
                 $ref: '#/components/schemas/Health'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
+
+  /system/gc:
+    post:
+      tags: [System]
+      operationId: collectGarbage
+      summary: Forces a full garbage collection that compacts the large object heap, to return unused memory.
+      description: This blocks the service while it runs, so expect a brief pause.
+      responses:
+        '204':
+          description: The collection has finished.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /accounts/{accountId}:
+    parameters:
+      - name: accountId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    delete:
+      tags: [Accounts]
+      operationId: deleteAccount
+      summary: Deletes an account and its API keys.
+      responses:
+        '204':
+          description: The account was deleted.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /accounts/{accountId}/api-keys/{apiKeyId}:
+    parameters:
+      - name: accountId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: apiKeyId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    delete:
+      tags: [Accounts]
+      operationId: deleteApiKey
+      summary: Deletes an API key. Requests that use it are refused from then on.
+      responses:
+        '204':
+          description: The API key was deleted.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   /queues:
     get:
@@ -706,10 +767,11 @@ paths:
     delete:
       tags: [Consumers]
       operationId: deleteConsumer
-      summary: Removes a lease consumer, so that `allConsumers` queues stop waiting for it.
+      summary: Removes a consumer, so that `allConsumers` queues stop waiting for it.
       description: |
-        Any leases that it holds are released. Removing a consumer that does not exist is not an error.
-        Consumers connected with the native TCP protocol end when they disconnect.
+        `consumer` is a consumer name, which removes every connection that uses it, or the subscriber ID of a single
+        connection. A lease consumer's leases are released. A connection that uses the native TCP protocol stops receiving
+        messages from the queue, but is not disconnected. Removing a consumer that does not exist is not an error.
       responses:
         '204':
           description: The consumer no longer exists.
@@ -726,6 +788,13 @@ components:
       type: apiKey
       in: header
       name: x-catmq-api-key
+    webUiSession:
+      type: apiKey
+      in: cookie
+      name: CatMQAuth
+      description: |
+        For the web UI. The login session cookie, which is only accepted along with an `x-catmq-ui` header, so that other
+        sites cannot use a signed-in browser to call the API.
 
   parameters:
     QueueName:

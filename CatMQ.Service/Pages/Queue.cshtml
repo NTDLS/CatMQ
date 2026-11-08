@@ -80,7 +80,7 @@
         }
 
         async function onRemoveSubscription(subscriberId) {
-            const url = `/ui/Unsubscribe/${queueName}/${subscriberId}`;
+            const url = `/api/v1/queues/${encodeURIComponent(queueName)}/consumers/${subscriberId}`;
             const message = fmt(@Json.Serialize(Localize("Removing the subscription for '{0}' from '{1}' will cause the subscriber to fail. Continue?")), subscriberId, queueName);
 
             const ok = await showConfirmModal(message);
@@ -88,10 +88,11 @@
 
             try {
                 const response = await fetch(url, {
-                    method: "POST",
+                    method: "DELETE",
                     credentials: 'same-origin',
                     headers: {
                         "Accept": "application/json",
+                        "x-catmq-ui": "1"
                     }
                 });
 
@@ -108,7 +109,7 @@
         }
 
         async function onPurgeQueue() {
-            const url = `/ui/PurgeQueue/${queueName}`;
+            const url = `/api/v1/queues/${encodeURIComponent(queueName)}/messages`;
             const message = fmt(@Json.Serialize(Localize("Purging the queue '{0}' will result in permanent message loss. Continue?")), queueName);
 
             const ok = await showConfirmModal(message);
@@ -116,10 +117,11 @@
 
             try {
                 const response = await fetch(url, {
-                    method: "POST",
+                    method: "DELETE",
                     credentials: 'same-origin',
                     headers: {
                         "Accept": "application/json",
+                        "x-catmq-ui": "1"
                     }
                 });
 
@@ -136,7 +138,7 @@
         }
 
         async function onDeleteQueue() {
-            const url = `/ui/DeleteQueue/${queueName}`;
+            const url = `/api/v1/queues/${encodeURIComponent(queueName)}`;
             const message = fmt(@Json.Serialize(Localize("Deleting the queue '{0}' will result in permanent message loss and any subscribers will fail. Continue?")), queueName);
 
             const ok = await showConfirmModal(message);
@@ -144,10 +146,11 @@
 
             try {
                 const response = await fetch(url, {
-                    method: "POST",
+                    method: "DELETE",
                     credentials: 'same-origin',
                     headers: {
                         "Accept": "application/json",
+                        "x-catmq-ui": "1"
                     }
                 });
 

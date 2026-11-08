@@ -3,6 +3,7 @@ using NTDLS.CatMQ.Server;
 using NTDLS.CatMQ.Shared;
 using System.Globalization;
 using System.Reflection;
+using System.Runtime;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -43,6 +44,55 @@ namespace CatMQ.Service.Api
         [HttpGet("health")]
         public IActionResult GetHealth()
             => Ok(new { status = "ok", version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "0.0.0" });
+
+        /// <summary>
+        /// Forces a full, blocking garbage collection that also compacts the large object heap, to return unused memory.
+        /// </summary>
+        [HttpPost("system/gc")]
+        public IActionResult CollectGarbage()
+        {
+            GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
+            GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, blocking: true, compacting: true);
+
+            //Finalizers can release more, which a second collection then reclaims.
+            GC.WaitForPendingFinalizers();
+            GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, blocking: true, compacting: true);
+
+            return NoContent();
+        }
+
+        #endregion
+
+        #region Accounts.
+
+        [HttpDelete("accounts/{accountId:guid}")]
+        public IActionResult DeleteAccount(Guid accountId)
+        {
+            var accounts = Configs.GetAccounts();
+            if (accounts.RemoveAll(o => o.Id == accountId) == 0)
+            {
+                return Problems.NotFound("account_not_found", $"Account not found: [{accountId}].");
+            }
+            Configs.PutAccounts(accounts);
+            return NoContent();
+        }
+
+        [HttpDelete("accounts/{accountId:guid}/api-keys/{apiKeyId:guid}")]
+        public IActionResult DeleteApiKey(Guid accountId, Guid apiKeyId)
+        {
+            var accounts = Configs.GetAccounts();
+            var account = accounts.FirstOrDefault(o => o.Id == accountId);
+            if (account == null)
+            {
+                return Problems.NotFound("account_not_found", $"Account not found: [{accountId}].");
+            }
+            if (account.ApiKeys.RemoveAll(o => o.Id == apiKeyId) == 0)
+            {
+                return Problems.NotFound("api_key_not_found", $"API key not found: [{apiKeyId}].");
+            }
+            Configs.PutAccounts(accounts);
+            return NoContent();
+        }
 
         #endregion
 
@@ -414,10 +464,35 @@ namespace CatMQ.Service.Api
             return Ok(new { consumers });
         }
 
+        /// <summary>
+        /// Removes a consumer by its name, which removes every connection that uses that name, or a single connection by
+        /// its subscriber ID. A connection removed this way stops receiving messages, but is not disconnected.
+        /// </summary>
         [HttpDelete("queues/{queue}/consumers/{consumer}")]
         public IActionResult DeleteConsumer(string queue, string consumer)
         {
             mqServer.RemoveLeaseConsumer(queue, consumer);
+
+            foreach (var subscriber in mqServer.GetSubscribers(queue) ?? [])
+            {
+                bool isNamed = subscriber.ConsumerName == consumer;
+                bool isConnection = subscriber.SubscriberId.ToString().Equals(consumer, StringComparison.OrdinalIgnoreCase);
+                if (isNamed == false && isConnection == false)
+                {
+                    continue;
+                }
+
+                //A lease consumer has to be removed as a whole. Removing only its subscription would leave it registered, unable to receive.
+                if (subscriber.TransportName == "lease" && subscriber.ConsumerName != null)
+                {
+                    mqServer.RemoveLeaseConsumer(queue, subscriber.ConsumerName);
+                }
+                else
+                {
+                    mqServer.Unsubscribe(subscriber.SubscriberId, queue);
+                }
+            }
+
             return NoContent();
         }
 

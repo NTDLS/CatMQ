@@ -2,6 +2,8 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Sockets;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 
 namespace CatMQ.Tests
@@ -13,6 +15,13 @@ namespace CatMQ.Tests
     public class ServiceFixture : IDisposable
     {
         public const string ApiKey = "test-api-key";
+        public const string UiUsername = "test";
+        public const string UiPassword = "test-password";
+        public const string DisposableApiKey = "disposable-api-key";
+        public static readonly Guid DisposableAccountId = Guid.NewGuid();
+        public static readonly Guid DisposableApiKeyId = Guid.NewGuid();
+
+        public string WebBaseUrl => $"http://127.0.0.1:{WebPort}";
 
         private readonly Process _process;
         private readonly string _folder = Path.Join(Path.GetTempPath(), "CatMQ.Tests.Service", Guid.NewGuid().ToString("N"));
@@ -62,12 +71,26 @@ namespace CatMQ.Tests
                 QueuePort,
                 WebListenURL = $"http://127.0.0.1:{WebPort}",
                 EnableWebApi = true,
-                EnableWebUI = false,
+                EnableWebUI = true,
                 AcknowledgmentTimeoutSeconds = 30
             }));
             File.WriteAllText(Path.Join(_folder, "config", "accounts.json"), JsonSerializer.Serialize(new[]
             {
-                new { Id = Guid.NewGuid(), Username = "test", ApiKeys = new[] { new { Id = Guid.NewGuid(), Key = ApiKey } } }
+                new
+                {
+                    Id = Guid.NewGuid(),
+                    Username = UiUsername,
+                    PasswordHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(UiPassword))).ToLower(),
+                    ApiKeys = new[] { new { Id = Guid.NewGuid(), Key = ApiKey } }
+                },
+                //Tests that delete an account or an API key use this one, so that the other tests keep working.
+                new
+                {
+                    Id = DisposableAccountId,
+                    Username = "disposable",
+                    PasswordHash = "",
+                    ApiKeys = new[] { new { Id = DisposableApiKeyId, Key = DisposableApiKey } }
+                }
             }));
 
             _process = Process.Start(new ProcessStartInfo("dotnet", $"\"{Path.Join(_folder, "CatMQ.Service.dll")}\"")

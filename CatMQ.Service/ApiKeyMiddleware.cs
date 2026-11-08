@@ -8,6 +8,12 @@ namespace CatMQ.Service
         private readonly RequestDelegate _next;
         private const string ApiKeyHeaderName = "x-catmq-api-Key";
 
+        /// <summary>
+        /// The web UI sends this header with its API requests. Another site cannot add a custom header to a request without
+        /// the browser asking this server first, which it refuses, so this keeps other sites from using a signed-in browser's cookie.
+        /// </summary>
+        public const string UiHeaderName = "x-catmq-ui";
+
         public ApiKeyMiddleware(RequestDelegate next)
         {
             _next = next;
@@ -26,6 +32,13 @@ namespace CatMQ.Service
             // Only enforce API key for the API (e.g. /api/). The health check is for load balancers and monitors, which have no key.
             if (!path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase)
                 || path.Equals("/api/v1/health", StringComparison.OrdinalIgnoreCase))
+            {
+                await _next(context);
+                return;
+            }
+
+            //The web UI calls the API with the user's login session rather than an API key.
+            if (context.User.Identity?.IsAuthenticated == true && context.Request.Headers.ContainsKey(UiHeaderName))
             {
                 await _next(context);
                 return;

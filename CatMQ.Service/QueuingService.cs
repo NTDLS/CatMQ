@@ -44,6 +44,8 @@ namespace CatMQ.Service
                     .AddCookie("CookieAuth", options =>
                     {
                         options.Cookie.Name = "CatMQAuth";
+                        options.Cookie.SameSite = SameSiteMode.Lax; //Browsers do not send it with requests that other sites make, other than links.
+                        options.Cookie.HttpOnly = true;
                         options.LoginPath = "/Login";
                     });
 
@@ -111,6 +113,9 @@ namespace CatMQ.Service
 
                 app.UseRouting();
 
+                //Before the API key check, because the web UI uses the API with its login session.
+                app.UseAuthentication();
+
                 if (serviceConfiguration.EnableWebApi)
                 {
                     app.UseMiddleware<ApiKeyMiddleware>();
@@ -126,7 +131,6 @@ namespace CatMQ.Service
                 }
 
                 //app.UseHttpsRedirection();
-                app.UseAuthentication();
                 app.UseAuthorization();
                 app.MapStaticAssets();
                 app.UseStaticFiles();

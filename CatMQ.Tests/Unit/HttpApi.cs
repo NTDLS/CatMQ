@@ -527,6 +527,117 @@ namespace CatMQ.Tests.Unit
 
         #endregion
 
+        #region The web UI, accounts and system.
+
+        /// <summary>
+        /// Signs in to the web UI the way a browser does, and returns a client that carries the session cookie.
+        /// </summary>
+        private async Task<HttpClient> SignInToWebUi()
+        {
+            var browser = new HttpClient(new HttpClientHandler { CookieContainer = new CookieContainer() }) { BaseAddress = new Uri(service.WebBaseUrl) };
+            var loginPage = await browser.GetStringAsync("/Login");
+            var token = System.Text.RegularExpressions.Regex.Match(loginPage, "name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"").Groups[1].Value;
+            var login = await browser.PostAsync("/Login", new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["Username"] = ServiceFixture.UiUsername,
+                ["Password"] = ServiceFixture.UiPassword,
+                ["__RequestVerificationToken"] = token
+            }));
+            Assert.Equal("/", login.RequestMessage?.RequestUri?.AbsolutePath); //Signing in redirects to the home page.
+            return browser;
+        }
+
+        [Fact(DisplayName = "HTTP: the web UI uses the API with its login session, but only with its header.")]
+        public async Task TestWebUiSession()
+        {
+            var queueName = await CreateQueue();
+            using var browser = await SignInToWebUi();
+
+            //Without the header, the cookie alone is refused, which keeps other sites from using a signed-in browser.
+            await AssertProblem(await browser.GetAsync($"/api/v1/queues/{queueName}"), HttpStatusCode.Unauthorized, "unauthorized");
+
+            browser.DefaultRequestHeaders.Add("x-catmq-ui", "1");
+            Assert.Equal(HttpStatusCode.OK, (await browser.GetAsync($"/api/v1/queues/{queueName}")).StatusCode);
+            Assert.Equal(HttpStatusCode.NoContent, (await browser.DeleteAsync($"/api/v1/queues/{queueName}/messages")).StatusCode);
+            Assert.Equal(HttpStatusCode.NoContent, (await browser.DeleteAsync($"/api/v1/queues/{queueName}")).StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, (await Http.GetAsync($"queues/{queueName}")).StatusCode);
+
+            //The header without a session is not enough either.
+            using var anonymous = new HttpClient { BaseAddress = new Uri(service.WebBaseUrl) };
+            anonymous.DefaultRequestHeaders.Add("x-catmq-ui", "1");
+            await AssertProblem(await anonymous.GetAsync("/api/v1/queues"), HttpStatusCode.Unauthorized, "unauthorized");
+        }
+
+        [Fact(DisplayName = "HTTP: API keys and accounts can be deleted, and a deleted key stops working.")]
+        public async Task TestDeleteApiKeyAndAccount()
+        {
+            using var disposable = new HttpClient { BaseAddress = Http.BaseAddress };
+            disposable.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ServiceFixture.DisposableApiKey);
+            Assert.Equal(HttpStatusCode.OK, (await disposable.GetAsync("queues")).StatusCode);
+
+            var accountId = ServiceFixture.DisposableAccountId;
+            Assert.Equal(HttpStatusCode.NoContent, (await Http.DeleteAsync($"accounts/{accountId}/api-keys/{ServiceFixture.DisposableApiKeyId}")).StatusCode);
+            await AssertProblem(await disposable.GetAsync("queues"), HttpStatusCode.Unauthorized, "unauthorized");
+            await AssertProblem(await Http.DeleteAsync($"accounts/{accountId}/api-keys/{ServiceFixture.DisposableApiKeyId}"), HttpStatusCode.NotFound, "api_key_not_found");
+
+            Assert.Equal(HttpStatusCode.NoContent, (await Http.DeleteAsync($"accounts/{accountId}")).StatusCode);
+            await AssertProblem(await Http.DeleteAsync($"accounts/{accountId}"), HttpStatusCode.NotFound, "account_not_found");
+            await AssertProblem(await Http.DeleteAsync($"accounts/{accountId}/api-keys/{Guid.NewGuid()}"), HttpStatusCode.NotFound, "account_not_found");
+        }
+
+        [Fact(DisplayName = "HTTP: a garbage collection can be requested.")]
+        public async Task TestGarbageCollection()
+        {
+            Assert.Equal(HttpStatusCode.NoContent, (await Http.PostAsync("system/gc", null)).StatusCode);
+        }
+
+        [Fact(DisplayName = "HTTP: a single connection can be removed by its subscriber ID, as the web UI does.")]
+        public async Task TestRemoveConnectionBySubscriberId()
+        {
+            var queueName = await CreateQueue(new { consumptionScheme = "firstConsumer" });
+
+            using var client = new CMqClient();
+            client.Connect(Constants.HOST_NAME, service.QueuePort);
+            int received = 0;
+            client.Subscribe(queueName, (_, _) => { Interlocked.Increment(ref received); return CMqConsumeResult.Consumed(); });
+
+            var consumers = (await Json(await Http.GetAsync($"queues/{queueName}/consumers"))).GetProperty("consumers");
+            var tcp = Assert.Single(consumers.EnumerateArray());
+            Assert.Equal("tcp", tcp.GetProperty("kind").GetString());
+
+            //An unnamed connection is listed under its subscriber ID.
+            Assert.Equal(HttpStatusCode.NoContent, (await Http.DeleteAsync($"queues/{queueName}/consumers/{tcp.GetProperty("name").GetString()}")).StatusCode);
+            Assert.Empty((await Json(await Http.GetAsync($"queues/{queueName}/consumers"))).GetProperty("consumers").EnumerateArray());
+
+            await Publish(queueName, new { body = 1 });
+            await Task.Delay(300);
+            Assert.Equal(0, received);
+            Assert.Equal(1, (await Stats(queueName)).GetProperty("depth").GetInt32());
+        }
+
+        [Fact(DisplayName = "HTTP: removing a lease consumer by its subscriber ID removes it completely.")]
+        public async Task TestRemoveLeaseConsumerBySubscriberId()
+        {
+            var queueName = await CreateQueue();
+            Assert.Empty(await Receive(queueName, "worker", waitSeconds: 0));
+
+            using var browser = await SignInToWebUi();
+            browser.DefaultRequestHeaders.Add("x-catmq-ui", "1");
+
+            //The web UI lists subscriptions by subscriber ID, and removes them that way.
+            var page = await Json(await browser.GetAsync($"/queue/{queueName}?handler=QueueSubscribers&queueName={queueName}"));
+            var subscriberId = Assert.Single(page.EnumerateArray()).GetProperty("subscriberId").GetString();
+            Assert.Equal(HttpStatusCode.NoContent, (await browser.DeleteAsync($"/api/v1/queues/{queueName}/consumers/{subscriberId}")).StatusCode);
+
+            Assert.Empty((await Json(await Http.GetAsync($"queues/{queueName}/consumers"))).GetProperty("consumers").EnumerateArray());
+
+            //Receiving again registers it afresh, and it works.
+            await Publish(queueName, new { body = 1 });
+            await Ack((await Receive(queueName, "worker")).Single());
+        }
+
+        #endregion
+
         #region Consumers and dead letters.
 
         [Fact(DisplayName = "HTTP: consumers can be listed, and removing one stops the queue waiting for it.")]
