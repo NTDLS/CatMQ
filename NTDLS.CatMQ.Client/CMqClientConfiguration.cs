@@ -24,12 +24,6 @@ namespace NTDLS.CatMQ.Client
         public int CompressionThreshold { get; set; } = CMqDefaults.DEFAULT_COMPRESSION_THRESHOLD;
 
         /// <summary>
-        /// Whether to send small writes immediately rather than holding them back to combine them (Nagle's algorithm), which
-        /// delays messages and replies when several are in flight on one connection.
-        /// </summary>
-        public bool NoDelay { get; set; } = CMqDefaults.DEFAULT_NO_DELAY;
-
-        /// <summary>
         /// A stable name for this consumer. Clients that share a name act as competing workers for one consumer,
         /// so each message goes to one of them. When null, the consumer is identified by its connection.
         /// </summary>

@@ -74,7 +74,6 @@ namespace NTDLS.CatMQ.Server
             _rmServer = new RmServer(rmConfiguration);
             _rmServer.OnException += RmServer_OnException;
             _rmServer.OnDisconnected += RmServer_OnDisconnected;
-            _rmServer.OnConnected += RmServer_OnConnected;
             _rmServer.AddHandler(new InternalServerQueryHandlers(this));
         }
 
@@ -102,7 +101,6 @@ namespace NTDLS.CatMQ.Server
             _rmServer = new RmServer(rmConfiguration);
             _rmServer.OnException += RmServer_OnException;
             _rmServer.OnDisconnected += RmServer_OnDisconnected;
-            _rmServer.OnConnected += RmServer_OnConnected;
             _rmServer.AddHandler(new InternalServerQueryHandlers(this));
         }
 
@@ -130,9 +128,6 @@ namespace NTDLS.CatMQ.Server
 
         internal void InvokeOnLog(CMqErrorLevel errorLevel, string message)
             => OnLog?.Invoke(this, errorLevel, message);
-
-        private void RmServer_OnConnected(RmContext context)
-            => context.TcpClient.NoDelay = _configuration.NoDelay;
 
         private void RmServer_OnDisconnected(RmContext context)
         {

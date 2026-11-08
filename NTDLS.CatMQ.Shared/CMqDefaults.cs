@@ -29,12 +29,6 @@
         public const int DEFAULT_COMPRESSION_THRESHOLD = 1024;
 
         /// <summary>
-        /// Whether to send small writes immediately rather than holding them back to combine them (Nagle's algorithm), which
-        /// delays messages and replies when several are in flight on one connection.
-        /// </summary>
-        public const bool DEFAULT_NO_DELAY = true;
-
-        /// <summary>
         /// The longest time in milliseconds that a queue will pause deliveries after consecutive delivery failures.
         /// </summary>
         public const int MAX_DELIVERY_FAILURE_BACKOFF_MS = 1000;

@@ -57,11 +57,5 @@ namespace NTDLS.CatMQ.Server
         /// Frames smaller than this many bytes are not compressed, because compressing them costs more time than the bytes it saves.
         /// </summary>
         public int CompressionThreshold { get; set; } = CMqDefaults.DEFAULT_COMPRESSION_THRESHOLD;
-
-        /// <summary>
-        /// Whether to send small writes immediately rather than holding them back to combine them (Nagle's algorithm), which
-        /// delays messages and replies when several are in flight on one connection.
-        /// </summary>
-        public bool NoDelay { get; set; } = CMqDefaults.DEFAULT_NO_DELAY;
     }
 }

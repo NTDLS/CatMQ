@@ -99,7 +99,7 @@ namespace CatMQ.Tests.Unit
             server.Start(port);
             try
             {
-                using var client = new CMqClient(new CMqClientConfiguration { CompressionLevel = CompressionLevel.NoCompression, NoDelay = false });
+                using var client = new CMqClient(new CMqClientConfiguration { CompressionLevel = CompressionLevel.NoCompression });
                 client.Connect(Constants.HOST_NAME, port);
                 client.CreateQueue("compression");
 

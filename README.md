@@ -1,21 +1,25 @@
 # CatMQ
-CatMQ is a high-performance and reliable persistent message queue designed for efficient inter-process communication, task queuing, load balancing, and data buffering over TCP/IP.
+CatMQ is a high-performance and reliable persistent message queue designed for efficient inter-process communication, task queuing, load balancing, and data buffering.
+
+Applications written in any language can publish and consume messages. .NET applications connect with the native TCP client,
+and Python, JavaScript, Go, Java, shell scripts and everything else use the [HTTP API](#http-api). They all share the same
+queues, so a message published from one language can be consumed in another.
 
 ## Testing Status
 [![Regression Tests](https://github.com/NTDLS/CatMQ/actions/workflows/Regression%20Tests.yml/badge.svg)](https://github.com/NTDLS/CatMQ/actions/workflows/Regression%20Tests.yml)
 
 ## Another Message Queue?! Why?
 CatMQ is not “fully featured”, as in it does not natively support clustering and it is not multi-protocol (no AMQP nor MQTT).
-.NET applications use the native TCP client, and anything else can publish and consume over the [HTTP API](#http-api).
 Ok, then what’s the deal?
 Well, we needed a MQ that was slim, straight forward and free of fat-runtimes such as java or additional dependencies such as erlang. We went on an internet fishing expedition and came up empty.
 
 So, we built one. __Welcome to CatMQ: a reliable yet slim message queue.__
 
 ## Packages 📦
-- Server Nuget package: https://www.nuget.org/packages/NTDLS.CatMQ.Server
-- Client Nuget package: https://www.nuget.org/packages/NTDLS.CatMQ.Client
-- Dedicated server install and web UI: https://github.com/NTDLS/CatMQ/releases
+- Dedicated server install, with the web UI and the HTTP API: https://github.com/NTDLS/CatMQ/releases
+- HTTP API for any language, described by an OpenAPI document: [docs/api/catmq.openapi.yaml](docs/api/catmq.openapi.yaml)
+- .NET client Nuget package: https://www.nuget.org/packages/NTDLS.CatMQ.Client
+- .NET server Nuget package, for running the server in-process: https://www.nuget.org/packages/NTDLS.CatMQ.Server
 
 ## See also:
  - https://github.com/NTDLS/KitKey
@@ -49,11 +53,11 @@ internal class Program
 }
 ```
 
-## Client
+## .NET client
 
-With the client, we can interact with the server. Create/delete/purge queues, subscribe
+With the .NET client, we can interact with the server. Create/delete/purge queues, subscribe
 and of course send and receive messages. Messages are sent by simply passing a serializable
-class instance that inherits ICMqMessage.
+class instance that inherits ICMqMessage. For other languages, see the [HTTP API](#http-api).
 
 
 ```csharp
@@ -166,10 +170,10 @@ so each message goes to one of them. Clients with a different name still get the
 var client = new CMqClient(new CMqClientConfiguration { ConsumerName = "billing" });
 ```
 
-## Choosing TCP or HTTP
-The native TCP protocol is CatMQ's primary interface, and the right choice for .NET applications. The HTTP API is for
-everything else: other languages, scripts, and services where adding a .NET client is not practical. Both reach the same
-queues, so a .NET publisher can feed a Python consumer and the other way around.
+## TCP and HTTP
+.NET applications have a dedicated path: the native TCP client, which pushes messages to them as they arrive. Every other
+language uses the HTTP API, which .NET applications can use as well. Both reach the same queues, so a .NET publisher can
+feed a Python consumer and the other way around.
 
 | | Native TCP (.NET) | HTTP API (any language) |
 |---|---|---|
@@ -207,9 +211,6 @@ Treat them as a rough comparison, not a guarantee: a network, other hardware or 
 | TCP publisher to TCP subscriber | 0.7 ms | 1.6 to 2.3 ms |
 | HTTP publisher to an HTTP consumer that is already waiting | 1.8 ms | 10.8 to 11.8 ms |
 
-Publishing in batches over HTTP is the fastest way to add many messages, because the TCP client sends one message per call.
-For everything else the native TCP client is as fast or faster, and it has the lowest latency.
-
 Larger JSON messages are compressed. For JSON of 50 KB or more, `Fastest` makes them roughly twice the size that `Optimal`
 would, in about a fifth of the time (for 4 KB, about 1.5 times the size in 40% of the time), which suits a fast local network. On a slower link, set `CompressionLevel` to `Optimal` on the client and the server.
 They do not need to match, because each frame records how it was compressed.
@@ -218,8 +219,9 @@ In practice, a consumer's own work usually limits throughput long before either 
 `MaxOutstandingDeliveries` decides how much of that work happens at once.
 
 ## HTTP API
-When enabled, the CatMQ service also has an HTTP API, so that queues can be managed, and messages published and consumed,
-from any language. The full contract is an OpenAPI document: [docs/api/catmq.openapi.yaml](docs/api/catmq.openapi.yaml).
+The CatMQ service has an HTTP API for managing queues and for publishing and consuming messages from any language. The full
+contract is an OpenAPI document: [docs/api/catmq.openapi.yaml](docs/api/catmq.openapi.yaml), from which clients can be generated.
+The API is on by default, and can be turned off with `EnableWebApi` in the service's configuration.
 
 You'll first need to log in to the web management UI, create a user and generate an API key. Pass the key in the
 `Authorization: Bearer` header, or in the `x-catmq-api-key` header. The health check at `/api/v1/health` needs no key.
@@ -306,13 +308,6 @@ and list and remove consumers. Every error is returned as an RFC 9457 problem do
 `queue_not_found` or `lease_expired`.
 
 Webhooks, where CatMQ pushes messages to a URL, are described in the OpenAPI document but are not available yet.
-
-## Upgrading from 2.x
-- Clients and servers must be upgraded together, because the messages they exchange have changed.
-- `CMqReceivedMessage.AssemblyQualifiedTypeName` is now `MessageType`, and `MessageJson` is now `Body`.
-- Calling `CreateQueue` with a configuration now changes an existing queue, where before it was ignored. Check that the
-  configuration in each application's code is what you want the queue to have.
-- Messages that are already persisted keep working, and are delivered as before.
 
 ## Technologies
 CatMQ is based heavily on internally built technologies that leverage the works by people

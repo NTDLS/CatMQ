@@ -159,8 +159,6 @@ namespace NTDLS.CatMQ.Client
 
         private void RmClient_OnConnected(RmContext context, bool isReconnect)
         {
-            context.TcpClient.NoDelay = _configuration.NoDelay;
-
             if (isReconnect)
             {
                 //Subscriptions are tied to the server-side connection, so they are lost when the connection drops.
