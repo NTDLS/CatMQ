@@ -65,7 +65,7 @@ namespace CatMQ.Tests.Unit
             var ex = Assert.Throws<CMqQueueFullException>(() => Server.Enqueue(queueName, null, null, "{}"));
             Assert.Equal(3, ex.MaxDepth);
 
-            var leased = Assert.Single(await Server.ReceiveAsync(queueName, "worker", 1, TimeSpan.FromSeconds(5)));
+            var leased = Assert.Single(await Server.ReceiveAsync(queueName, "worker", 1, TimeSpan.FromSeconds(5), cancellationToken: TestContext.Current.CancellationToken));
             Assert.False(TryEnqueue(queueName)); //A leased message is still in the queue.
 
             Server.AcknowledgeLease(leased.LeaseId, CMqConsumeResult.Consumed());
@@ -108,7 +108,7 @@ namespace CatMQ.Tests.Unit
             for (int i = 0; i < 3; i++)
             {
                 Assert.True(TryEnqueue(queueName));
-                var leased = Assert.Single(await Server.ReceiveAsync(queueName, "worker", 1, TimeSpan.FromSeconds(5)));
+                var leased = Assert.Single(await Server.ReceiveAsync(queueName, "worker", 1, TimeSpan.FromSeconds(5), cancellationToken: TestContext.Current.CancellationToken));
                 Server.AcknowledgeLease(leased.LeaseId, CMqConsumeResult.DeadLetter());
                 Assert.True(Wait.Until(() => Depth(queueName) == 0));
             }
@@ -126,7 +126,7 @@ namespace CatMQ.Tests.Unit
             for (int i = 0; i < 5; i++)
             {
                 Assert.True(TryEnqueue(queueName));
-                var leased = Assert.Single(await Server.ReceiveAsync(queueName, "worker", 1, TimeSpan.FromSeconds(5)));
+                var leased = Assert.Single(await Server.ReceiveAsync(queueName, "worker", 1, TimeSpan.FromSeconds(5), cancellationToken: TestContext.Current.CancellationToken));
                 Server.AcknowledgeLease(leased.LeaseId, CMqConsumeResult.DeadLetter());
             }
             Assert.True(Wait.Until(() => Depth($"{queueName}.dlq") == 5 && Depth(queueName) == 0));

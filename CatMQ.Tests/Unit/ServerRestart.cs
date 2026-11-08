@@ -231,12 +231,12 @@ namespace CatMQ.Tests.Unit
                     PersistenceScheme = CMqPersistenceScheme.Persistent,
                     ConsumptionScheme = CMqConsumptionScheme.AllSubscribersSatisfied
                 });
-                Assert.Empty(await server.ReceiveAsync(queueName, "billing", 1, TimeSpan.Zero));
-                Assert.Empty(await server.ReceiveAsync(queueName, "audit", 1, TimeSpan.Zero));
+                Assert.Empty(await server.ReceiveAsync(queueName, "billing", 1, TimeSpan.Zero, cancellationToken: TestContext.Current.CancellationToken));
+                Assert.Empty(await server.ReceiveAsync(queueName, "audit", 1, TimeSpan.Zero, cancellationToken: TestContext.Current.CancellationToken));
 
                 server.Enqueue(queueName, null, "orders.created", "{}");
 
-                var leased = Assert.Single(await server.ReceiveAsync(queueName, "billing", 1, TimeSpan.FromSeconds(5)));
+                var leased = Assert.Single(await server.ReceiveAsync(queueName, "billing", 1, TimeSpan.FromSeconds(5), cancellationToken: TestContext.Current.CancellationToken));
                 leaseId = leased.LeaseId;
                 messageId = leased.Message.MessageId;
             }
@@ -256,12 +256,12 @@ namespace CatMQ.Tests.Unit
                 Assert.Equal(CMqLeaseStatus.NotFound, server.AcknowledgeLease(leaseId, CMqConsumeResult.Consumed()));
                 Assert.Equal(1, server.GetQueue(queueName)?.QueueDepth);
 
-                var redelivered = Assert.Single(await server.ReceiveAsync(queueName, "billing", 1, TimeSpan.FromSeconds(5)));
+                var redelivered = Assert.Single(await server.ReceiveAsync(queueName, "billing", 1, TimeSpan.FromSeconds(5), cancellationToken: TestContext.Current.CancellationToken));
                 Assert.Equal(messageId, redelivered.Message.MessageId);
                 Assert.Equal("orders.created", redelivered.Message.MessageType);
                 server.AcknowledgeLease(redelivered.LeaseId, CMqConsumeResult.Consumed());
 
-                var audit = Assert.Single(await server.ReceiveAsync(queueName, "audit", 1, TimeSpan.FromSeconds(5)));
+                var audit = Assert.Single(await server.ReceiveAsync(queueName, "audit", 1, TimeSpan.FromSeconds(5), cancellationToken: TestContext.Current.CancellationToken));
                 server.AcknowledgeLease(audit.LeaseId, CMqConsumeResult.Consumed());
 
                 Assert.True(Wait.Until(() => server.GetQueue(queueName)?.QueueDepth == 0));
@@ -281,7 +281,7 @@ namespace CatMQ.Tests.Unit
             try
             {
                 server.CreateQueue(new CMqQueueConfiguration(queueName) { PersistenceScheme = CMqPersistenceScheme.Persistent });
-                Assert.Empty(await server.ReceiveAsync(queueName, "billing", 1, TimeSpan.Zero));
+                Assert.Empty(await server.ReceiveAsync(queueName, "billing", 1, TimeSpan.Zero, cancellationToken: TestContext.Current.CancellationToken));
                 Assert.True(server.RemoveLeaseConsumer(queueName, "billing"));
             }
             finally

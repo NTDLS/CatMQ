@@ -294,10 +294,10 @@ namespace CatMQ.Tests.Unit
             Assert.Throws<CMqQueueNotFoundException>(() => _server.PutWebhook(NewQueueName(), "hook", new CMqWebhookSettings { Url = _receiver.Url }, out _));
 
             //A webhook and a lease consumer cannot share a name, because they would compete for messages without meaning to.
-            Assert.Empty(await _server.ReceiveAsync(queueName, "shared", 1, TimeSpan.Zero));
+            Assert.Empty(await _server.ReceiveAsync(queueName, "shared", 1, TimeSpan.Zero, cancellationToken: TestContext.Current.CancellationToken));
             Assert.Throws<ArgumentException>(() => _server.PutWebhook(queueName, "shared", new CMqWebhookSettings { Url = _receiver.Url }, out _));
             _server.PutWebhook(queueName, "hook", new CMqWebhookSettings { Url = _receiver.Url }, out _);
-            await Assert.ThrowsAnyAsync<ArgumentException>(() => _server.ReceiveAsync(queueName, "hook", 1, TimeSpan.Zero));
+            await Assert.ThrowsAnyAsync<ArgumentException>(() => _server.ReceiveAsync(queueName, "hook", 1, TimeSpan.Zero, cancellationToken: TestContext.Current.CancellationToken));
         }
 
         [Fact(DisplayName = "Webhook: https is required unless the server allows http.")]

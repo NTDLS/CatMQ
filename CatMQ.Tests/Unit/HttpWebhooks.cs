@@ -44,7 +44,7 @@ namespace CatMQ.Tests.Unit
                 url = _receiver.Url + "orders",
                 timeoutSeconds = 10,
                 headers = new Dictionary<string, string> { ["Authorization"] = "Bearer receiver-token" }
-            });
+            }, cancellationToken: TestContext.Current.CancellationToken);
             Assert.Equal(HttpStatusCode.Created, created.StatusCode);
             var webhook = await Json(created);
             var secret = webhook.GetProperty("secret").GetString()!;
@@ -55,7 +55,7 @@ namespace CatMQ.Tests.Unit
             Assert.True(webhook.GetProperty("enabled").GetBoolean());
             Assert.Equal("********", webhook.GetProperty("headers").GetProperty("Authorization").GetString());
 
-            var published = await Http.PostAsJsonAsync($"queues/{queueName}/messages", new { body = new { orderId = 9 } });
+            var published = await Http.PostAsJsonAsync($"queues/{queueName}/messages", new { body = new { orderId = 9 } }, cancellationToken: TestContext.Current.CancellationToken);
             Assert.Equal(HttpStatusCode.Accepted, published.StatusCode);
             Assert.True(await Wait.UntilAsync(async () => await Depth(queueName) == 0));
 
@@ -65,43 +65,43 @@ namespace CatMQ.Tests.Unit
             Assert.Equal(9, delivery.Json.GetProperty("body").GetProperty("orderId").GetInt32());
 
             //Reading it back never includes the secret, nor header values.
-            var read = await Json(await Http.GetAsync($"queues/{queueName}/webhooks/orders"));
+            var read = await Json(await Http.GetAsync($"queues/{queueName}/webhooks/orders", cancellationToken: TestContext.Current.CancellationToken));
             Assert.False(read.TryGetProperty("secret", out _));
             Assert.Equal("********", read.GetProperty("headers").GetProperty("Authorization").GetString());
             Assert.NotEqual(JsonValueKind.Null, read.GetProperty("lastSuccessAt").ValueKind);
 
-            var list = await Json(await Http.GetAsync($"queues/{queueName}/webhooks"));
+            var list = await Json(await Http.GetAsync($"queues/{queueName}/webhooks", cancellationToken: TestContext.Current.CancellationToken));
             Assert.Equal("orders", Assert.Single(list.GetProperty("webhooks").EnumerateArray()).GetProperty("name").GetString());
 
-            var consumers = await Json(await Http.GetAsync($"queues/{queueName}/consumers"));
+            var consumers = await Json(await Http.GetAsync($"queues/{queueName}/consumers", cancellationToken: TestContext.Current.CancellationToken));
             var consumer = Assert.Single(consumers.GetProperty("consumers").EnumerateArray());
             Assert.Equal("orders", consumer.GetProperty("name").GetString());
 
             //Replacing the settings keeps the secret, so it answers 200 without one.
-            var replaced = await Http.PutAsJsonAsync($"queues/{queueName}/webhooks/orders", new { url = _receiver.Url + "orders", enabled = false });
+            var replaced = await Http.PutAsJsonAsync($"queues/{queueName}/webhooks/orders", new { url = _receiver.Url + "orders", enabled = false }, cancellationToken: TestContext.Current.CancellationToken);
             Assert.Equal(HttpStatusCode.OK, replaced.StatusCode);
             Assert.False((await Json(replaced)).TryGetProperty("secret", out _));
 
-            var rotated = await Http.PostAsync($"queues/{queueName}/webhooks/orders/rotate-secret", null);
+            var rotated = await Http.PostAsync($"queues/{queueName}/webhooks/orders/rotate-secret", null, cancellationToken: TestContext.Current.CancellationToken);
             Assert.Equal(HttpStatusCode.OK, rotated.StatusCode);
             var newSecret = (await Json(rotated)).GetProperty("secret").GetString();
             Assert.StartsWith("whsec_", newSecret);
             Assert.NotEqual(secret, newSecret);
 
-            Assert.Equal(HttpStatusCode.NoContent, (await Http.DeleteAsync($"queues/{queueName}/webhooks/orders")).StatusCode);
-            await AssertProblem(await Http.GetAsync($"queues/{queueName}/webhooks/orders"), HttpStatusCode.NotFound, "webhook_not_found");
-            await AssertProblem(await Http.PostAsync($"queues/{queueName}/webhooks/orders/rotate-secret", null), HttpStatusCode.NotFound, "webhook_not_found");
-            Assert.Empty((await Json(await Http.GetAsync($"queues/{queueName}/webhooks"))).GetProperty("webhooks").EnumerateArray());
+            Assert.Equal(HttpStatusCode.NoContent, (await Http.DeleteAsync($"queues/{queueName}/webhooks/orders", cancellationToken: TestContext.Current.CancellationToken)).StatusCode);
+            await AssertProblem(await Http.GetAsync($"queues/{queueName}/webhooks/orders", cancellationToken: TestContext.Current.CancellationToken), HttpStatusCode.NotFound, "webhook_not_found");
+            await AssertProblem(await Http.PostAsync($"queues/{queueName}/webhooks/orders/rotate-secret", null, cancellationToken: TestContext.Current.CancellationToken), HttpStatusCode.NotFound, "webhook_not_found");
+            Assert.Empty((await Json(await Http.GetAsync($"queues/{queueName}/webhooks", cancellationToken: TestContext.Current.CancellationToken))).GetProperty("webhooks").EnumerateArray());
         }
 
         [Fact(DisplayName = "HTTP webhooks: deleting the consumer deletes the webhook.")]
         public async Task TestDeleteAsConsumer()
         {
             var queueName = await CreateQueue();
-            Assert.Equal(HttpStatusCode.Created, (await Http.PutAsJsonAsync($"queues/{queueName}/webhooks/hook", new { url = _receiver.Url })).StatusCode);
+            Assert.Equal(HttpStatusCode.Created, (await Http.PutAsJsonAsync($"queues/{queueName}/webhooks/hook", new { url = _receiver.Url }, cancellationToken: TestContext.Current.CancellationToken)).StatusCode);
 
-            Assert.Equal(HttpStatusCode.NoContent, (await Http.DeleteAsync($"queues/{queueName}/consumers/hook")).StatusCode);
-            Assert.Empty((await Json(await Http.GetAsync($"queues/{queueName}/webhooks"))).GetProperty("webhooks").EnumerateArray());
+            Assert.Equal(HttpStatusCode.NoContent, (await Http.DeleteAsync($"queues/{queueName}/consumers/hook", cancellationToken: TestContext.Current.CancellationToken)).StatusCode);
+            Assert.Empty((await Json(await Http.GetAsync($"queues/{queueName}/webhooks", cancellationToken: TestContext.Current.CancellationToken))).GetProperty("webhooks").EnumerateArray());
         }
 
         [Fact(DisplayName = "HTTP webhooks: invalid requests are problem details.")]
@@ -109,16 +109,16 @@ namespace CatMQ.Tests.Unit
         {
             var queueName = await CreateQueue();
 
-            await AssertProblem(await Http.PutAsJsonAsync($"queues/{queueName}/webhooks/hook", new { }), HttpStatusCode.BadRequest, "invalid_request");
-            await AssertProblem(await Http.PutAsJsonAsync($"queues/{queueName}/webhooks/hook", new { url = "not a url" }), HttpStatusCode.BadRequest, "invalid_request");
-            await AssertProblem(await Http.PutAsJsonAsync($"queues/{queueName}/webhooks/hook", new { url = _receiver.Url, timeoutSeconds = 0 }), HttpStatusCode.BadRequest, "invalid_request");
-            await AssertProblem(await Http.PutAsJsonAsync($"queues/{queueName}/webhooks/bad%20name", new { url = _receiver.Url }), HttpStatusCode.BadRequest, "invalid_request");
-            await AssertProblem(await Http.PutAsJsonAsync($"queues/q{Guid.NewGuid():N}/webhooks/hook", new { url = _receiver.Url }), HttpStatusCode.NotFound, "queue_not_found");
-            await AssertProblem(await Http.GetAsync($"queues/q{Guid.NewGuid():N}/webhooks"), HttpStatusCode.NotFound, "queue_not_found");
+            await AssertProblem(await Http.PutAsJsonAsync($"queues/{queueName}/webhooks/hook", new { }, cancellationToken: TestContext.Current.CancellationToken), HttpStatusCode.BadRequest, "invalid_request");
+            await AssertProblem(await Http.PutAsJsonAsync($"queues/{queueName}/webhooks/hook", new { url = "not a url" }, cancellationToken: TestContext.Current.CancellationToken), HttpStatusCode.BadRequest, "invalid_request");
+            await AssertProblem(await Http.PutAsJsonAsync($"queues/{queueName}/webhooks/hook", new { url = _receiver.Url, timeoutSeconds = 0 }, cancellationToken: TestContext.Current.CancellationToken), HttpStatusCode.BadRequest, "invalid_request");
+            await AssertProblem(await Http.PutAsJsonAsync($"queues/{queueName}/webhooks/bad%20name", new { url = _receiver.Url }, cancellationToken: TestContext.Current.CancellationToken), HttpStatusCode.BadRequest, "invalid_request");
+            await AssertProblem(await Http.PutAsJsonAsync($"queues/q{Guid.NewGuid():N}/webhooks/hook", new { url = _receiver.Url }, cancellationToken: TestContext.Current.CancellationToken), HttpStatusCode.NotFound, "queue_not_found");
+            await AssertProblem(await Http.GetAsync($"queues/q{Guid.NewGuid():N}/webhooks", cancellationToken: TestContext.Current.CancellationToken), HttpStatusCode.NotFound, "queue_not_found");
 
             //A lease consumer's name cannot also be a webhook's.
-            Assert.Equal(HttpStatusCode.OK, (await Http.PostAsJsonAsync($"queues/{queueName}/messages/receive", new { consumer = "worker", waitSeconds = 0 })).StatusCode);
-            await AssertProblem(await Http.PutAsJsonAsync($"queues/{queueName}/webhooks/worker", new { url = _receiver.Url }), HttpStatusCode.BadRequest, "invalid_request");
+            Assert.Equal(HttpStatusCode.OK, (await Http.PostAsJsonAsync($"queues/{queueName}/messages/receive", new { consumer = "worker", waitSeconds = 0 }, cancellationToken: TestContext.Current.CancellationToken)).StatusCode);
+            await AssertProblem(await Http.PutAsJsonAsync($"queues/{queueName}/webhooks/worker", new { url = _receiver.Url }, cancellationToken: TestContext.Current.CancellationToken), HttpStatusCode.BadRequest, "invalid_request");
         }
     }
 }

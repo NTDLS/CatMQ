@@ -102,18 +102,18 @@ namespace CatMQ.Tests.Unit
         {
             using var anonymous = new HttpClient { BaseAddress = Http.BaseAddress };
 
-            var health = await anonymous.GetAsync("health");
+            var health = await anonymous.GetAsync("health", cancellationToken: TestContext.Current.CancellationToken);
             Assert.Equal(HttpStatusCode.OK, health.StatusCode);
             Assert.Equal("ok", (await Json(health)).GetProperty("status").GetString());
 
-            await AssertProblem(await anonymous.GetAsync("queues"), HttpStatusCode.Unauthorized, "unauthorized");
+            await AssertProblem(await anonymous.GetAsync("queues", cancellationToken: TestContext.Current.CancellationToken), HttpStatusCode.Unauthorized, "unauthorized");
 
             anonymous.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "wrong");
-            await AssertProblem(await anonymous.GetAsync("queues"), HttpStatusCode.Unauthorized, "unauthorized");
+            await AssertProblem(await anonymous.GetAsync("queues", cancellationToken: TestContext.Current.CancellationToken), HttpStatusCode.Unauthorized, "unauthorized");
 
             anonymous.DefaultRequestHeaders.Authorization = null;
             anonymous.DefaultRequestHeaders.Add("x-catmq-api-key", ServiceFixture.ApiKey);
-            Assert.Equal(HttpStatusCode.OK, (await anonymous.GetAsync("queues")).StatusCode);
+            Assert.Equal(HttpStatusCode.OK, (await anonymous.GetAsync("queues", cancellationToken: TestContext.Current.CancellationToken)).StatusCode);
         }
 
         #endregion
@@ -125,18 +125,18 @@ namespace CatMQ.Tests.Unit
         {
             var queueName = await CreateQueue(new { persistence = "persistent", consumptionScheme = "firstConsumer", maxOutstandingDeliveries = 3 });
 
-            var queue = await Json(await Http.GetAsync($"queues/{queueName}"));
+            var queue = await Json(await Http.GetAsync($"queues/{queueName}", cancellationToken: TestContext.Current.CancellationToken));
             Assert.Equal(queueName, queue.GetProperty("name").GetString());
             Assert.Equal("persistent", queue.GetProperty("settings").GetProperty("persistence").GetString());
             Assert.Equal("firstConsumer", queue.GetProperty("settings").GetProperty("consumptionScheme").GetString());
             Assert.Equal(3, queue.GetProperty("settings").GetProperty("maxOutstandingDeliveries").GetInt32());
             Assert.Equal(JsonValueKind.String, queue.GetProperty("stats").GetProperty("receivedCount").ValueKind);
 
-            var updated = await Http.PutAsJsonAsync($"queues/{queueName}", new { persistence = "persistent", consumptionScheme = "firstConsumer", maxOutstandingDeliveries = 9 });
+            var updated = await Http.PutAsJsonAsync($"queues/{queueName}", new { persistence = "persistent", consumptionScheme = "firstConsumer", maxOutstandingDeliveries = 9 }, cancellationToken: TestContext.Current.CancellationToken);
             Assert.Equal(HttpStatusCode.OK, updated.StatusCode);
             Assert.Equal(9, (await Json(updated)).GetProperty("settings").GetProperty("maxOutstandingDeliveries").GetInt32());
 
-            await AssertProblem(await Http.PutAsJsonAsync($"queues/{queueName}", new { persistence = "ephemeral" }),
+            await AssertProblem(await Http.PutAsJsonAsync($"queues/{queueName}", new { persistence = "ephemeral" }, cancellationToken: TestContext.Current.CancellationToken),
                 HttpStatusCode.Conflict, "queue_persistence_immutable");
         }
 
@@ -145,16 +145,16 @@ namespace CatMQ.Tests.Unit
         {
             var queueName = await CreateQueue(new { maxOutstandingDeliveries = 3, maxDeliveryAttempts = 7, maxMessageAgeSeconds = 100 });
 
-            var patched = await Json(await Http.PatchAsJsonAsync($"queues/{queueName}", new { maxOutstandingDeliveries = 8 }));
+            var patched = await Json(await Http.PatchAsJsonAsync($"queues/{queueName}", new { maxOutstandingDeliveries = 8 }, cancellationToken: TestContext.Current.CancellationToken));
             var settings = patched.GetProperty("settings");
             Assert.Equal(8, settings.GetProperty("maxOutstandingDeliveries").GetInt32());
             Assert.Equal(7, settings.GetProperty("maxDeliveryAttempts").GetInt32());
             Assert.Equal(100, settings.GetProperty("maxMessageAgeSeconds").GetInt32());
 
-            var cleared = await Json(await Http.PatchAsJsonAsync($"queues/{queueName}", new { maxMessageAgeSeconds = (int?)null }));
+            var cleared = await Json(await Http.PatchAsJsonAsync($"queues/{queueName}", new { maxMessageAgeSeconds = (int?)null }, cancellationToken: TestContext.Current.CancellationToken));
             Assert.Equal(JsonValueKind.Null, cleared.GetProperty("settings").GetProperty("maxMessageAgeSeconds").ValueKind);
 
-            await AssertProblem(await Http.PatchAsJsonAsync($"queues/{NewQueueName()}", new { maxOutstandingDeliveries = 8 }),
+            await AssertProblem(await Http.PatchAsJsonAsync($"queues/{NewQueueName()}", new { maxOutstandingDeliveries = 8 }, cancellationToken: TestContext.Current.CancellationToken),
                 HttpStatusCode.NotFound, "queue_not_found");
         }
 
@@ -163,18 +163,18 @@ namespace CatMQ.Tests.Unit
         {
             var queueName = await CreateQueue();
 
-            await AssertProblem(await Http.PutAsJsonAsync($"queues/{NewQueueName()}", new { persistence = "sometimes" }), HttpStatusCode.BadRequest, "invalid_request");
-            await AssertProblem(await Http.PutAsJsonAsync($"queues/{NewQueueName()}", new { maxOutstandingDeliveries = 0 }), HttpStatusCode.BadRequest, "invalid_request");
-            await AssertProblem(await Http.PutAsJsonAsync("queues/name.dlq", new { }), HttpStatusCode.BadRequest, "invalid_request");
-            await AssertProblem(await Http.GetAsync($"queues/{NewQueueName()}"), HttpStatusCode.NotFound, "queue_not_found");
+            await AssertProblem(await Http.PutAsJsonAsync($"queues/{NewQueueName()}", new { persistence = "sometimes" }, cancellationToken: TestContext.Current.CancellationToken), HttpStatusCode.BadRequest, "invalid_request");
+            await AssertProblem(await Http.PutAsJsonAsync($"queues/{NewQueueName()}", new { maxOutstandingDeliveries = 0 }, cancellationToken: TestContext.Current.CancellationToken), HttpStatusCode.BadRequest, "invalid_request");
+            await AssertProblem(await Http.PutAsJsonAsync("queues/name.dlq", new { }, cancellationToken: TestContext.Current.CancellationToken), HttpStatusCode.BadRequest, "invalid_request");
+            await AssertProblem(await Http.GetAsync($"queues/{NewQueueName()}", cancellationToken: TestContext.Current.CancellationToken), HttpStatusCode.NotFound, "queue_not_found");
 
-            var malformed = await Http.PutAsync($"queues/{NewQueueName()}", new StringContent("{not json", Encoding.UTF8, "application/json"));
+            var malformed = await Http.PutAsync($"queues/{NewQueueName()}", new StringContent("{not json", Encoding.UTF8, "application/json"), cancellationToken: TestContext.Current.CancellationToken);
             await AssertProblem(malformed, HttpStatusCode.BadRequest, "invalid_request");
 
-            await AssertProblem(await Http.PostAsJsonAsync($"queues/{queueName}/messages/receive", new { max = 1 }), HttpStatusCode.BadRequest, "invalid_request");
-            await AssertProblem(await Http.PostAsJsonAsync($"queues/{queueName}/messages/receive", new { consumer = "bad name" }), HttpStatusCode.BadRequest, "invalid_request");
-            await AssertProblem(await Http.PostAsJsonAsync($"queues/{queueName}/messages/receive", new { consumer = "w", waitSeconds = 61 }), HttpStatusCode.BadRequest, "invalid_request");
-            await AssertProblem(await Http.GetAsync("queues?limit=0"), HttpStatusCode.BadRequest, "invalid_request");
+            await AssertProblem(await Http.PostAsJsonAsync($"queues/{queueName}/messages/receive", new { max = 1 }, cancellationToken: TestContext.Current.CancellationToken), HttpStatusCode.BadRequest, "invalid_request");
+            await AssertProblem(await Http.PostAsJsonAsync($"queues/{queueName}/messages/receive", new { consumer = "bad name" }, cancellationToken: TestContext.Current.CancellationToken), HttpStatusCode.BadRequest, "invalid_request");
+            await AssertProblem(await Http.PostAsJsonAsync($"queues/{queueName}/messages/receive", new { consumer = "w", waitSeconds = 61 }, cancellationToken: TestContext.Current.CancellationToken), HttpStatusCode.BadRequest, "invalid_request");
+            await AssertProblem(await Http.GetAsync("queues?limit=0", cancellationToken: TestContext.Current.CancellationToken), HttpStatusCode.BadRequest, "invalid_request");
         }
 
         [Fact(DisplayName = "HTTP: queues can be listed a page at a time, and deleted repeatedly.")]
@@ -190,7 +190,7 @@ namespace CatMQ.Tests.Unit
             string? cursor = null;
             do
             {
-                var page = await Json(await Http.GetAsync("queues?limit=2" + (cursor == null ? "" : $"&cursor={cursor}")));
+                var page = await Json(await Http.GetAsync("queues?limit=2" + (cursor == null ? "" : $"&cursor={cursor}"), cancellationToken: TestContext.Current.CancellationToken));
                 Assert.True(page.GetProperty("queues").GetArrayLength() <= 2);
                 seen.AddRange(page.GetProperty("queues").EnumerateArray().Select(o => o.GetProperty("name").GetString()!));
                 cursor = page.GetProperty("nextCursor").GetString();
@@ -199,9 +199,9 @@ namespace CatMQ.Tests.Unit
             Assert.Equal(seen.Count, seen.Distinct().Count());
             Assert.All(created, o => Assert.Contains(o, seen));
 
-            Assert.Equal(HttpStatusCode.NoContent, (await Http.DeleteAsync($"queues/{created[0]}")).StatusCode);
-            Assert.Equal(HttpStatusCode.NoContent, (await Http.DeleteAsync($"queues/{created[0]}")).StatusCode);
-            Assert.Equal(HttpStatusCode.NotFound, (await Http.GetAsync($"queues/{created[0]}")).StatusCode);
+            Assert.Equal(HttpStatusCode.NoContent, (await Http.DeleteAsync($"queues/{created[0]}", cancellationToken: TestContext.Current.CancellationToken)).StatusCode);
+            Assert.Equal(HttpStatusCode.NoContent, (await Http.DeleteAsync($"queues/{created[0]}", cancellationToken: TestContext.Current.CancellationToken)).StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, (await Http.GetAsync($"queues/{created[0]}", cancellationToken: TestContext.Current.CancellationToken)).StatusCode);
         }
 
         #endregion
@@ -263,10 +263,10 @@ namespace CatMQ.Tests.Unit
             Assert.Equal("invalid_request", results[1].GetProperty("error").GetProperty("code").GetString());
             Assert.Equal(2, (await Stats(queueName)).GetProperty("depth").GetInt32());
 
-            await AssertProblem(await Http.PostAsJsonAsync($"queues/{queueName}/messages", new { messageType = "nobody" }), HttpStatusCode.BadRequest, "invalid_request");
-            await AssertProblem(await Http.PostAsJsonAsync($"queues/{queueName}/messages", new { body = 1, bodyBase64 = "AA==" }), HttpStatusCode.BadRequest, "invalid_request");
-            await AssertProblem(await Http.PostAsJsonAsync($"queues/{queueName}/messages", new { messages = Array.Empty<object>() }), HttpStatusCode.BadRequest, "invalid_request");
-            await AssertProblem(await Http.PostAsJsonAsync($"queues/{NewQueueName()}/messages", new { body = 1 }), HttpStatusCode.NotFound, "queue_not_found");
+            await AssertProblem(await Http.PostAsJsonAsync($"queues/{queueName}/messages", new { messageType = "nobody" }, cancellationToken: TestContext.Current.CancellationToken), HttpStatusCode.BadRequest, "invalid_request");
+            await AssertProblem(await Http.PostAsJsonAsync($"queues/{queueName}/messages", new { body = 1, bodyBase64 = "AA==" }, cancellationToken: TestContext.Current.CancellationToken), HttpStatusCode.BadRequest, "invalid_request");
+            await AssertProblem(await Http.PostAsJsonAsync($"queues/{queueName}/messages", new { messages = Array.Empty<object>() }, cancellationToken: TestContext.Current.CancellationToken), HttpStatusCode.BadRequest, "invalid_request");
+            await AssertProblem(await Http.PostAsJsonAsync($"queues/{NewQueueName()}/messages", new { body = 1 }, cancellationToken: TestContext.Current.CancellationToken), HttpStatusCode.NotFound, "queue_not_found");
         }
 
         [Fact(DisplayName = "HTTP: an idempotency key makes retries safe, including concurrent ones.")]
@@ -308,16 +308,16 @@ namespace CatMQ.Tests.Unit
         public async Task TestQueueFull()
         {
             var queueName = await CreateQueue(new { maxDepth = 2 });
-            Assert.Equal(2, (await Json(await Http.GetAsync($"queues/{queueName}"))).GetProperty("settings").GetProperty("maxDepth").GetInt32());
+            Assert.Equal(2, (await Json(await Http.GetAsync($"queues/{queueName}", cancellationToken: TestContext.Current.CancellationToken))).GetProperty("settings").GetProperty("maxDepth").GetInt32());
 
             await Publish(queueName, new { body = 1 });
             await Publish(queueName, new { body = 2 });
 
-            var full = await Http.PostAsJsonAsync($"queues/{queueName}/messages", new { body = 3 });
+            var full = await Http.PostAsJsonAsync($"queues/{queueName}/messages", new { body = 3 }, cancellationToken: TestContext.Current.CancellationToken);
             await AssertProblem(full, HttpStatusCode.TooManyRequests, "queue_full");
             Assert.NotNull(full.Headers.RetryAfter);
 
-            var raised = await Json(await Http.PatchAsJsonAsync($"queues/{queueName}", new { maxDepth = 3 }));
+            var raised = await Json(await Http.PatchAsJsonAsync($"queues/{queueName}", new { maxDepth = 3 }, cancellationToken: TestContext.Current.CancellationToken));
             Assert.Equal(3, raised.GetProperty("settings").GetProperty("maxDepth").GetInt32());
 
             var batch = await Publish(queueName, new { messages = new[] { new { body = 3 }, new { body = 4 } } });
@@ -327,13 +327,13 @@ namespace CatMQ.Tests.Unit
             Assert.Equal(429, batch[1].GetProperty("error").GetProperty("status").GetInt32());
 
             //An idempotency key is not used up by a publish that was refused.
-            await AssertProblem(await Http.PostAsJsonAsync($"queues/{queueName}/messages", new { idempotencyKey = "k", body = 5 }), HttpStatusCode.TooManyRequests, "queue_full");
-            var removed = await Json(await Http.PatchAsJsonAsync($"queues/{queueName}", new { maxDepth = (int?)null }));
+            await AssertProblem(await Http.PostAsJsonAsync($"queues/{queueName}/messages", new { idempotencyKey = "k", body = 5 }, cancellationToken: TestContext.Current.CancellationToken), HttpStatusCode.TooManyRequests, "queue_full");
+            var removed = await Json(await Http.PatchAsJsonAsync($"queues/{queueName}", new { maxDepth = (int?)null }, cancellationToken: TestContext.Current.CancellationToken));
             Assert.Equal(JsonValueKind.Null, removed.GetProperty("settings").GetProperty("maxDepth").ValueKind);
             Assert.Equal("accepted", (await Publish(queueName, new { idempotencyKey = "k", body = 5 }))[0].GetProperty("status").GetString());
             Assert.Equal(4, (await Stats(queueName)).GetProperty("depth").GetInt32());
 
-            await AssertProblem(await Http.PatchAsJsonAsync($"queues/{queueName}", new { maxDepth = -1 }), HttpStatusCode.BadRequest, "invalid_request");
+            await AssertProblem(await Http.PatchAsJsonAsync($"queues/{queueName}", new { maxDepth = -1 }, cancellationToken: TestContext.Current.CancellationToken), HttpStatusCode.BadRequest, "invalid_request");
         }
 
         #region Inspecting messages.
@@ -350,7 +350,7 @@ namespace CatMQ.Tests.Unit
             string? cursor = null;
             do
             {
-                var page = await Json(await Http.GetAsync($"queues/{queueName}/messages?limit=2&includeBody=true" + (cursor == null ? "" : $"&cursor={cursor}")));
+                var page = await Json(await Http.GetAsync($"queues/{queueName}/messages?limit=2&includeBody=true" + (cursor == null ? "" : $"&cursor={cursor}"), cancellationToken: TestContext.Current.CancellationToken));
                 foreach (var message in page.GetProperty("messages").EnumerateArray())
                 {
                     Assert.Equal(serials.Count, message.GetProperty("body").GetProperty("n").GetInt32());
@@ -361,19 +361,19 @@ namespace CatMQ.Tests.Unit
 
             Assert.Equal(5, serials.Count);
 
-            var withoutBody = await Json(await Http.GetAsync($"queues/{queueName}/messages?limit=1"));
+            var withoutBody = await Json(await Http.GetAsync($"queues/{queueName}/messages?limit=1", cancellationToken: TestContext.Current.CancellationToken));
             Assert.False(withoutBody.GetProperty("messages")[0].TryGetProperty("body", out _));
 
-            var single = await Json(await Http.GetAsync($"queues/{queueName}/messages/{serials[2]}"));
+            var single = await Json(await Http.GetAsync($"queues/{queueName}/messages/{serials[2]}", cancellationToken: TestContext.Current.CancellationToken));
             Assert.Equal(2, single.GetProperty("body").GetProperty("n").GetInt32());
 
-            Assert.Equal(HttpStatusCode.NoContent, (await Http.DeleteAsync($"queues/{queueName}/messages/{serials[2]}")).StatusCode);
-            await AssertProblem(await Http.GetAsync($"queues/{queueName}/messages/{serials[2]}"), HttpStatusCode.NotFound, "message_not_found");
-            await AssertProblem(await Http.DeleteAsync($"queues/{queueName}/messages/{serials[2]}"), HttpStatusCode.NotFound, "message_not_found");
-            await AssertProblem(await Http.GetAsync($"queues/{queueName}/messages/abc"), HttpStatusCode.BadRequest, "invalid_request");
+            Assert.Equal(HttpStatusCode.NoContent, (await Http.DeleteAsync($"queues/{queueName}/messages/{serials[2]}", cancellationToken: TestContext.Current.CancellationToken)).StatusCode);
+            await AssertProblem(await Http.GetAsync($"queues/{queueName}/messages/{serials[2]}", cancellationToken: TestContext.Current.CancellationToken), HttpStatusCode.NotFound, "message_not_found");
+            await AssertProblem(await Http.DeleteAsync($"queues/{queueName}/messages/{serials[2]}", cancellationToken: TestContext.Current.CancellationToken), HttpStatusCode.NotFound, "message_not_found");
+            await AssertProblem(await Http.GetAsync($"queues/{queueName}/messages/abc", cancellationToken: TestContext.Current.CancellationToken), HttpStatusCode.BadRequest, "invalid_request");
             Assert.Equal(4, (await Stats(queueName)).GetProperty("depth").GetInt32());
 
-            Assert.Equal(HttpStatusCode.NoContent, (await Http.DeleteAsync($"queues/{queueName}/messages")).StatusCode);
+            Assert.Equal(HttpStatusCode.NoContent, (await Http.DeleteAsync($"queues/{queueName}/messages", cancellationToken: TestContext.Current.CancellationToken)).StatusCode);
             Assert.Equal(0, (await Stats(queueName)).GetProperty("depth").GetInt32());
         }
 
@@ -384,7 +384,7 @@ namespace CatMQ.Tests.Unit
             await Publish(queueName, new { body = 1 });
             var leased = (await Receive(queueName)).Single();
 
-            await AssertProblem(await Http.DeleteAsync($"queues/{queueName}/messages/{leased.GetProperty("serialNumber").GetString()}"),
+            await AssertProblem(await Http.DeleteAsync($"queues/{queueName}/messages/{leased.GetProperty("serialNumber").GetString()}", cancellationToken: TestContext.Current.CancellationToken),
                 HttpStatusCode.Conflict, "message_in_delivery");
 
             await Ack(leased);
@@ -401,7 +401,7 @@ namespace CatMQ.Tests.Unit
             Assert.Empty(await Receive(queueName, waitSeconds: 1));
 
             var pending = Receive(queueName, waitSeconds: 30);
-            await Task.Delay(200);
+            await Task.Delay(200, cancellationToken: TestContext.Current.CancellationToken);
             Assert.False(pending.IsCompleted);
 
             await Publish(queueName, new { body = 1 });
@@ -421,10 +421,10 @@ namespace CatMQ.Tests.Unit
             Assert.Equal(first.GetProperty("messageId").GetString(), second.GetProperty("messageId").GetString());
 
             var leaseId = first.GetProperty("leaseId").GetString();
-            await AssertProblem(await Http.PostAsJsonAsync($"leases/{leaseId}/ack", new { disposition = "consumed" }), HttpStatusCode.Conflict, "lease_expired");
-            await AssertProblem(await Http.PostAsJsonAsync($"leases/{leaseId}/extend", new { leaseSeconds = 10 }), HttpStatusCode.Conflict, "lease_expired");
-            await AssertProblem(await Http.PostAsJsonAsync("leases/nope/ack", new { disposition = "consumed" }), HttpStatusCode.NotFound, "lease_not_found");
-            await AssertProblem(await Http.PostAsJsonAsync("leases/nope/extend", new { leaseSeconds = 10 }), HttpStatusCode.NotFound, "lease_not_found");
+            await AssertProblem(await Http.PostAsJsonAsync($"leases/{leaseId}/ack", new { disposition = "consumed" }, cancellationToken: TestContext.Current.CancellationToken), HttpStatusCode.Conflict, "lease_expired");
+            await AssertProblem(await Http.PostAsJsonAsync($"leases/{leaseId}/extend", new { leaseSeconds = 10 }, cancellationToken: TestContext.Current.CancellationToken), HttpStatusCode.Conflict, "lease_expired");
+            await AssertProblem(await Http.PostAsJsonAsync("leases/nope/ack", new { disposition = "consumed" }, cancellationToken: TestContext.Current.CancellationToken), HttpStatusCode.NotFound, "lease_not_found");
+            await AssertProblem(await Http.PostAsJsonAsync("leases/nope/extend", new { leaseSeconds = 10 }, cancellationToken: TestContext.Current.CancellationToken), HttpStatusCode.NotFound, "lease_not_found");
 
             await Ack(second);
             await Ack(second);
@@ -440,15 +440,15 @@ namespace CatMQ.Tests.Unit
             var leased = (await Receive(queueName, leaseSeconds: 1)).Single();
             var leaseId = leased.GetProperty("leaseId").GetString();
 
-            var extended = await Http.PostAsJsonAsync($"leases/{leaseId}/extend", new { leaseSeconds = 30 });
+            var extended = await Http.PostAsJsonAsync($"leases/{leaseId}/extend", new { leaseSeconds = 30 }, cancellationToken: TestContext.Current.CancellationToken);
             Assert.Equal(HttpStatusCode.OK, extended.StatusCode);
             Assert.True((await Json(extended)).GetProperty("leaseExpiresAt").GetDateTime() > leased.GetProperty("leaseExpiresAt").GetDateTime());
-            await Task.Delay(2500);
+            await Task.Delay(2500, cancellationToken: TestContext.Current.CancellationToken);
 
-            await AssertProblem(await Http.PostAsJsonAsync($"leases/{leaseId}/ack", new { disposition = "defer" }), HttpStatusCode.BadRequest, "invalid_request");
-            await AssertProblem(await Http.PostAsJsonAsync($"leases/{leaseId}/ack", new { disposition = "maybe" }), HttpStatusCode.BadRequest, "invalid_request");
+            await AssertProblem(await Http.PostAsJsonAsync($"leases/{leaseId}/ack", new { disposition = "defer" }, cancellationToken: TestContext.Current.CancellationToken), HttpStatusCode.BadRequest, "invalid_request");
+            await AssertProblem(await Http.PostAsJsonAsync($"leases/{leaseId}/ack", new { disposition = "maybe" }, cancellationToken: TestContext.Current.CancellationToken), HttpStatusCode.BadRequest, "invalid_request");
 
-            var deferred = await Http.PostAsJsonAsync($"leases/{leaseId}/ack", new { disposition = "defer", deferSeconds = 1 });
+            var deferred = await Http.PostAsJsonAsync($"leases/{leaseId}/ack", new { disposition = "defer", deferSeconds = 1 }, cancellationToken: TestContext.Current.CancellationToken);
             Assert.Equal(HttpStatusCode.NoContent, deferred.StatusCode);
 
             await Ack((await Receive(queueName, waitSeconds: 10)).Single(), "deadLetter");
@@ -469,7 +469,7 @@ namespace CatMQ.Tests.Unit
             {
                 acks = leased.Select(o => new { leaseId = o.GetProperty("leaseId").GetString(), disposition = "consumed" })
                     .Append(new { leaseId = (string?)"nope", disposition = "consumed" }).ToArray()
-            });
+            }, cancellationToken: TestContext.Current.CancellationToken);
 
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             var statuses = (await Json(response)).GetProperty("results").EnumerateArray().Select(o => o.GetProperty("status").GetString()).ToArray();
@@ -486,7 +486,7 @@ namespace CatMQ.Tests.Unit
                     new { leaseId = message.GetProperty("leaseId").GetString(), disposition = "consumed" },
                     new { leaseId = (string?)"other", disposition = "maybe" }
                 }
-            }), HttpStatusCode.BadRequest, "invalid_request");
+            }, cancellationToken: TestContext.Current.CancellationToken), HttpStatusCode.BadRequest, "invalid_request");
             await Ack(message);
         }
 
@@ -497,10 +497,10 @@ namespace CatMQ.Tests.Unit
 
             using var cancel = new CancellationTokenSource();
             var abandoned = Http.PostAsJsonAsync($"queues/{queueName}/messages/receive", new { consumer = "worker", waitSeconds = 30 }, cancel.Token);
-            await Task.Delay(300);
+            await Task.Delay(300, cancellationToken: TestContext.Current.CancellationToken);
             cancel.Cancel();
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => abandoned);
-            await Task.Delay(300);
+            await Task.Delay(300, cancellationToken: TestContext.Current.CancellationToken);
 
             await Publish(queueName, new { body = 1 });
             var leased = (await Receive(queueName)).Single();
@@ -554,18 +554,18 @@ namespace CatMQ.Tests.Unit
             using var browser = await SignInToWebUi();
 
             //Without the header, the cookie alone is refused, which keeps other sites from using a signed-in browser.
-            await AssertProblem(await browser.GetAsync($"/api/v1/queues/{queueName}"), HttpStatusCode.Unauthorized, "unauthorized");
+            await AssertProblem(await browser.GetAsync($"/api/v1/queues/{queueName}", cancellationToken: TestContext.Current.CancellationToken), HttpStatusCode.Unauthorized, "unauthorized");
 
             browser.DefaultRequestHeaders.Add("x-catmq-ui", "1");
-            Assert.Equal(HttpStatusCode.OK, (await browser.GetAsync($"/api/v1/queues/{queueName}")).StatusCode);
-            Assert.Equal(HttpStatusCode.NoContent, (await browser.DeleteAsync($"/api/v1/queues/{queueName}/messages")).StatusCode);
-            Assert.Equal(HttpStatusCode.NoContent, (await browser.DeleteAsync($"/api/v1/queues/{queueName}")).StatusCode);
-            Assert.Equal(HttpStatusCode.NotFound, (await Http.GetAsync($"queues/{queueName}")).StatusCode);
+            Assert.Equal(HttpStatusCode.OK, (await browser.GetAsync($"/api/v1/queues/{queueName}", cancellationToken: TestContext.Current.CancellationToken)).StatusCode);
+            Assert.Equal(HttpStatusCode.NoContent, (await browser.DeleteAsync($"/api/v1/queues/{queueName}/messages", cancellationToken: TestContext.Current.CancellationToken)).StatusCode);
+            Assert.Equal(HttpStatusCode.NoContent, (await browser.DeleteAsync($"/api/v1/queues/{queueName}", cancellationToken: TestContext.Current.CancellationToken)).StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, (await Http.GetAsync($"queues/{queueName}", cancellationToken: TestContext.Current.CancellationToken)).StatusCode);
 
             //The header without a session is not enough either.
             using var anonymous = new HttpClient { BaseAddress = new Uri(service.WebBaseUrl) };
             anonymous.DefaultRequestHeaders.Add("x-catmq-ui", "1");
-            await AssertProblem(await anonymous.GetAsync("/api/v1/queues"), HttpStatusCode.Unauthorized, "unauthorized");
+            await AssertProblem(await anonymous.GetAsync("/api/v1/queues", cancellationToken: TestContext.Current.CancellationToken), HttpStatusCode.Unauthorized, "unauthorized");
         }
 
         [Fact(DisplayName = "HTTP: API keys and accounts can be deleted, and a deleted key stops working.")]
@@ -573,22 +573,22 @@ namespace CatMQ.Tests.Unit
         {
             using var disposable = new HttpClient { BaseAddress = Http.BaseAddress };
             disposable.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ServiceFixture.DisposableApiKey);
-            Assert.Equal(HttpStatusCode.OK, (await disposable.GetAsync("queues")).StatusCode);
+            Assert.Equal(HttpStatusCode.OK, (await disposable.GetAsync("queues", cancellationToken: TestContext.Current.CancellationToken)).StatusCode);
 
             var accountId = ServiceFixture.DisposableAccountId;
-            Assert.Equal(HttpStatusCode.NoContent, (await Http.DeleteAsync($"accounts/{accountId}/api-keys/{ServiceFixture.DisposableApiKeyId}")).StatusCode);
-            await AssertProblem(await disposable.GetAsync("queues"), HttpStatusCode.Unauthorized, "unauthorized");
-            await AssertProblem(await Http.DeleteAsync($"accounts/{accountId}/api-keys/{ServiceFixture.DisposableApiKeyId}"), HttpStatusCode.NotFound, "api_key_not_found");
+            Assert.Equal(HttpStatusCode.NoContent, (await Http.DeleteAsync($"accounts/{accountId}/api-keys/{ServiceFixture.DisposableApiKeyId}", cancellationToken: TestContext.Current.CancellationToken)).StatusCode);
+            await AssertProblem(await disposable.GetAsync("queues", cancellationToken: TestContext.Current.CancellationToken), HttpStatusCode.Unauthorized, "unauthorized");
+            await AssertProblem(await Http.DeleteAsync($"accounts/{accountId}/api-keys/{ServiceFixture.DisposableApiKeyId}", cancellationToken: TestContext.Current.CancellationToken), HttpStatusCode.NotFound, "api_key_not_found");
 
-            Assert.Equal(HttpStatusCode.NoContent, (await Http.DeleteAsync($"accounts/{accountId}")).StatusCode);
-            await AssertProblem(await Http.DeleteAsync($"accounts/{accountId}"), HttpStatusCode.NotFound, "account_not_found");
-            await AssertProblem(await Http.DeleteAsync($"accounts/{accountId}/api-keys/{Guid.NewGuid()}"), HttpStatusCode.NotFound, "account_not_found");
+            Assert.Equal(HttpStatusCode.NoContent, (await Http.DeleteAsync($"accounts/{accountId}", cancellationToken: TestContext.Current.CancellationToken)).StatusCode);
+            await AssertProblem(await Http.DeleteAsync($"accounts/{accountId}", cancellationToken: TestContext.Current.CancellationToken), HttpStatusCode.NotFound, "account_not_found");
+            await AssertProblem(await Http.DeleteAsync($"accounts/{accountId}/api-keys/{Guid.NewGuid()}", cancellationToken: TestContext.Current.CancellationToken), HttpStatusCode.NotFound, "account_not_found");
         }
 
         [Fact(DisplayName = "HTTP: a garbage collection can be requested.")]
         public async Task TestGarbageCollection()
         {
-            Assert.Equal(HttpStatusCode.NoContent, (await Http.PostAsync("system/gc", null)).StatusCode);
+            Assert.Equal(HttpStatusCode.NoContent, (await Http.PostAsync("system/gc", null, cancellationToken: TestContext.Current.CancellationToken)).StatusCode);
         }
 
         [Fact(DisplayName = "HTTP: a single connection can be removed by its subscriber ID, as the web UI does.")]
@@ -601,16 +601,16 @@ namespace CatMQ.Tests.Unit
             int received = 0;
             client.Subscribe(queueName, (_, _) => { Interlocked.Increment(ref received); return CMqConsumeResult.Consumed(); });
 
-            var consumers = (await Json(await Http.GetAsync($"queues/{queueName}/consumers"))).GetProperty("consumers");
+            var consumers = (await Json(await Http.GetAsync($"queues/{queueName}/consumers", cancellationToken: TestContext.Current.CancellationToken))).GetProperty("consumers");
             var tcp = Assert.Single(consumers.EnumerateArray());
             Assert.Equal("tcp", tcp.GetProperty("kind").GetString());
 
             //An unnamed connection is listed under its subscriber ID.
-            Assert.Equal(HttpStatusCode.NoContent, (await Http.DeleteAsync($"queues/{queueName}/consumers/{tcp.GetProperty("name").GetString()}")).StatusCode);
-            Assert.Empty((await Json(await Http.GetAsync($"queues/{queueName}/consumers"))).GetProperty("consumers").EnumerateArray());
+            Assert.Equal(HttpStatusCode.NoContent, (await Http.DeleteAsync($"queues/{queueName}/consumers/{tcp.GetProperty("name").GetString()}", cancellationToken: TestContext.Current.CancellationToken)).StatusCode);
+            Assert.Empty((await Json(await Http.GetAsync($"queues/{queueName}/consumers", cancellationToken: TestContext.Current.CancellationToken))).GetProperty("consumers").EnumerateArray());
 
             await Publish(queueName, new { body = 1 });
-            await Task.Delay(300);
+            await Task.Delay(300, cancellationToken: TestContext.Current.CancellationToken);
             Assert.Equal(0, received);
             Assert.Equal(1, (await Stats(queueName)).GetProperty("depth").GetInt32());
         }
@@ -625,11 +625,11 @@ namespace CatMQ.Tests.Unit
             browser.DefaultRequestHeaders.Add("x-catmq-ui", "1");
 
             //The web UI lists subscriptions by subscriber ID, and removes them that way.
-            var page = await Json(await browser.GetAsync($"/queue/{queueName}?handler=QueueSubscribers&queueName={queueName}"));
+            var page = await Json(await browser.GetAsync($"/queue/{queueName}?handler=QueueSubscribers&queueName={queueName}", cancellationToken: TestContext.Current.CancellationToken));
             var subscriberId = Assert.Single(page.EnumerateArray()).GetProperty("subscriberId").GetString();
-            Assert.Equal(HttpStatusCode.NoContent, (await browser.DeleteAsync($"/api/v1/queues/{queueName}/consumers/{subscriberId}")).StatusCode);
+            Assert.Equal(HttpStatusCode.NoContent, (await browser.DeleteAsync($"/api/v1/queues/{queueName}/consumers/{subscriberId}", cancellationToken: TestContext.Current.CancellationToken)).StatusCode);
 
-            Assert.Empty((await Json(await Http.GetAsync($"queues/{queueName}/consumers"))).GetProperty("consumers").EnumerateArray());
+            Assert.Empty((await Json(await Http.GetAsync($"queues/{queueName}/consumers", cancellationToken: TestContext.Current.CancellationToken))).GetProperty("consumers").EnumerateArray());
 
             //Receiving again registers it afresh, and it works.
             await Publish(queueName, new { body = 1 });
@@ -647,17 +647,17 @@ namespace CatMQ.Tests.Unit
             Assert.Empty(await Receive(queueName, "billing", waitSeconds: 0));
             Assert.Empty(await Receive(queueName, "audit", waitSeconds: 0));
 
-            var consumers = (await Json(await Http.GetAsync($"queues/{queueName}/consumers"))).GetProperty("consumers").EnumerateArray().ToArray();
+            var consumers = (await Json(await Http.GetAsync($"queues/{queueName}/consumers", cancellationToken: TestContext.Current.CancellationToken))).GetProperty("consumers").EnumerateArray().ToArray();
             Assert.Equal(["audit", "billing"], consumers.Select(o => o.GetProperty("name").GetString()).ToArray());
             Assert.All(consumers, o => Assert.Equal("lease", o.GetProperty("kind").GetString()));
 
             await Publish(queueName, new { body = 1 });
             await Ack((await Receive(queueName, "billing")).Single());
-            await Task.Delay(100);
+            await Task.Delay(100, cancellationToken: TestContext.Current.CancellationToken);
             Assert.Equal(1, (await Stats(queueName)).GetProperty("depth").GetInt32());
 
-            Assert.Equal(HttpStatusCode.NoContent, (await Http.DeleteAsync($"queues/{queueName}/consumers/audit")).StatusCode);
-            Assert.Equal(HttpStatusCode.NoContent, (await Http.DeleteAsync($"queues/{queueName}/consumers/audit")).StatusCode);
+            Assert.Equal(HttpStatusCode.NoContent, (await Http.DeleteAsync($"queues/{queueName}/consumers/audit", cancellationToken: TestContext.Current.CancellationToken)).StatusCode);
+            Assert.Equal(HttpStatusCode.NoContent, (await Http.DeleteAsync($"queues/{queueName}/consumers/audit", cancellationToken: TestContext.Current.CancellationToken)).StatusCode);
 
             Assert.Empty(await Receive(queueName, "billing", waitSeconds: 1));
             Assert.True(await WaitForDepth(queueName, 0));
@@ -677,7 +677,7 @@ namespace CatMQ.Tests.Unit
             await Ack((await Receive(queueName)).Single(), "deadLetter");
             Assert.True(await WaitForDepth($"{queueName}.dlq", 2));
 
-            var partial = await Http.PostAsJsonAsync($"queues/{queueName}/redrive", new { max = 1 });
+            var partial = await Http.PostAsJsonAsync($"queues/{queueName}/redrive", new { max = 1 }, cancellationToken: TestContext.Current.CancellationToken);
             Assert.Equal(1, (await Json(partial)).GetProperty("moved").GetInt32());
             Assert.Equal(1, (await Stats($"{queueName}.dlq")).GetProperty("depth").GetInt32());
 
@@ -688,13 +688,13 @@ namespace CatMQ.Tests.Unit
             Assert.Equal(1, redriven.GetProperty("deliveryAttempt").GetInt32());
             await Ack(redriven);
 
-            var rest = await Http.PostAsync($"queues/{queueName}/redrive", JsonContent.Create(new { }));
+            var rest = await Http.PostAsync($"queues/{queueName}/redrive", JsonContent.Create(new { }), cancellationToken: TestContext.Current.CancellationToken);
             Assert.Equal(1, (await Json(rest)).GetProperty("moved").GetInt32());
             await Ack((await Receive(queueName)).Single());
             Assert.True(await WaitForDepth(queueName, 0));
 
             var noDeadLetters = await CreateQueue();
-            await AssertProblem(await Http.PostAsync($"queues/{noDeadLetters}/redrive", JsonContent.Create(new { })), HttpStatusCode.NotFound, "queue_not_found");
+            await AssertProblem(await Http.PostAsync($"queues/{noDeadLetters}/redrive", JsonContent.Create(new { }), cancellationToken: TestContext.Current.CancellationToken), HttpStatusCode.NotFound, "queue_not_found");
         }
 
         #endregion
@@ -726,7 +726,7 @@ namespace CatMQ.Tests.Unit
             Assert.Equal("orders.created", fromHttp.MessageType);
             Assert.Equal(7, fromHttp.Deserialize<KeyValueMessage>()?.Key);
 
-            var consumers = (await Json(await Http.GetAsync($"queues/{queueName}/consumers"))).GetProperty("consumers");
+            var consumers = (await Json(await Http.GetAsync($"queues/{queueName}/consumers", cancellationToken: TestContext.Current.CancellationToken))).GetProperty("consumers");
             Assert.Contains(consumers.EnumerateArray(), o => o.GetProperty("kind").GetString() == "tcp");
         }
 

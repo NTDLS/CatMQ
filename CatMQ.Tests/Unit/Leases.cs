@@ -55,7 +55,7 @@ namespace CatMQ.Tests.Unit
             Assert.InRange(stopwatch.ElapsedMilliseconds, 250, 3000);
 
             var pending = Receive(queueName, waitSeconds: 30);
-            await Task.Delay(100);
+            await Task.Delay(100, cancellationToken: TestContext.Current.CancellationToken);
             Assert.False(pending.IsCompleted);
 
             stopwatch.Restart();
@@ -107,7 +107,7 @@ namespace CatMQ.Tests.Unit
             Assert.Equal(CMqLeaseStatus.Active, Server.ExtendLease(leased.LeaseId, TimeSpan.FromSeconds(30), out var expiresAt));
             Assert.True(expiresAt > leased.LeaseExpiresAt);
 
-            await Task.Delay(3000);
+            await Task.Delay(3000, cancellationToken: TestContext.Current.CancellationToken);
             Assert.Equal(0UL, Server.GetQueue(queueName)?.FailedDeliveryCount);
             Assert.Equal(CMqLeaseStatus.Acknowledged, Server.AcknowledgeLease(leased.LeaseId, CMqConsumeResult.Consumed()));
             Assert.True(Wait.Until(() => Depth(queueName) == 0));
@@ -204,7 +204,7 @@ namespace CatMQ.Tests.Unit
                 {
                     await Receive(queueName, waitSeconds: 0.2); //Delivery is what finishes the message off.
                 }
-            });
+            }, cancellationToken: TestContext.Current.CancellationToken);
 
             Assert.True(Wait.Until(() => Depth($"{queueName}.dlq") == 1));
             await poller;
@@ -236,7 +236,7 @@ namespace CatMQ.Tests.Unit
                 }
             })).ToArray();
 
-            Assert.True(Task.WaitAll(workers, TimeSpan.FromSeconds(30)));
+            await Task.WhenAll(workers).WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
             Assert.Equal(count, seen.Count);
             Assert.All(seen.Values, c => Assert.Equal(1, c));
             Assert.True(Wait.Until(() => Depth(queueName) == 0));
@@ -257,7 +257,7 @@ namespace CatMQ.Tests.Unit
 
             var active = Assert.Single(await Receive(queueName, "active"));
             Server.AcknowledgeLease(active.LeaseId, CMqConsumeResult.Consumed());
-            await Task.Delay(200);
+            await Task.Delay(200, cancellationToken: TestContext.Current.CancellationToken);
             Assert.Equal(1, Depth(queueName));
             Assert.Empty(await Receive(queueName, "active", waitSeconds: 0.2)); //It already has this one.
 
@@ -301,7 +301,7 @@ namespace CatMQ.Tests.Unit
 
             using var cancel = new CancellationTokenSource();
             var pending = Server.ReceiveAsync(queueName, "worker", 1, TimeSpan.FromSeconds(30), null, cancel.Token);
-            await Task.Delay(100);
+            await Task.Delay(100, cancellationToken: TestContext.Current.CancellationToken);
             cancel.Cancel();
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pending);
 
@@ -326,7 +326,7 @@ namespace CatMQ.Tests.Unit
                     Server.Enqueue(queueName, null, null, $"{{\"n\":{i}}}");
                     await Task.Delay(1);
                 }
-            });
+            }, cancellationToken: TestContext.Current.CancellationToken);
 
             var deadline = DateTime.UtcNow.AddSeconds(30);
             while (seen.Count < count && DateTime.UtcNow < deadline)
@@ -354,13 +354,13 @@ namespace CatMQ.Tests.Unit
             var leased = Assert.Single(await Receive(queueName));
 
             var waiting = Receive(queueName, waitSeconds: 30);
-            await Task.Delay(100);
+            await Task.Delay(100, cancellationToken: TestContext.Current.CancellationToken);
 
             var stopwatch = Stopwatch.StartNew();
             Server.DeleteQueue(queueName);
             Assert.True(stopwatch.ElapsedMilliseconds < 5000, $"Took {stopwatch.ElapsedMilliseconds}ms.");
 
-            Assert.Empty(await waiting.WaitAsync(TimeSpan.FromSeconds(5)));
+            Assert.Empty(await waiting.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken: TestContext.Current.CancellationToken));
             Assert.Equal(CMqLeaseStatus.Expired, Server.AcknowledgeLease(leased.LeaseId, CMqConsumeResult.Consumed()));
         }
 
@@ -371,8 +371,8 @@ namespace CatMQ.Tests.Unit
 
             var queueName = NewQueueName();
             Server.CreateQueue(new CMqQueueConfiguration(queueName));
-            await Assert.ThrowsAnyAsync<ArgumentException>(() => Server.ReceiveAsync(queueName, " "));
-            await Assert.ThrowsAnyAsync<ArgumentException>(() => Server.ReceiveAsync(queueName, "worker", max: 0));
+            await Assert.ThrowsAnyAsync<ArgumentException>(() => Server.ReceiveAsync(queueName, " ", cancellationToken: TestContext.Current.CancellationToken));
+            await Assert.ThrowsAnyAsync<ArgumentException>(() => Server.ReceiveAsync(queueName, "worker", max: 0, cancellationToken: TestContext.Current.CancellationToken));
         }
 
         [Fact(DisplayName = "A persistent queue stops loading messages that are waiting on an idle consumer.")]
@@ -399,9 +399,9 @@ namespace CatMQ.Tests.Unit
 
             //It gets everything that can be buffered, and then has to wait for the idle consumer.
             Assert.True(Wait.Until(() => Volatile.Read(ref delivered) >= CMqDefaults.DEFAULT_PERSISTENT_MESSAGES_MAX_BUFFER, 60));
-            await Task.Delay(500);
+            await Task.Delay(500, cancellationToken: TestContext.Current.CancellationToken);
             int settled = Volatile.Read(ref delivered);
-            await Task.Delay(500);
+            await Task.Delay(500, cancellationToken: TestContext.Current.CancellationToken);
 
             Assert.Equal(settled, Volatile.Read(ref delivered));
             Assert.True(settled < total, $"Delivered {settled} of {total}.");
