@@ -4,7 +4,7 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 		<TargetFrameworks>net9.0;net10.0;</TargetFrameworks>
-		<GenerateDocumentationFile>True</GenerateDocumentationFile>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
 		<Title>NTDLS.CatMQ.Shared</Title>
 		<Copyright>Copyright © 2026 NetworkDLS</Copyright>
 		<Description>
@@ -20,7 +20,7 @@
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<Authors>NetworkDLS</Authors>
 		<Company>NetworkDLS</Company>
-		<version>2.9.1</version>
+		<version>3.0.0</version>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<PackageIcon>Logo.png</PackageIcon>
 		<ApplicationIcon>Logo.ico</ApplicationIcon>
@@ -46,7 +46,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <PackageReference Include="NTDLS.ReliableMessaging" Version="4.0.1" />
+		<PackageReference Include="NTDLS.ReliableMessaging" Version="4.0.1" />
 	</ItemGroup>
 
 </Project>
