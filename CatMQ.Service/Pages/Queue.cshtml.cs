@@ -42,7 +42,7 @@ namespace CatMQ.Service.Pages
                 records.Add(new
                 {
                     SubscriberId = subscriber.SubscriberId,
-                    remotePeer = $"{subscriber.RemoteAddress} : {subscriber.RemotePort}",
+                    remotePeer = subscriber.RemoteAddress == null ? subscriber.TransportName : $"{subscriber.RemoteAddress} : {subscriber.RemotePort}",
                     attemptedDeliveryCount = subscriber.AttemptedDeliveryCount.ToString("n0"),
                     successfulDeliveryCount = subscriber.SuccessfulDeliveryCount.ToString("n0"),
                     deferredDeliveryCount = subscriber.DeferredDeliveryCount.ToString("n0"),

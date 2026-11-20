@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Extensions.Options;
-using Microsoft.AspNetCore.Builder;
 using System.Globalization;
 
 namespace CatMQ.Service.Pages

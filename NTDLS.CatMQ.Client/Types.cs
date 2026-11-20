@@ -35,5 +35,20 @@ namespace NTDLS.CatMQ.Client
         /// The amount of time to wait on the server for confirmation that it received the message.
         /// </summary>
         public TimeSpan? ServerDeliveryTimeout { get; set; }
+
+        /// <summary>
+        /// The media type of the body. Defaults to JSON.
+        /// </summary>
+        public string? ContentType { get; set; }
+
+        /// <summary>
+        /// Optional application-defined headers.
+        /// </summary>
+        public Dictionary<string, string>? Headers { get; set; }
+
+        /// <summary>
+        /// Whether the body is base64 encoded binary content.
+        /// </summary>
+        public bool BodyIsBase64 { get; set; }
     }
 }

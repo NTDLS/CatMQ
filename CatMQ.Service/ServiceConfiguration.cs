@@ -1,6 +1,5 @@
 ﻿using NTDLS.CatMQ.Shared;
 using NTDLS.Helpers;
-using System.ComponentModel.DataAnnotations;
 using System.Reflection;
 
 namespace CatMQ.Service
@@ -18,6 +17,11 @@ namespace CatMQ.Service
         /// Gets or sets a value indicating whether instrumentation is enabled.
         /// </summary>
         public bool EnableInstrumentation { get; set; } = false;
+
+        /// <summary>
+        /// Whether webhooks may use plain http URLs rather than only https.
+        /// </summary>
+        public bool AllowHttpWebhooks { get; set; } = false;
 
         /// <summary>
         /// Whether or not the web UI is enabled.

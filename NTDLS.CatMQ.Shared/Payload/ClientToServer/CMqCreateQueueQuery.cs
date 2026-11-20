@@ -15,6 +15,11 @@ namespace NTDLS.CatMQ.Shared.Payload.ClientToServer
         /// Gets or sets the configuration settings for the message queue.
         /// </summary>
         public CMqQueueConfiguration QueueConfiguration { get; set; } = queueConfiguration;
+
+        /// <summary>
+        /// When true, an existing queue is left unchanged. When false, the configuration is applied to an existing queue.
+        /// </summary>
+        public bool OnlyIfMissing { get; set; }
     }
 
     /// <summary>

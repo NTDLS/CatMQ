@@ -14,6 +14,21 @@
         public const int QUEUE_THREAD_DELIVERY_BURNDOWN = 100;
 
         /// <summary>
+        /// The content type of a message when the publisher does not supply one.
+        /// </summary>
+        public const string DEFAULT_CONTENT_TYPE = "application/json";
+
+        /// <summary>
+        /// How hard to compress frames. Fastest compresses JSON nearly as well as Optimal for much less time.
+        /// </summary>
+        public const System.IO.Compression.CompressionLevel DEFAULT_COMPRESSION_LEVEL = System.IO.Compression.CompressionLevel.Fastest;
+
+        /// <summary>
+        /// Frames smaller than this many bytes are not compressed, because compressing them costs more time than the bytes it saves.
+        /// </summary>
+        public const int DEFAULT_COMPRESSION_THRESHOLD = 1024;
+
+        /// <summary>
         /// The longest time in milliseconds that a queue will pause deliveries after consecutive delivery failures.
         /// </summary>
         public const int MAX_DELIVERY_FAILURE_BACKOFF_MS = 1000;
@@ -32,6 +47,12 @@
         /// The minimum number of messages to keep in memory for persistent queues.
         /// </summary>
         public const int DEFAULT_PERSISTENT_MESSAGES_MIN_BUFFER = 1000;
+
+        /// <summary>
+        /// The number of buffered messages at which a persistent queue stops loading more from the database. This limits
+        /// memory use when the buffered messages cannot be delivered yet, such as when they are waiting on an idle consumer.
+        /// </summary>
+        public const int DEFAULT_PERSISTENT_MESSAGES_MAX_BUFFER = 20000;
 
         /// <summary>
         /// The amount of time to wait when performing deadlock avoidance locks.

@@ -25,6 +25,8 @@ namespace NTDLS.CatMQ.Server
         private readonly JsonSerializerOptions _indentedJsonOptions = new() { WriteIndented = true };
         private readonly OptimisticCriticalResource<MessageQueueDictionary> _messageQueues = new();
         private readonly RmServer _rmServer;
+        private readonly LeaseManager _leases = new();
+        private readonly object _checkpointLock = new();
 
         internal CMqServerConfiguration Configuration => _configuration;
 
@@ -66,7 +68,7 @@ namespace NTDLS.CatMQ.Server
                 MaxReceiveBufferSize = _configuration.MaxReceiveBufferSize,
                 QueryTimeout = TimeSpan.FromSeconds(_configuration.AcknowledgmentTimeoutSeconds),
                 ReceiveBufferGrowthRate = _configuration.ReceiveBufferGrowthRate,
-                CompressionProvider = new RmDeflateCompressionProvider(),
+                CompressionProvider = new CMqCompressionProvider(_configuration.CompressionLevel, _configuration.CompressionThreshold),
             };
 
             _rmServer = new RmServer(rmConfiguration);
@@ -93,7 +95,7 @@ namespace NTDLS.CatMQ.Server
                 MaxReceiveBufferSize = _configuration.MaxReceiveBufferSize,
                 QueryTimeout = TimeSpan.FromSeconds(_configuration.AcknowledgmentTimeoutSeconds),
                 ReceiveBufferGrowthRate = _configuration.ReceiveBufferGrowthRate,
-                CompressionProvider = new RmDeflateCompressionProvider(),
+                CompressionProvider = new CMqCompressionProvider(_configuration.CompressionLevel, _configuration.CompressionThreshold),
             };
 
             _rmServer = new RmServer(rmConfiguration);
@@ -195,7 +197,11 @@ namespace NTDLS.CatMQ.Server
                 OnLog?.Invoke(this, CMqErrorLevel.Verbose, "Checkpoint persistent queues.");
 
                 var queueMetas = mqd.Where(q => q.Value.Configuration.PersistenceScheme == CMqPersistenceScheme.Persistent)
-                    .Select(q => new MessageQueueMetadata(q.Value.Configuration, q.Value.Statistics)).ToList();
+                    .Select(q => new MessageQueueMetadata(q.Value.Configuration, q.Value.Statistics)
+                    {
+                        LeaseConsumers = q.Value.LeaseConsumers.Keys.ToList(),
+                        Webhooks = q.Value.Webhooks.Values.Select(o => o.Registration).ToList()
+                    }).ToList();
 
                 try
                 {
@@ -212,8 +218,13 @@ namespace NTDLS.CatMQ.Server
                 // This approach minimizes the risk of data corruption if the application crashes during the write operation.
                 var fileName = Path.Join(_configuration.PersistencePath, "queues.json");
                 var tempfileName = fileName + ".tmp";
-                File.WriteAllText(tempfileName, persistedQueuesJson);
-                File.Move(tempfileName, fileName, overwrite: true);
+
+                //Checkpoints can be requested from several threads at once, and they share the temporary file.
+                lock (_checkpointLock)
+                {
+                    File.WriteAllText(tempfileName, persistedQueuesJson);
+                    File.Move(tempfileName, fileName, overwrite: true);
+                }
             }
         }
 
@@ -275,6 +286,7 @@ namespace NTDLS.CatMQ.Server
                                 DeliveryThrottle = mqKVP.Value.Configuration.DeliveryThrottle,
                                 MaxOutstandingDeliveries = mqKVP.Value.Configuration.MaxOutstandingDeliveries,
                                 MaxDeliveryAttempts = mqKVP.Value.Configuration.MaxDeliveryAttempts,
+                                MaxDepth = mqKVP.Value.Configuration.MaxDepth,
                                 MaxMessageAge = mqKVP.Value.Configuration.MaxMessageAge,
                                 PersistenceScheme = mqKVP.Value.Configuration.PersistenceScheme,
                                 QueueName = mqKVP.Value.Configuration.QueueName,
@@ -351,6 +363,7 @@ namespace NTDLS.CatMQ.Server
                                 DeliveryThrottle = queue.Configuration.DeliveryThrottle,
                                 MaxOutstandingDeliveries = queue.Configuration.MaxOutstandingDeliveries,
                                 MaxDeliveryAttempts = queue.Configuration.MaxDeliveryAttempts,
+                                MaxDepth = queue.Configuration.MaxDepth,
                                 MaxMessageAge = queue.Configuration.MaxMessageAge,
                                 PersistenceScheme = queue.Configuration.PersistenceScheme,
                                 QueueName = queue.Configuration.QueueName,
@@ -426,7 +439,7 @@ namespace NTDLS.CatMQ.Server
                     }
                     else
                     {
-                        throw new Exception($"Queue not found: [{queueName}].");
+                        throw new CMqQueueNotFoundException(queueName);
                     }
                 });
 
@@ -530,8 +543,11 @@ namespace NTDLS.CatMQ.Server
                                             DeferredDeliveryCount = message.DeferredCount,
                                             SubscriberMessageDeliveries = message.SubscriberMessageDeliveries.Keys.ToHashSet(),
                                             SatisfiedSubscribersSubscriberIDs = message.SatisfiedDeliverySubscriberIDs,
-                                            AssemblyQualifiedTypeName = message.AssemblyQualifiedTypeName,
-                                            MessageJson = message.MessageJson,
+                                            MessageType = message.MessageType,
+                                            ContentType = message.ContentType,
+                                            Headers = message.Headers,
+                                            BodyIsBase64 = message.BodyIsBase64,
+                                            Body = message.Body,
                                         });
                                     }
                                 }
@@ -563,8 +579,11 @@ namespace NTDLS.CatMQ.Server
                                                 DeferredDeliveryCount = persistedMessage.DeferredCount,
                                                 SubscriberMessageDeliveries = persistedMessage.SubscriberMessageDeliveries.Keys.ToHashSet(),
                                                 SatisfiedSubscribersSubscriberIDs = persistedMessage.SatisfiedDeliverySubscriberIDs,
-                                                AssemblyQualifiedTypeName = persistedMessage.AssemblyQualifiedTypeName,
-                                                MessageJson = persistedMessage.MessageJson,
+                                                MessageType = persistedMessage.MessageType,
+                                                ContentType = persistedMessage.ContentType,
+                                                Headers = persistedMessage.Headers,
+                                                BodyIsBase64 = persistedMessage.BodyIsBase64,
+                                                Body = persistedMessage.Body,
                                             });
                                         }
                                         iterator.Next();
@@ -637,8 +656,11 @@ namespace NTDLS.CatMQ.Server
                                     Timestamp = message.Timestamp,
                                     SubscriberMessageDeliveries = message.SubscriberMessageDeliveries.Keys.ToHashSet(),
                                     SatisfiedSubscribersSubscriberIDs = message.SatisfiedDeliverySubscriberIDs,
-                                    AssemblyQualifiedTypeName = message.AssemblyQualifiedTypeName,
-                                    MessageJson = message.MessageJson,
+                                    MessageType = message.MessageType,
+                                    ContentType = message.ContentType,
+                                    Headers = message.Headers,
+                                    BodyIsBase64 = message.BodyIsBase64,
+                                    Body = message.Body,
                                     DeferredUntil = message.DeferredUntil,
                                     DeferredDeliveryCount = message.DeferredCount
                                 };
@@ -659,8 +681,11 @@ namespace NTDLS.CatMQ.Server
                                     Timestamp = persistedMessage.Timestamp,
                                     SubscriberMessageDeliveries = persistedMessage.SubscriberMessageDeliveries.Keys.ToHashSet(),
                                     SatisfiedSubscribersSubscriberIDs = persistedMessage.SatisfiedDeliverySubscriberIDs,
-                                    AssemblyQualifiedTypeName = persistedMessage.AssemblyQualifiedTypeName,
-                                    MessageJson = persistedMessage.MessageJson,
+                                    MessageType = persistedMessage.MessageType,
+                                    ContentType = persistedMessage.ContentType,
+                                    Headers = persistedMessage.Headers,
+                                    BodyIsBase64 = persistedMessage.BodyIsBase64,
+                                    Body = persistedMessage.Body,
                                     DeferredUntil = persistedMessage.DeferredUntil,
                                     DeferredDeliveryCount = persistedMessage.DeferredCount
                                 };
@@ -669,7 +694,7 @@ namespace NTDLS.CatMQ.Server
                     }
                     else
                     {
-                        throw new Exception($"Queue not found: [{queueName}].");
+                        throw new CMqQueueNotFoundException(queueName);
                     }
                 });
 
@@ -677,9 +702,9 @@ namespace NTDLS.CatMQ.Server
                 {
                     if (truncateToBytes != null)
                     {
-                        if (result.MessageJson.Length > truncateToBytes)
+                        if (result.Body.Length > truncateToBytes)
                         {
-                            result.MessageJson = result.MessageJson.Substring(0, truncateToBytes.Value);
+                            result.Body = result.Body.Substring(0, truncateToBytes.Value);
                         }
                     }
 
@@ -713,6 +738,8 @@ namespace NTDLS.CatMQ.Server
             var messageQueuesToLoad = new List<SingleMessageQueueServer>();
             var deadLetterQueuesToLoad = new List<SingleMessageQueueServer>();
             var queuesToStart = new List<SingleMessageQueueServer>();
+            var leaseConsumersToRestore = new List<(SingleMessageQueueServer Queue, string ConsumerName)>();
+            var webhooksToRestore = new List<(SingleMessageQueueServer Queue, WebhookRegistration Registration)>();
 
             if (_configuration.PersistencePath != null)
             {
@@ -749,6 +776,8 @@ namespace NTDLS.CatMQ.Server
                                            messageQueuesToLoad.Add(messageQueue);
                                        }
                                        mqd.Add(queueMeta.Configuration.QueueName.ToLowerInvariant(), messageQueue);
+                                       leaseConsumersToRestore.AddRange(queueMeta.LeaseConsumers.Select(o => (messageQueue, o)));
+                                       webhooksToRestore.AddRange(queueMeta.Webhooks.Select(o => (messageQueue, o)));
 
                                        if (queueMeta.Configuration.DeadLetterConfiguration != null
                                            && queueMeta.Configuration.DeadLetterConfiguration.PersistenceScheme == CMqPersistenceScheme.Ephemeral)
@@ -778,6 +807,16 @@ namespace NTDLS.CatMQ.Server
 
             loadTasks = messageQueuesToLoad.Select(m => Task.Run(() => m.InitializePersistentDatabase())).ToArray();
             Task.WaitAll(loadTasks);
+
+            foreach (var (queue, consumerName) in leaseConsumersToRestore)
+            {
+                GetOrAddLeaseConsumer(queue, consumerName, persist: false);
+            }
+
+            foreach (var (queue, registration) in webhooksToRestore)
+            {
+                AddWebhookTransport(queue, registration);
+            }
 
             OnLog?.Invoke(this, CMqErrorLevel.Information, "Starting queues.");
             foreach (var mq in queuesToStart.Where(o => o.IsInitialized == true))
@@ -821,6 +860,15 @@ namespace NTDLS.CatMQ.Server
                         {
                             OnLog?.Invoke(this, CMqErrorLevel.Error, "An error occurred while touching HistoricalStatistics", ex);
                         }
+                    }
+
+                    try
+                    {
+                        _leases.Sweep();
+                    }
+                    catch (Exception ex)
+                    {
+                        OnLog?.Invoke(this, CMqErrorLevel.Error, "An error occurred while sweeping leases", ex);
                     }
 
                     try
@@ -967,24 +1015,12 @@ namespace NTDLS.CatMQ.Server
         }
 
         /// <summary>
-        /// Deliver a message from a server queue to a subscribed client.
+        /// Sends a message delivery to a client connected with the native TCP protocol and waits for its response.
         /// </summary>
-        internal async Task<CMqConsumeResult> DeliverMessageWithResultAsync(Guid subscriberId, string queueName, EnqueuedMessage enqueuedMessage)
+        internal async Task<CMqConsumeResult> QueryConnectionAsync(Guid connectionId, CMqMessageDeliveryQuery message)
         {
-            var message = new CMqMessageDeliveryQuery(queueName, enqueuedMessage.SerialNumber,
-                enqueuedMessage.AssemblyQualifiedTypeName, enqueuedMessage.MessageJson)
-            {
-                MessageId = enqueuedMessage.MessageId,
-                Timestamp = enqueuedMessage.Timestamp,
-                DeferDuration = enqueuedMessage.DeferDuration,
-                DeferredCount = enqueuedMessage.DeferredCount,
-                SubscriberDeliveryCount = enqueuedMessage.SubscriberMessageDeliveries.Count,
-                SatisfiedSubscriberCount = enqueuedMessage.SatisfiedDeliverySubscriberIDs.Count,
-                FailedSubscriberCount = enqueuedMessage.DeliveryLimitReachedSubscriberIDs.Count
-            };
-
             var ticketDeliverMessageWithResult = Instrumentation?.CreateTicket(CMqInstrumentationEventType.DeliverMessageWithResult);
-            var result = await _rmServer.QueryAsync(subscriberId, message);
+            var result = await _rmServer.QueryAsync(connectionId, message);
             ticketDeliverMessageWithResult?.Accumulate();
 
             result.ThrowIfFailed();
@@ -996,9 +1032,25 @@ namespace NTDLS.CatMQ.Server
         #region Client interactions.
 
         /// <summary>
-        /// Creates a new empty queue if it does not already exist.
+        /// Creates a new empty queue, or applies the given configuration to the queue if it already exists.
+        /// Changes take effect immediately and are persisted. The PersistenceScheme of an existing queue cannot be changed.
         /// </summary>
         public void CreateQueue(CMqQueueConfiguration queueConfiguration)
+        {
+            ValidateNewQueueConfiguration(queueConfiguration);
+            CreateQueueInternal(queueConfiguration, updateExisting: true);
+        }
+
+        /// <summary>
+        /// Creates a new empty queue if it does not already exist. An existing queue is left unchanged.
+        /// </summary>
+        public void CreateQueueIfMissing(CMqQueueConfiguration queueConfiguration)
+        {
+            ValidateNewQueueConfiguration(queueConfiguration);
+            CreateQueueInternal(queueConfiguration, updateExisting: false);
+        }
+
+        private static void ValidateNewQueueConfiguration(CMqQueueConfiguration queueConfiguration)
         {
             if (queueConfiguration.IsDeadLetter)
             {
@@ -1008,14 +1060,62 @@ namespace NTDLS.CatMQ.Server
             {
                 throw new ArgumentException("Queue names cannot end with '.dlq'.");
             }
-
-            CreateQueueInternal(queueConfiguration);
         }
 
         /// <summary>
-        /// Creates a new empty queue if it does not already exist.
+        /// Applies a configuration to a running queue and to its dead-letter queue. The caller must hold the write lock on the message queues.
+        /// Everything is validated first, so that a rejected configuration changes nothing.
         /// </summary>
-        private void CreateQueueInternal(CMqQueueConfiguration queueConfiguration)
+        private void UpdateExistingQueue(MessageQueueDictionary mqd, SingleMessageQueueServer messageQueue, CMqQueueConfiguration queueConfiguration)
+        {
+            //Work on a copy that the caller cannot change later. The original name is kept because
+            //  it determines the persistence path, and queue names are not case-sensitive.
+            var updatedConfiguration = JsonSerializer.Deserialize<CMqQueueConfiguration>(JsonSerializer.Serialize(queueConfiguration))
+                ?? throw new Exception($"Failed to copy the configuration for [{queueConfiguration.QueueName}].");
+            updatedConfiguration.QueueName = messageQueue.Configuration.QueueName;
+
+            ThrowIfPersistenceChanged(messageQueue, updatedConfiguration);
+
+            var deadLetterConfiguration = updatedConfiguration.DeadLetterConfiguration?.ToConfiguration(updatedConfiguration.QueueName);
+            if (deadLetterConfiguration != null
+                && mqd.TryGetValue(deadLetterConfiguration.QueueName.ToLowerInvariant(), out var deadLetterQueue))
+            {
+                ThrowIfPersistenceChanged(deadLetterQueue, deadLetterConfiguration);
+            }
+
+            if (JsonSerializer.Serialize(updatedConfiguration) == JsonSerializer.Serialize(messageQueue.Configuration))
+            {
+                return;
+            }
+
+            OnLog?.Invoke(this, CMqErrorLevel.Information, $"Updating configuration for queue: [{updatedConfiguration.QueueName}].");
+
+            if (deadLetterConfiguration != null)
+            {
+                CreateQueueInternal(deadLetterConfiguration, updateExisting: true);
+            }
+
+            messageQueue.ApplyConfiguration(updatedConfiguration);
+
+            if (string.IsNullOrEmpty(_configuration.PersistencePath) == false)
+            {
+                CheckpointPersistentMessageQueues(mqd);
+            }
+        }
+
+        private static void ThrowIfPersistenceChanged(SingleMessageQueueServer messageQueue, CMqQueueConfiguration queueConfiguration)
+        {
+            if (messageQueue.Configuration.PersistenceScheme != queueConfiguration.PersistenceScheme)
+            {
+                throw new CMqQueuePersistenceChangeException($"The PersistenceScheme of [{messageQueue.Configuration.QueueName}] cannot be changed from"
+                    + $" [{messageQueue.Configuration.PersistenceScheme}] to [{queueConfiguration.PersistenceScheme}].");
+            }
+        }
+
+        /// <summary>
+        /// Creates a new empty queue, or optionally applies the configuration if the queue already exists.
+        /// </summary>
+        private void CreateQueueInternal(CMqQueueConfiguration queueConfiguration, bool updateExisting)
         {
             if (string.IsNullOrEmpty(queueConfiguration.QueueName))
             {
@@ -1027,7 +1127,14 @@ namespace NTDLS.CatMQ.Server
             _messageQueues.Write(mqd =>
             {
                 string queueKey = queueConfiguration.QueueName.ToLowerInvariant();
-                if (mqd.ContainsKey(queueKey) == false)
+                if (mqd.TryGetValue(queueKey, out var existingQueue))
+                {
+                    if (updateExisting)
+                    {
+                        UpdateExistingQueue(mqd, existingQueue, queueConfiguration);
+                    }
+                }
+                else
                 {
                     if (queueConfiguration.PersistenceScheme == CMqPersistenceScheme.Persistent
                         && string.IsNullOrEmpty(_configuration.PersistencePath))
@@ -1051,7 +1158,7 @@ namespace NTDLS.CatMQ.Server
                         if (queueConfiguration.DeadLetterConfiguration != null)
                         {
                             var dlqConfig = queueConfiguration.DeadLetterConfiguration.ToConfiguration(queueConfiguration.QueueName);
-                            CreateQueueInternal(dlqConfig);
+                            CreateQueueInternal(dlqConfig, updateExisting: true);
                         }
 
                         if (string.IsNullOrEmpty(_configuration.PersistencePath) == false)
@@ -1149,9 +1256,469 @@ namespace NTDLS.CatMQ.Server
         /// <summary>
         /// Creates a subscription to a queue for a given connection id.
         /// </summary>
-        internal void Subscribe(Guid subscriberId, IPEndPoint? localEndpoint, IPEndPoint? remoteEndpoint, string queueName, TimeSpan? timeout = null)
+        internal void Subscribe(Guid subscriberId, IPEndPoint? localEndpoint, IPEndPoint? remoteEndpoint, string queueName, string? consumerName = null, TimeSpan? timeout = null)
         {
-            OnLog?.Invoke(this, CMqErrorLevel.Verbose, $"Subscribing connection [{subscriberId}] to queue: [{queueName}].");
+            AddSubscriber(queueName, new CMqSubscriberDescriptor(subscriberId, new TcpDeliveryTransport(this, subscriberId), consumerName)
+            {
+                LocalAddress = localEndpoint?.Address?.ToString(),
+                RemoteAddress = remoteEndpoint?.Address?.ToString(),
+                LocalPort = localEndpoint?.Port,
+                RemotePort = remoteEndpoint?.Port
+            }, timeout);
+        }
+
+        #region Message inspection.
+
+        /// <summary>
+        /// Returns a copy of a queue's configuration.
+        /// </summary>
+        public CMqQueueConfiguration GetQueueConfiguration(string queueName)
+        {
+            var configuration = GetQueueOrThrow(queueName).Configuration;
+            return JsonSerializer.Deserialize<CMqQueueConfiguration>(JsonSerializer.Serialize(configuration))
+                ?? throw new Exception($"Failed to copy the configuration for [{queueName}].");
+        }
+
+        private static CMqEnqueuedMessageDescriptor ToDescriptor(EnqueuedMessage message)
+        {
+            return new CMqEnqueuedMessageDescriptor(message.SerialNumber)
+            {
+                MessageId = message.MessageId,
+                Timestamp = message.Timestamp,
+                MessageType = message.MessageType,
+                ContentType = message.ContentType,
+                Headers = message.Headers,
+                BodyIsBase64 = message.BodyIsBase64,
+                Body = message.Body,
+                DeferredUntil = message.DeferredUntil,
+                DeferredDeliveryCount = message.DeferredCount
+            };
+        }
+
+        /// <summary>
+        /// Lists messages in serial number order, without consuming them. Pass the last serial number of one page to
+        /// get the next, which unlike an offset does not have to walk through everything before it.
+        /// </summary>
+        public IReadOnlyList<CMqEnqueuedMessageDescriptor> GetMessagesAfter(string queueName, ulong? afterSerialNumber, int take)
+        {
+            var messageQueue = GetQueueOrThrow(queueName);
+
+            return messageQueue.EnqueuedMessages.Read(m =>
+            {
+                var result = new List<CMqEnqueuedMessageDescriptor>();
+
+                if (m.Database != null)
+                {
+                    using var iterator = m.Database.NewIterator();
+                    if (afterSerialNumber != null)
+                    {
+                        iterator.Seek((afterSerialNumber.Value + 1).ToKey());
+                    }
+                    else
+                    {
+                        iterator.SeekToFirst();
+                    }
+
+                    for (; iterator.Valid() && result.Count < take; iterator.Next())
+                    {
+                        var message = JsonSerializer.Deserialize<EnqueuedMessage>(iterator.StringValue());
+                        if (message != null)
+                        {
+                            result.Add(ToDescriptor(message));
+                        }
+                    }
+                }
+                else
+                {
+                    result.AddRange(m.MessageBuffer
+                        .Where(o => afterSerialNumber == null || o.SerialNumber > afterSerialNumber)
+                        .OrderBy(o => o.SerialNumber).Take(take).Select(ToDescriptor));
+                }
+
+                return result;
+            }) ?? [];
+        }
+
+        /// <summary>
+        /// Removes a single message from a queue. A message that is out for delivery cannot be removed.
+        /// </summary>
+        /// <returns>True if the message existed.</returns>
+        public bool DeleteMessage(string queueName, ulong serialNumber)
+        {
+            var messageQueue = GetQueueOrThrow(queueName);
+
+            return messageQueue.EnqueuedMessages.Write(m =>
+            {
+                var message = m.MessageBuffer.FirstOrDefault(o => o.SerialNumber == serialNumber);
+                if (message != null)
+                {
+                    if (message.State == CMqMessageState.OutForDelivery)
+                    {
+                        throw new CMqMessageInDeliveryException($"Message [{serialNumber}] is out for delivery.");
+                    }
+
+                    m.RemoveFromBufferAndDatabase(this, message);
+                    messageQueue.Statistics.DecrementQueueDepth();
+                    return true;
+                }
+
+                if (m.Database != null)
+                {
+                    var keyBytes = serialNumber.ToKey();
+                    if (m.Database.Get(keyBytes, keyBytes.Length) != null)
+                    {
+                        m.Database.Remove(keyBytes, keyBytes.Length);
+                        messageQueue.Statistics.DecrementQueueDepth();
+                        return true;
+                    }
+                }
+
+                return false;
+            });
+        }
+
+        /// <summary>
+        /// Moves messages from a queue's dead-letter queue back onto the queue. They keep their message ID, and start again
+        /// with no delivery attempts and a new timestamp. A failure part way through can leave a message in both queues, but never in neither.
+        /// </summary>
+        /// <param name="queueName">The name of the queue, not of its dead-letter queue.</param>
+        /// <param name="max">The most messages to move, or null to move all of them.</param>
+        /// <returns>The number of messages that were moved. Moving stops early if the queue reaches its MaxDepth.</returns>
+        public int RedriveDeadLetters(string queueName, int? max = null)
+        {
+            var deadLetterQueueName = $"{GetQueueOrThrow(queueName).Configuration.QueueName}.dlq";
+            GetQueueOrThrow(deadLetterQueueName);
+
+            int moved = 0;
+            ulong? after = null;
+
+            bool isFull = false;
+
+            while ((max == null || moved < max) && isFull == false)
+            {
+                var page = GetMessagesAfter(deadLetterQueueName, after, Math.Min(max - moved ?? 500, 500));
+                if (page.Count == 0)
+                {
+                    break;
+                }
+
+                foreach (var message in page)
+                {
+                    after = message.SerialNumber;
+
+                    try
+                    {
+                        EnqueueInternal(queueName, null, message.MessageType, message.Body, message.ContentType,
+                            message.Headers, message.BodyIsBase64, null, message.MessageId);
+                        DeleteMessage(deadLetterQueueName, message.SerialNumber);
+                        moved++;
+                    }
+                    catch (CMqMessageInDeliveryException)
+                    {
+                        //A consumer of the dead-letter queue has this one, and the copy we just made is the safe side to fail on.
+                        moved++;
+                    }
+                    catch (CMqQueueFullException)
+                    {
+                        isFull = true;
+                        break;
+                    }
+                }
+            }
+
+            return moved;
+        }
+
+        #endregion
+
+        #region Webhooks.
+
+        private static readonly System.Text.RegularExpressions.Regex _consumerNameRegex = new("^[A-Za-z0-9._-]{1,128}$");
+
+        private void ValidateWebhook(string webhookName, CMqWebhookSettings settings)
+        {
+            if (_consumerNameRegex.IsMatch(webhookName) == false)
+            {
+                throw new ArgumentException("A webhook name may contain only letters, numbers, dots, underscores and hyphens, up to 128 of them.");
+            }
+            if (Uri.TryCreate(settings.Url, UriKind.Absolute, out var url) == false || (url.Scheme != Uri.UriSchemeHttps && url.Scheme != Uri.UriSchemeHttp))
+            {
+                throw new ArgumentException("The webhook URL must be an absolute http or https URL.");
+            }
+            if (url.Scheme == Uri.UriSchemeHttp && _configuration.AllowHttpWebhooks == false)
+            {
+                throw new ArgumentException("The webhook URL must use https. The server can be configured to allow http with AllowHttpWebhooks.");
+            }
+            if (settings.TimeoutSeconds is < 1 or > 300)
+            {
+                throw new ArgumentException("The webhook timeout must be between 1 and 300 seconds.");
+            }
+            if (settings.MaxConcurrency < 1)
+            {
+                throw new ArgumentException("The webhook's maximum concurrency must be at least 1.");
+            }
+            if (settings.Headers?.Any(o => string.IsNullOrWhiteSpace(o.Key) || o.Key.IndexOfAny(['\r', '\n', ':']) >= 0 || o.Value.IndexOfAny(['\r', '\n']) >= 0) == true)
+            {
+                throw new ArgumentException("Webhook header names must not be empty, and names and values must not contain line breaks.");
+            }
+        }
+
+        private WebhookDeliveryTransport AddWebhookTransport(SingleMessageQueueServer messageQueue, WebhookRegistration registration)
+        {
+            var transport = new WebhookDeliveryTransport(messageQueue.Configuration.QueueName, registration);
+            messageQueue.Webhooks[registration.Name] = transport;
+            AddSubscriber(messageQueue.Configuration.QueueName, new CMqSubscriberDescriptor(transport.SubscriberId, transport, registration.Name), null);
+            return transport;
+        }
+
+        /// <summary>
+        /// Creates a webhook, which POSTs each of the queue's messages to a URL, or replaces the settings of an existing one.
+        /// The webhook's name is also its consumer name.
+        /// </summary>
+        /// <param name="queueName">The queue to deliver from.</param>
+        /// <param name="webhookName">The name of the webhook.</param>
+        /// <param name="settings">Where and how to deliver.</param>
+        /// <param name="secret">The new webhook's signing secret, which is only ever given here. Null when an existing webhook was replaced, which keeps its secret.</param>
+        public CMqWebhookDescriptor PutWebhook(string queueName, string webhookName, CMqWebhookSettings settings, out string? secret)
+        {
+            ArgumentNullException.ThrowIfNull(settings);
+            ValidateWebhook(webhookName, settings);
+            var messageQueue = GetQueueOrThrow(queueName);
+
+            //A copy, so that the caller cannot change a registered webhook's settings afterwards.
+            var copy = new CMqWebhookSettings
+            {
+                Url = settings.Url,
+                TimeoutSeconds = settings.TimeoutSeconds,
+                MaxConcurrency = settings.MaxConcurrency,
+                Headers = settings.Headers == null ? null : new Dictionary<string, string>(settings.Headers),
+                Enabled = settings.Enabled
+            };
+
+            lock (messageQueue.Webhooks)
+            {
+                if (messageQueue.Webhooks.TryGetValue(webhookName, out var existing))
+                {
+                    var current = existing.Registration;
+                    existing.Registration = new WebhookRegistration
+                    {
+                        Name = webhookName,
+                        Settings = copy,
+                        Secret = current.Secret,
+                        PreviousSecret = current.PreviousSecret,
+                        PreviousSecretExpiresAt = current.PreviousSecretExpiresAt
+                    };
+                    secret = null;
+                    messageQueue.DeliveryThreadWaitEvent.Set();
+                    CheckpointPersistentMessageQueues();
+                    return existing.ToDescriptor();
+                }
+
+                if (messageQueue.LeaseConsumers.ContainsKey(webhookName))
+                {
+                    throw new ArgumentException($"The name [{webhookName}] is already used by a consumer that receives by asking for messages.");
+                }
+
+                secret = WebhookRegistration.NewSecret();
+                var transport = AddWebhookTransport(messageQueue, new WebhookRegistration { Name = webhookName, Settings = copy, Secret = secret });
+                CheckpointPersistentMessageQueues();
+                return transport.ToDescriptor();
+            }
+        }
+
+        /// <summary>
+        /// Lists a queue's webhooks, and how their deliveries have been going.
+        /// </summary>
+        public IReadOnlyList<CMqWebhookDescriptor> GetWebhooks(string queueName)
+            => GetQueueOrThrow(queueName).Webhooks.Values.Select(o => o.ToDescriptor()).OrderBy(o => o.Name, StringComparer.Ordinal).ToList();
+
+        /// <summary>
+        /// Gets a webhook, or null if the queue has none by that name.
+        /// </summary>
+        public CMqWebhookDescriptor? GetWebhook(string queueName, string webhookName)
+            => GetQueueOrThrow(queueName).Webhooks.TryGetValue(webhookName, out var transport) ? transport.ToDescriptor() : null;
+
+        /// <summary>
+        /// Deletes a webhook. Deliveries to it that are in progress finish.
+        /// </summary>
+        /// <returns>True if the webhook existed.</returns>
+        public bool DeleteWebhook(string queueName, string webhookName)
+        {
+            var messageQueue = GetQueueOrThrow(queueName);
+            if (messageQueue.Webhooks.TryRemove(webhookName, out var transport) == false)
+            {
+                return false;
+            }
+
+            Unsubscribe(transport.SubscriberId, queueName);
+            messageQueue.DeliveryThreadWaitEvent.Set();
+            CheckpointPersistentMessageQueues();
+            return true;
+        }
+
+        /// <summary>
+        /// Replaces a webhook's signing secret. For the next 24 hours deliveries are signed with both the new and the old
+        /// secret, so that the receiver can be moved to the new one without rejecting deliveries in between.
+        /// </summary>
+        /// <returns>The new secret, or null if the queue has no webhook by that name.</returns>
+        public string? RotateWebhookSecret(string queueName, string webhookName)
+        {
+            var messageQueue = GetQueueOrThrow(queueName);
+
+            lock (messageQueue.Webhooks)
+            {
+                if (messageQueue.Webhooks.TryGetValue(webhookName, out var transport) == false)
+                {
+                    return null;
+                }
+
+                var current = transport.Registration;
+                var secret = WebhookRegistration.NewSecret();
+                transport.Registration = new WebhookRegistration
+                {
+                    Name = current.Name,
+                    Settings = current.Settings,
+                    Secret = secret,
+                    PreviousSecret = current.Secret,
+                    PreviousSecretExpiresAt = DateTime.UtcNow.AddHours(24)
+                };
+                CheckpointPersistentMessageQueues();
+                return secret;
+            }
+        }
+
+        #endregion
+
+        #region Leases.
+
+        private SingleMessageQueueServer GetQueueOrThrow(string queueName)
+        {
+            string queueKey = queueName.ToLowerInvariant();
+            return _messageQueues.Read(mqd => mqd.TryGetValue(queueKey, out var messageQueue) ? messageQueue : null)
+                ?? throw new CMqQueueNotFoundException(queueName);
+        }
+
+        private LeaseDeliveryTransport GetOrAddLeaseConsumer(SingleMessageQueueServer messageQueue, string consumerName, bool persist = true)
+        {
+            var created = new LeaseDeliveryTransport(_leases, () => messageQueue.DeliveryThreadWaitEvent.Set());
+            if (messageQueue.Webhooks.ContainsKey(consumerName))
+            {
+                throw new ArgumentException($"The name [{consumerName}] is already used by a webhook.");
+            }
+
+            var transport = messageQueue.LeaseConsumers.GetOrAdd(consumerName, created);
+
+            if (ReferenceEquals(transport, created))
+            {
+                AddSubscriber(messageQueue.Configuration.QueueName,
+                    new CMqSubscriberDescriptor(transport.SubscriberId, transport, consumerName), null);
+
+                if (persist)
+                {
+                    CheckpointPersistentMessageQueues();
+                }
+            }
+
+            return transport;
+        }
+
+        /// <summary>
+        /// Leases up to max messages to a named consumer, which is registered with the queue if this is its first request.
+        /// Returns as soon as there are messages, or an empty list if none arrive in time. The number returned is also
+        /// limited by the queue's free delivery slots. Each message must be acknowledged before its lease expires.
+        /// Delivery is at-least-once: an unacknowledged message is delivered again after its lease expires or after a restart.
+        /// </summary>
+        /// <param name="queueName">The name of the queue.</param>
+        /// <param name="consumerName">The stable name of the consumer. Requests with the same name compete for messages.</param>
+        /// <param name="max">The most messages to return.</param>
+        /// <param name="wait">How long to wait for a message. Defaults to 20 seconds.</param>
+        /// <param name="leaseDuration">How long the consumer has to acknowledge each message. Defaults to 60 seconds.</param>
+        /// <param name="cancellationToken">Cancels the request. Any messages already leased to it go back to the queue.</param>
+        public async Task<IReadOnlyList<CMqLeasedMessage>> ReceiveAsync(string queueName, string consumerName, int max = 1,
+            TimeSpan? wait = null, TimeSpan? leaseDuration = null, CancellationToken cancellationToken = default)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(consumerName);
+            ArgumentOutOfRangeException.ThrowIfLessThan(max, 1);
+
+            var effectiveWait = wait ?? TimeSpan.FromSeconds(20);
+            var effectiveLeaseDuration = leaseDuration ?? TimeSpan.FromSeconds(60);
+            ArgumentOutOfRangeException.ThrowIfLessThan(effectiveWait, TimeSpan.Zero, nameof(wait));
+            ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(effectiveLeaseDuration, TimeSpan.Zero, nameof(leaseDuration));
+
+            var messageQueue = GetQueueOrThrow(queueName);
+            var transport = GetOrAddLeaseConsumer(messageQueue, consumerName);
+
+            using var linkedToken = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, messageQueue.ShutdownToken);
+            try
+            {
+                return await transport.ReceiveAsync(max, effectiveWait, effectiveLeaseDuration, linkedToken.Token);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested == false)
+            {
+                return []; //The queue is shutting down or was deleted.
+            }
+        }
+
+        /// <summary>
+        /// Reports what happened to a leased message and frees its delivery slot. Repeating an acknowledgment is safe.
+        /// </summary>
+        public CMqLeaseStatus AcknowledgeLease(string leaseId, CMqConsumeResult result)
+        {
+            ArgumentNullException.ThrowIfNull(result);
+            return _leases.Acknowledge(leaseId, result);
+        }
+
+        /// <summary>
+        /// Gives a consumer more time, from now, to work on a leased message.
+        /// </summary>
+        public CMqLeaseStatus ExtendLease(string leaseId, TimeSpan duration, out DateTime expiresAt)
+        {
+            ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(duration, TimeSpan.Zero);
+            return _leases.Extend(leaseId, duration, out expiresAt);
+        }
+
+        /// <summary>
+        /// Removes a consumer that receives by asking for messages, so that queues stop waiting for it.
+        /// Messages leased to it go back to the queue.
+        /// </summary>
+        /// <returns>True if the consumer existed.</returns>
+        public bool RemoveLeaseConsumer(string queueName, string consumerName)
+        {
+            var messageQueue = GetQueueOrThrow(queueName);
+
+            if (messageQueue.LeaseConsumers.TryRemove(consumerName, out var transport) == false)
+            {
+                return false;
+            }
+
+            Unsubscribe(transport.SubscriberId, queueName);
+            transport.Close();
+            _leases.ReleaseOwnedBy(transport);
+            messageQueue.DeliveryThreadWaitEvent.Set();
+            CheckpointPersistentMessageQueues();
+            return true;
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Adds a consumer that receives messages through the given transport rather than through a TCP connection.
+        /// Consumers that share a name compete for messages, including those connected with the native TCP protocol.
+        /// </summary>
+        /// <returns>The subscriber ID, which removes the consumer when it is passed to Unsubscribe.</returns>
+        public Guid AddConsumer(string queueName, string consumerName, ICMqDeliveryTransport transport, TimeSpan? timeout = null)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(consumerName);
+            ArgumentNullException.ThrowIfNull(transport);
+
+            var subscriberId = Guid.NewGuid();
+            AddSubscriber(queueName, new CMqSubscriberDescriptor(subscriberId, transport, consumerName), timeout);
+            return subscriberId;
+        }
+
+        private void AddSubscriber(string queueName, CMqSubscriberDescriptor subscriber, TimeSpan? timeout)
+        {
+            OnLog?.Invoke(this, CMqErrorLevel.Verbose, $"Subscribing [{subscriber.SubscriberId}] to queue: [{queueName}] using [{subscriber.TransportName}].");
 
             string queueKey = queueName.ToLowerInvariant();
 
@@ -1173,21 +1740,14 @@ namespace NTDLS.CatMQ.Server
                     {
                         success = messageQueue.Subscribers.TryWrite(CMqDefaults.DEFAULT_TRY_WAIT_MS, s =>
                         {
-                            if (s.ContainsKey(subscriberId) == false)
-                            {
-                                s.Add(subscriberId, new CMqSubscriberDescriptor(subscriberId)
-                                {
-                                    LocalAddress = localEndpoint?.Address?.ToString(),
-                                    RemoteAddress = remoteEndpoint?.Address?.ToString(),
-                                    LocalPort = localEndpoint?.Port,
-                                    RemotePort = remoteEndpoint?.Port
-                                });
-                            }
+                            s.TryAdd(subscriber.SubscriberId, subscriber);
                         }) && success;
+
+                        messageQueue.DeliveryThreadWaitEvent.Set();
                     }
                     else
                     {
-                        throw new Exception("The specified queue does not exist.");
+                        throw new CMqQueueNotFoundException(queueName);
                     }
                 });
 
@@ -1248,15 +1808,26 @@ namespace NTDLS.CatMQ.Server
         /// <summary>
         /// Places a message into the given queue.
         /// </summary>
-        public void Enqueue(string queueName, TimeSpan? deferDeliveryDuration, string assemblyQualifiedTypeName, string messageJson, TimeSpan? timeout = null)
+        /// <returns>The ID of the message.</returns>
+        public Guid Enqueue(string queueName, TimeSpan? deferDeliveryDuration, string? messageType, string body, string? contentType = null,
+            Dictionary<string, string>? headers = null, bool bodyIsBase64 = false, TimeSpan? timeout = null)
+            => EnqueueInternal(queueName, deferDeliveryDuration, messageType, body, contentType, headers, bodyIsBase64, timeout, Guid.NewGuid());
+
+        private static void ThrowIfQueueFull(SingleMessageQueueServer messageQueue)
         {
-            if (string.IsNullOrWhiteSpace(assemblyQualifiedTypeName))
+            var maxDepth = messageQueue.Configuration.MaxDepth;
+            if (maxDepth > 0 && messageQueue.Statistics.QueueDepth >= maxDepth)
             {
-                throw new ArgumentException("A message type is required.", nameof(assemblyQualifiedTypeName));
+                throw new CMqQueueFullException(messageQueue.Configuration.QueueName, maxDepth.Value);
             }
-            if (string.IsNullOrEmpty(messageJson))
+        }
+
+        private Guid EnqueueInternal(string queueName, TimeSpan? deferDeliveryDuration, string? messageType, string body, string? contentType,
+            Dictionary<string, string>? headers, bool bodyIsBase64, TimeSpan? timeout, Guid messageId)
+        {
+            if (string.IsNullOrEmpty(body))
             {
-                throw new ArgumentException("A message body is required.", nameof(messageJson));
+                throw new ArgumentException("A message body is required.", nameof(body));
             }
 
             OnLog?.Invoke(this, CMqErrorLevel.Verbose, $"Enqueuing message to queue: [{queueName}].");
@@ -1297,22 +1868,44 @@ namespace NTDLS.CatMQ.Server
                                     throw new Exception($"Persistence database has not been initialized for [{queueName}].");
                                 }
 
-                                var message = new EnqueuedMessage(messageQueue.Configuration.QueueName, assemblyQualifiedTypeName, messageJson, messageQueue.Statistics.GetNextSerialNumber())
+                                //Persistent publishes run in parallel, so a queue with a limit makes checking it and storing the
+                                //  message one step. Queues without a limit skip this, so that they do not pay for it.
+                                var depthLimitLock = messageQueue.Configuration.MaxDepth > 0 ? messageQueue.DepthLimitLock : null;
+                                if (depthLimitLock != null)
                                 {
-                                    MessageId = Guid.NewGuid(),
-                                    DeferDuration = deferDeliveryDuration,
-                                    DeferredUntil = deferDeliveryDuration == null ? null : DateTime.UtcNow + deferDeliveryDuration
-                                };
+                                    Monitor.Enter(depthLimitLock);
+                                }
+                                try
+                                {
+                                    ThrowIfQueueFull(messageQueue);
 
-                                var ticketDatabaseStore = Instrumentation?.CreateTicket(CMqInstrumentationEventType.PersistenceStore);
-                                //For persistent queues, the messages are only loaded into the database.
-                                //They will be buffered into the message buffer by the message queue delivery thread.
-                                messages.Database.Store(message);
-                                ticketDatabaseStore?.Accumulate();
+                                    var message = new EnqueuedMessage(messageQueue.Configuration.QueueName, messageType, body, messageQueue.Statistics.GetNextSerialNumber())
+                                    {
+                                        MessageId = messageId,
+                                        ContentType = contentType ?? CMqDefaults.DEFAULT_CONTENT_TYPE,
+                                        Headers = headers,
+                                        BodyIsBase64 = bodyIsBase64,
+                                        DeferDuration = deferDeliveryDuration,
+                                        DeferredUntil = deferDeliveryDuration == null ? null : DateTime.UtcNow + deferDeliveryDuration
+                                    };
 
-                                //Only count the message once it has actually been stored.
-                                messageQueue.Statistics.IncrementReceivedMessageCount();
-                                messageQueue.Statistics.IncrementQueueDepth();
+                                    var ticketDatabaseStore = Instrumentation?.CreateTicket(CMqInstrumentationEventType.PersistenceStore);
+                                    //For persistent queues, the messages are only loaded into the database.
+                                    //They will be buffered into the message buffer by the message queue delivery thread.
+                                    messages.Database.Store(message);
+                                    ticketDatabaseStore?.Accumulate();
+
+                                    //Only count the message once it has actually been stored.
+                                    messageQueue.Statistics.IncrementReceivedMessageCount();
+                                    messageQueue.Statistics.IncrementQueueDepth();
+                                }
+                                finally
+                                {
+                                    if (depthLimitLock != null)
+                                    {
+                                        Monitor.Exit(depthLimitLock);
+                                    }
+                                }
 
                                 messageQueue.DeliveryThreadWaitEvent.Set();
                             }) && success;
@@ -1330,9 +1923,14 @@ namespace NTDLS.CatMQ.Server
                             {
                                 ticketEnqueueMessageEphemeralWriteLock?.Accumulate();
 
-                                var message = new EnqueuedMessage(messageQueue.Configuration.QueueName, assemblyQualifiedTypeName, messageJson, messageQueue.Statistics.GetNextSerialNumber())
+                                ThrowIfQueueFull(messageQueue); //The write lock already makes this exact.
+
+                                var message = new EnqueuedMessage(messageQueue.Configuration.QueueName, messageType, body, messageQueue.Statistics.GetNextSerialNumber())
                                 {
-                                    MessageId = Guid.NewGuid(),
+                                    MessageId = messageId,
+                                    ContentType = contentType ?? CMqDefaults.DEFAULT_CONTENT_TYPE,
+                                    Headers = headers,
+                                    BodyIsBase64 = bodyIsBase64,
                                     DeferDuration = deferDeliveryDuration,
                                     DeferredUntil = deferDeliveryDuration == null ? null : DateTime.UtcNow + deferDeliveryDuration
                                 };
@@ -1354,14 +1952,14 @@ namespace NTDLS.CatMQ.Server
                     }
                     else
                     {
-                        throw new Exception($"Queue not found: [{queueName}].");
+                        throw new CMqQueueNotFoundException(queueName);
                     }
                 });
 
                 if (success)
                 {
                     ticketEnqueueMessage?.Accumulate();
-                    return;
+                    return messageId;
                 }
 
                 var ticketDeadlockAvoidance = Instrumentation?.CreateTicket(CMqInstrumentationEventType.DeadlockAvoidance);
@@ -1413,7 +2011,7 @@ namespace NTDLS.CatMQ.Server
                     }
                     else
                     {
-                        throw new Exception($"Queue not found: [{queueName}].");
+                        throw new CMqQueueNotFoundException(queueName);
                     }
                 });
 

@@ -1,17 +1,44 @@
-﻿namespace NTDLS.CatMQ.Server.Management
+using System.Security.Cryptography;
+using System.Text;
+
+namespace NTDLS.CatMQ.Server.Management
 {
     /// <summary>
     /// Contains information about queue subscribers.
     /// </summary>
     public class CMqSubscriberDescriptor
     {
-        internal CMqSubscriberDescriptor(Guid subscriberId)
+        internal CMqSubscriberDescriptor(Guid subscriberId, ICMqDeliveryTransport transport, string? consumerName = null)
         {
             SubscriberId = subscriberId;
+            Transport = transport;
+            ConsumerName = consumerName;
+            ConsumerId = consumerName == null ? subscriberId : new Guid(MD5.HashData(Encoding.UTF8.GetBytes(consumerName)));
         }
 
         /// <summary>
-        /// The unique id of the subscriber, synonymous with ConnectionId.
+        /// Carries messages to this subscriber.
+        /// </summary>
+        internal ICMqDeliveryTransport Transport { get; }
+
+        /// <summary>
+        /// The name of the transport that carries messages to this subscriber, such as "tcp".
+        /// </summary>
+        public string TransportName => Transport.Name;
+
+        /// <summary>
+        /// The name that the consumer chose. Null when it is identified only by its connection.
+        /// </summary>
+        public string? ConsumerName { get; internal set; }
+
+        /// <summary>
+        /// The identity used to track which consumers have received a message. It is derived from ConsumerName
+        /// so that it is the same across connections, and otherwise is the same as SubscriberId.
+        /// </summary>
+        public Guid ConsumerId { get; internal set; }
+
+        /// <summary>
+        /// The unique id of the subscriber. For a subscriber connected with the native TCP protocol this is its ConnectionId.
         /// </summary>
         public Guid SubscriberId { get; internal set; }
 

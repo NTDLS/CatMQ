@@ -7,7 +7,7 @@
 @section Scripts {
     <script>
         async function onDeleteAccount(accountId, username) {
-            const url = `/ui/DeleteAccount/${accountId}`;
+            const url = `/api/v1/accounts/${accountId}`;
             const message = fmt(@Json.Serialize(Localize("Deleting account '{0}' will also remove any associated API keys. Continue?")), username);
 
             const ok = await showConfirmModal(message);
@@ -15,10 +15,11 @@
 
             try {
                 const response = await fetch(url, {
-                    method: "POST",
+                    method: "DELETE",
                     credentials: 'same-origin',
                     headers: {
                         "Accept": "application/json",
+                        "x-catmq-ui": "1"
                     }
                 });
 
@@ -35,7 +36,7 @@
         }
 
         async function onDeleteAPIKey(accountId, apiKeyId) {
-            const url = `/ui/DeleteAPIKey/${accountId}/${apiKeyId}`;
+            const url = `/api/v1/accounts/${accountId}/api-keys/${apiKeyId}`;
             const message = fmt(@Json.Serialize(Localize("Deleting API key '{0}' is not reversible. Continue?")), apiKeyId);
 
             const ok = await showConfirmModal(message);
@@ -43,10 +44,11 @@
 
             try {
                 const response = await fetch(url, {
-                    method: "POST",
+                    method: "DELETE",
                     credentials: 'same-origin',
                     headers: {
                         "Accept": "application/json",
+                        "x-catmq-ui": "1"
                     }
                 });
 

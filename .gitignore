@@ -100,3 +100,8 @@ Test.QueueClientAutoReconnect/bin/
 Installers/publish/
 
 Installers/packages/
+
+samples/dotnet-tcp/bin/
+samples/dotnet-tcp/obj/
+samples/dotnet-http/bin/
+samples/dotnet-http/obj/

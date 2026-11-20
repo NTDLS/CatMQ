@@ -17,7 +17,7 @@
 @section Scripts {
     <script>
         async function onCompact() {
-            const url = `/ui/LohCollect`;
+            const url = `/api/v1/system/gc`;
             const message = @Json.Serialize(Localize("Forcing an aggressive collection will release unused memory but can cause temporary performance issues. Continue?"));
 
             const ok = await showConfirmModal(message);
@@ -29,6 +29,7 @@
                     credentials: 'same-origin',
                     headers: {
                         "Accept": "application/json",
+                        "x-catmq-ui": "1"
                     }
                 });
 

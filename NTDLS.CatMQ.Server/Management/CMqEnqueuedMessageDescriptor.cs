@@ -1,4 +1,6 @@
-﻿namespace NTDLS.CatMQ.Server.Management
+using NTDLS.CatMQ.Shared;
+
+namespace NTDLS.CatMQ.Server.Management
 {
     /// <summary>
     /// Contains readonly information about messages and various statistics.
@@ -21,14 +23,29 @@
         public DateTime Timestamp { get; internal set; } = DateTime.UtcNow;
 
         /// <summary>
-        /// The full assembly qualified name of the type of MessageJson.
+        /// The name of the message type. Null when the publisher did not supply one.
         /// </summary>
-        public string AssemblyQualifiedTypeName { get; internal set; } = string.Empty;
+        public string? MessageType { get; internal set; }
+
+        /// <summary>
+        /// The media type of the body.
+        /// </summary>
+        public string ContentType { get; internal set; } = CMqDefaults.DEFAULT_CONTENT_TYPE;
+
+        /// <summary>
+        /// Optional application-defined headers.
+        /// </summary>
+        public Dictionary<string, string>? Headers { get; internal set; }
+
+        /// <summary>
+        /// Whether the body is base64 encoded binary content.
+        /// </summary>
+        public bool BodyIsBase64 { get; internal set; }
 
         /// <summary>
         /// The message payload that needs to be sent to the subscriber.
         /// </summary>
-        public string MessageJson { get; internal set; } = string.Empty;
+        public string Body { get; internal set; } = string.Empty;
 
         /// <summary>
         /// The number of subscribers expecting to receive this message.

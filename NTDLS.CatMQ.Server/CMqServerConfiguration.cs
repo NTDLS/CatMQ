@@ -46,5 +46,22 @@ namespace NTDLS.CatMQ.Server
         /// The number historical datapoints to retain per queue.
         /// </summary>
         public int MaxHistoricalStatisticsDatapoints { get; set; } = CMqDefaults.DEFAULT_MAX_HISTORICAL_STATISTICS_DATAPOINTS;
+
+        /// <summary>
+        /// How hard to compress frames that are at least CompressionThreshold bytes. Use NoCompression to turn compression off.
+        /// The other side reads frames whatever its own setting is.
+        /// </summary>
+        public System.IO.Compression.CompressionLevel CompressionLevel { get; set; } = CMqDefaults.DEFAULT_COMPRESSION_LEVEL;
+
+        /// <summary>
+        /// Frames smaller than this many bytes are not compressed, because compressing them costs more time than the bytes it saves.
+        /// </summary>
+        public int CompressionThreshold { get; set; } = CMqDefaults.DEFAULT_COMPRESSION_THRESHOLD;
+
+        /// <summary>
+        /// Whether webhooks may use plain http URLs. When false, only https URLs are accepted, so that messages and the
+        /// headers sent with them (which can include credentials) are encrypted on their way to the receiver.
+        /// </summary>
+        public bool AllowHttpWebhooks { get; set; } = false;
     }
 }

@@ -13,6 +13,23 @@ namespace NTDLS.CatMQ.Client
         public bool AutoReconnect { get; set; } = CMqDefaults.DEFAULT_AUTO_RECONNECT;
 
         /// <summary>
+        /// How hard to compress frames that are at least CompressionThreshold bytes. Use NoCompression to turn compression off.
+        /// The other side reads frames whatever its own setting is.
+        /// </summary>
+        public System.IO.Compression.CompressionLevel CompressionLevel { get; set; } = CMqDefaults.DEFAULT_COMPRESSION_LEVEL;
+
+        /// <summary>
+        /// Frames smaller than this many bytes are not compressed, because compressing them costs more time than the bytes it saves.
+        /// </summary>
+        public int CompressionThreshold { get; set; } = CMqDefaults.DEFAULT_COMPRESSION_THRESHOLD;
+
+        /// <summary>
+        /// A stable name for this consumer. Clients that share a name act as competing workers for one consumer,
+        /// so each message goes to one of them. When null, the consumer is identified by its connection.
+        /// </summary>
+        public string? ConsumerName { get; set; }
+
+        /// <summary>
         /// The default amount of time to wait for a query to reply before throwing a timeout exception.
         /// </summary>
         public TimeSpan QueryTimeout { get; set; } = TimeSpan.FromSeconds(CMqDefaults.DEFAULT_ACK_TIMEOUT_SECONDS);

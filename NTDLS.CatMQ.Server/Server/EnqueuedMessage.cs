@@ -6,7 +6,7 @@ namespace NTDLS.CatMQ.Server.Server
     /// <summary>
     /// A message that is in the queue and waiting to be delivered to all subscribers.
     /// </summary>
-    internal class EnqueuedMessage(string queueName, string assemblyQualifiedTypeName, string messageJson, ulong serialNumber)
+    internal class EnqueuedMessage(string queueName, string? messageType, string body, ulong serialNumber)
     {
         [JsonIgnore]
         public CMqMessageState State { get; set; } = CMqMessageState.Ready;
@@ -49,14 +49,55 @@ namespace NTDLS.CatMQ.Server.Server
         public TimeSpan? DeferDuration { get; set; }
 
         /// <summary>
-        /// The full assembly qualified name of the type of MessageJson.
+        /// The name of the message type, which is optional and meaningful only to publishers and consumers.
         /// </summary>
-        public string AssemblyQualifiedTypeName { get; set; } = assemblyQualifiedTypeName;
+        public string? MessageType { get; set; } = messageType;
+
+        /// <summary>
+        /// The media type of the body.
+        /// </summary>
+        public string ContentType { get; set; } = CMqDefaults.DEFAULT_CONTENT_TYPE;
+
+        /// <summary>
+        /// Optional application-defined headers.
+        /// </summary>
+        public Dictionary<string, string>? Headers { get; set; }
+
+        /// <summary>
+        /// Whether the body is base64 encoded binary content.
+        /// </summary>
+        public bool BodyIsBase64 { get; set; }
+
+        /// <summary>
+        /// Reads MessageType from messages persisted by older versions. It is never written.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? AssemblyQualifiedTypeName
+        {
+            get => null;
+            set => MessageType ??= value;
+        }
 
         /// <summary>
         /// The message payload that needs to be sent to the subscriber.
         /// </summary>
-        public string MessageJson { get; set; } = messageJson;
+        public string Body { get; set; } = body;
+
+        /// <summary>
+        /// Reads Body from messages persisted by older versions. It is never written.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? MessageJson
+        {
+            get => null;
+            set
+            {
+                if (value != null)
+                {
+                    Body = value;
+                }
+            }
+        }
 
         /// <summary>
         /// Dictionary of subscriber IDs and any per-subscriber statistics.
@@ -84,8 +125,11 @@ namespace NTDLS.CatMQ.Server.Server
 
         public EnqueuedMessage CloneForDeadLetter(string queueName, ulong serialNumber)
         {
-            return new EnqueuedMessage(queueName, AssemblyQualifiedTypeName, MessageJson, serialNumber)
+            return new EnqueuedMessage(queueName, MessageType, Body, serialNumber)
             {
+                ContentType = ContentType,
+                Headers = Headers,
+                BodyIsBase64 = BodyIsBase64,
                 MessageId = MessageId,
                 Timestamp = Timestamp,
                 DeferredCount = DeferredCount

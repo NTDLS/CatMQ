@@ -23,7 +23,8 @@ namespace CatMQ.Service
                 MaxReceiveBufferSize = serviceConfiguration.MaxReceiveBufferSize,
                 AcknowledgmentTimeoutSeconds = serviceConfiguration.AcknowledgmentTimeoutSeconds,
                 ReceiveBufferGrowthRate = serviceConfiguration.ReceiveBufferGrowthRate,
-                EnableInstrumentation = serviceConfiguration.EnableInstrumentation
+                EnableInstrumentation = serviceConfiguration.EnableInstrumentation,
+                AllowHttpWebhooks = serviceConfiguration.AllowHttpWebhooks
             });
             _mqServer.OnLog += MqServer_OnLog;
 
@@ -44,6 +45,8 @@ namespace CatMQ.Service
                     .AddCookie("CookieAuth", options =>
                     {
                         options.Cookie.Name = "CatMQAuth";
+                        options.Cookie.SameSite = SameSiteMode.Lax; //Browsers do not send it with requests that other sites make, other than links.
+                        options.Cookie.HttpOnly = true;
                         options.LoginPath = "/Login";
                     });
 
@@ -85,10 +88,21 @@ namespace CatMQ.Service
 
                 if (serviceConfiguration.EnableWebApi)
                 {
+                    builder.Services.AddSingleton<Api.IdempotencyStore>();
                     builder.Services.AddControllers()
                         .AddJsonOptions(options =>
                     {
                         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+                    })
+                        .ConfigureApiBehaviorOptions(options =>
+                    {
+                        //The API reports every error in the same format, including requests that cannot be parsed.
+                        var defaultResponse = options.InvalidModelStateResponseFactory;
+                        options.InvalidModelStateResponseFactory = context =>
+                            context.HttpContext.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase)
+                                ? Api.Problems.InvalidRequest("The request is not valid.",
+                                    string.Join(" ", context.ModelState.Values.SelectMany(o => o.Errors).Select(o => o.ErrorMessage)))
+                                : defaultResponse(context);
                     });
                 }
 
@@ -99,6 +113,9 @@ namespace CatMQ.Service
                 app.UseRequestLocalization(app.Services.GetRequiredService<IOptions<RequestLocalizationOptions>>().Value);
 
                 app.UseRouting();
+
+                //Before the API key check, because the web UI uses the API with its login session.
+                app.UseAuthentication();
 
                 if (serviceConfiguration.EnableWebApi)
                 {
@@ -115,7 +132,6 @@ namespace CatMQ.Service
                 }
 
                 //app.UseHttpsRedirection();
-                app.UseAuthentication();
                 app.UseAuthorization();
                 app.MapStaticAssets();
                 app.UseStaticFiles();
